@@ -1,0 +1,54 @@
+# OSWAGOTech WiFi — System Handoff & Context
+
+You are my Senior Developer. Read this entire document carefully. It contains the complete state of a project we built together, the architecture rules we must never break, and exactly what to do next.
+
+## 1. PROJECT OVERVIEW
+We are building **OSWAGOTech WiFi**, a multi-tenant hotspot billing SaaS for hotels and guest houses in Tanzania. 
+- **Business Model:** Voucher-based. Guests buy a paper code at reception, enter it on a captive portal, and get WiFi for a set time and speed.
+- **Market:** Tanzania (TZ). Timezone is strictly EAT (UTC+3).
+- **Stack:** Node.js/Express + Supabase (Postgres) backend. React 18 + Vite frontend. No TypeScript. No ORMs. Raw SQL and PL/pgSQL.
+
+## 2. THE ARCHITECTURE (NEVER BREAK THESE RULES)
+- **3 Frontends:**
+  1. Portal (`localhost:3000`): Guest facing. No login. Redeems vouchers.
+  2. Tenant Panel (`localhost:3001`): Hotel owner facing. Manages packages, routers, vouchers, sessions.
+  3. Platform Panel (`localhost:3002`): You (SaaS owner). Manages tenants, monitors hardware, impersonates tenants.
+- **1 Backend:** (`localhost:5001`). 
+- **The Router Adapter:** We never talk directly to hardware. We use `services/routers/routerFactory.js` which returns `MockRouter.js` (currently) or `MikroTikRouter.js` (future).
+- **Security:**
+  - Two JWT secrets (`JWT_SECRET` for tenants, `ADMIN_JWT_SECRET` for platform). They must be 32+ chars and never equal. `config/env.js` enforces this on boot.
+  - Passwords are hashed with bcrypt. Router API passwords are encrypted with AES-256-GCM in `utils/encryption.js`.
+  - Strict input validation via `utils/validators.js`.
+  - `tenant_id` is ALWAYS extracted from the JWT, NEVER from the request body.
+- **Data Format:** Speed is stored in Kbps. Duration is stored in minutes. The UI accepts Mbps/Hours and converts them.
+
+## 3. WHAT WE HAVE BUILT (100% COMPLETE)
+The entire software layer is complete and working.
+- **Database:** 10 tables (platform_admins, tenants, tenant_users, routers, packages, payments, vouchers, sessions, impersonation_sessions, platform_audit_logs) with RLS and atomic RPCs.
+- **Backend APIs:**
+  - Platform: Login, create tenant, list tenants, suspend, impersonate, view global routers/sessions/audit logs.
+  - Tenant: Login, create packages, register routers, generate vouchers, view live sessions, disconnect guests.
+  - Portal: Get hotel info, redeem voucher (which triggers the MockRouter).
+- **Frontend UIs:** 
+  - Platform Panel: Complete with tables, create tenant modal, and impersonation button.
+  - Tenant Panel: Complete with package creation, voucher generation grid, router registration (shows portal URL), and live session viewing.
+  - Portal: Complete with a beautiful "Connected!" green screen.
+
+## 4. WHAT IS LEFT TO DO
+We are currently in the final polish phase before buying hardware.
+1. **Impersonation Banner:** We just added the backend flow, but the Tenant Panel needs to show a yellow banner at the top when an Admin is impersonating them.
+2. **Hardware:** Buying the MikroTik router and Access Point.
+3. **MikroTikRouter.js:** Writing the real `node-routeros` code to replace the Mock.
+4. **WireGuard VPN:** Connecting the VPS to the hotel's router.
+5. **Deployment:** Moving from `localhost` to real domains (portal.domain.com, etc.).
+
+## 5. HOW WE WORK
+- Give me FULL files, not diffs.
+- Do not change security or authorization logic without explaining why.
+- If a file has not been provided, ask for it. Do not guess.
+- No emoji in code. Use clear, professional comments.
+
+## 6. CURRENT IMMEDIATE NEXT STEP
+I need to implement the **Impersonation Banner** in the Tenant Panel. The backend sends a JWT with `impersonation_token_id`, and the frontend needs to show a yellow warning bar and an "End Impersonation" button.
+
+Acknowledge this handoff, confirm you understand the architecture, and ask me what file we are writing next.
