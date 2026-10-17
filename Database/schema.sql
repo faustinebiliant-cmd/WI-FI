@@ -182,15 +182,24 @@ END;
 $$;
 
 -- ==========================================
--- INDEXES FOR PERFORMANCE
+-- INDEXES FOR PERFORMANCE & PAGINATION
 -- ==========================================
+-- Base indexes (tenant scoping)
 CREATE INDEX idx_tenant_users_tenant ON public.tenant_users(tenant_id);
 CREATE INDEX idx_routers_tenant ON public.routers(tenant_id);
 CREATE INDEX idx_packages_tenant ON public.packages(tenant_id);
 CREATE INDEX idx_vouchers_tenant ON public.vouchers(tenant_id);
-CREATE INDEX idx_vouchers_code ON public.vouchers(tenant_id, code);
 CREATE INDEX idx_sessions_tenant ON public.sessions(tenant_id);
+
+-- Lookup indexes
+CREATE INDEX idx_vouchers_code ON public.vouchers(tenant_id, code);
 CREATE INDEX idx_sessions_active ON public.sessions(tenant_id, ended_at);
+
+-- Sorting indexes for Pagination (Newest first)
+CREATE INDEX idx_packages_tenant_created ON public.packages(tenant_id, created_at DESC);
+CREATE INDEX idx_vouchers_tenant_created ON public.vouchers(tenant_id, created_at DESC);
+CREATE INDEX idx_sessions_tenant_started ON public.sessions(tenant_id, started_at DESC);
+CREATE INDEX idx_audit_created ON public.platform_audit_logs(created_at DESC);
 
 -- ==========================================
 -- ENABLE ROW LEVEL SECURITY (RLS)
