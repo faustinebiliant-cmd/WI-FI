@@ -10,12 +10,14 @@ const { listPackages, createPackage, deletePackage } = require('../controllers/t
 const { listRouters, createRouter } = require('../controllers/tenantRouterController');
 const { generateVouchers, listVouchers, revokeVoucher } = require('../controllers/tenantVoucherController');
 const { getActiveSessions, disconnectSession } = require('../controllers/tenantSessionController');
+const { getDashboardStats } = require('../controllers/tenantDashboardController');
 
 // --- Public Routes ---
 router.post('/auth/login', login);
 
 // --- Protected Routes (Require Auth) ---
 router.use(authTenant);
+router.get('/dashboard', getDashboardStats);
 
 // Auth Helpers
 router.post('/auth/end-impersonation', endImpersonationSelf);
