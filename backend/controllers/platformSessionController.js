@@ -1,10 +1,10 @@
 const supabase = require('../config/supabase');
 const { getRouter } = require('../services/routers/routerFactory');
+const { formatDateTimeEAT } = require('../utils/tz');
 
 // GET /api/platform/sessions
 const listAllSessions = async (req, res) => {
   try {
-    // Get all active sessions (ended_at is null)
     const { data, error } = await supabase
       .from('sessions')
       .select(`
@@ -16,7 +16,13 @@ const listAllSessions = async (req, res) => {
       .order('started_at', { ascending: false });
 
     if (error) throw error;
-    return res.status(200).json({ success: true, data });
+
+    const enriched = (data || []).map((s) => ({
+      ...s,
+      started_at_eat: formatDateTimeEAT(s.started_at),
+    }));
+
+    return res.status(200).json({ success: true, data: enriched });
   } catch (error) {
     return res.status(500).json({ success: false, error: 'Failed to list sessions' });
   }
@@ -27,7 +33,6 @@ const forceDisconnect = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 1. Get the session
     const { data: session, error } = await supabase
       .from('sessions')
       .select('*, routers(*)')
@@ -38,16 +43,14 @@ const forceDisconnect = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Session not found' });
     }
 
-    // 2. Call the router adapter to kick them off
     const router = getRouter(session.routers);
     await router.disconnectUser(session.mac_address);
 
-    // 3. Mark session as ended in the database
     await supabase
       .from('sessions')
-      .update({ 
+      .update({
         ended_at: new Date(),
-        disconnect_reason: 'Force disconnected by Platform Admin'
+        disconnect_reason: 'Force disconnected by Platform Admin',
       })
       .eq('id', id);
 

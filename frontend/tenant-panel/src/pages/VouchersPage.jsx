@@ -10,15 +10,17 @@ export default function VouchersPage() {
   const [selectedPackage, setSelectedPackage] = useState('');
   const [quantity, setQuantity] = useState(10);
   const [generatedCodes, setGeneratedCodes] = useState(null);
-  
-  // Pagination State
+  const [todayOnly, setTodayOnly] = useState(false);
+
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
   const fetchVouchers = useCallback(async (pageNumber = 1) => {
     setLoading(true);
     try {
-      const res = await apiClient.get(`/tenant/vouchers?page=${pageNumber}&limit=20`);
+      const qs = new URLSearchParams({ page: String(pageNumber), limit: '20' });
+      if (todayOnly) qs.set('today', 'true');
+      const res = await apiClient.get(`/tenant/vouchers?${qs.toString()}`);
       setVouchers(res.data.data);
       setTotalPages(res.data.pagination.pages);
       setPage(res.data.pagination.page);
@@ -27,7 +29,7 @@ export default function VouchersPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [todayOnly]);
 
   useEffect(() => {
     apiClient.get('/tenant/packages').then(res => {
@@ -55,16 +57,24 @@ export default function VouchersPage() {
           <h1>Vouchers</h1>
           <p>Generate codes to sell to your guests.</p>
         </div>
-        <button onClick={() => { setShowModal(true); setGeneratedCodes(null); }} className="btn btn-primary">
-          + Generate Vouchers
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: 'var(--gray)' }}>
+            <input type="checkbox" checked={todayOnly} onChange={(e) => { setTodayOnly(e.target.checked); }} />
+            Today only (EAT)
+          </label>
+          <button onClick={() => { setShowModal(true); setGeneratedCodes(null); }} className="btn btn-primary">
+            + Generate Vouchers
+          </button>
+        </div>
       </div>
 
       <div className="table-container">
         {loading ? (
           <Loader message="Loading vouchers..." />
         ) : vouchers.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center' }}>No vouchers generated yet.</div>
+          <div style={{ padding: '40px', textAlign: 'center' }}>
+            {todayOnly ? 'No vouchers generated today (EAT).' : 'No vouchers generated yet.'}
+          </div>
         ) : (
           <>
             <table>
@@ -89,37 +99,20 @@ export default function VouchersPage() {
                 ))}
               </tbody>
             </table>
-            
-            {/* PAGINATION CONTROLS */}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderTop: '1px solid var(--border)' }}>
-              <button 
-                className="btn btn-secondary" 
-                disabled={page === 1} 
-                onClick={() => fetchVouchers(page - 1)}
-              >
-                Previous
-              </button>
-              <span style={{ fontSize: '14px', color: 'var(--gray)' }}>
-                Page {page} of {totalPages}
-              </span>
-              <button 
-                className="btn btn-secondary" 
-                disabled={page === totalPages} 
-                onClick={() => fetchVouchers(page + 1)}
-              >
-                Next
-              </button>
+              <button className="btn btn-secondary" disabled={page === 1} onClick={() => fetchVouchers(page - 1)}>Previous</button>
+              <span style={{ fontSize: '14px', color: 'var(--gray)' }}>Page {page} of {totalPages}</span>
+              <button className="btn btn-secondary" disabled={page === totalPages} onClick={() => fetchVouchers(page + 1)}>Next</button>
             </div>
           </>
         )}
       </div>
 
-      {/* GENERATE MODAL */}
       {showModal && (
         <div className="modal-overlay">
           <div className="modal-content">
             <h2 style={{ marginTop: 0 }}>Generate Vouchers</h2>
-            
             {!generatedCodes ? (
               <form onSubmit={handleGenerate}>
                 <div className="form-group">
@@ -142,9 +135,7 @@ export default function VouchersPage() {
                 <p style={{ color: 'var(--success)', fontWeight: 'bold' }}>Successfully generated {generatedCodes.length} vouchers!</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginTop: '20px', maxHeight: '300px', overflowY: 'auto', padding: '10px', backgroundColor: 'var(--light)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
                   {generatedCodes.map((code, idx) => (
-                    <div key={idx} style={{ fontFamily: 'monospace', fontSize: '16px', textAlign: 'center', padding: '5px', border: '1px dashed #ccc' }}>
-                      {code}
-                    </div>
+                    <div key={idx} style={{ fontFamily: 'monospace', fontSize: '16px', textAlign: 'center', padding: '5px', border: '1px dashed #ccc' }}>{code}</div>
                   ))}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>

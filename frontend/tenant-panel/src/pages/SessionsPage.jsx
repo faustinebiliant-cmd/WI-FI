@@ -48,7 +48,7 @@ export default function SessionsPage() {
                 <th style={{ padding: '12px 20px', color: '#6b7280' }}>MAC Address</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280' }}>Voucher Code</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280' }}>Router</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280' }}>Started At</th>
+                <th style={{ padding: '12px 20px', color: '#6b7280' }}>Started (EAT)</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280' }}>Action</th>
               </tr>
             </thead>
@@ -58,7 +58,7 @@ export default function SessionsPage() {
                   <td style={{ padding: '16px 20px', fontFamily: 'monospace' }}>{s.mac_address}</td>
                   <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{s.vouchers?.code}</td>
                   <td style={{ padding: '16px 20px' }}>{s.routers?.name}</td>
-                  <td style={{ padding: '16px 20px' }}>{new Date(s.started_at).toLocaleTimeString()}</td>
+                  <td style={{ padding: '16px 20px' }}>{s.started_at_eat}</td>
                   <td style={{ padding: '16px 20px' }}>
                     <button onClick={() => handleDisconnect(s.id)} style={{ padding: '6px 12px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
                       Disconnect

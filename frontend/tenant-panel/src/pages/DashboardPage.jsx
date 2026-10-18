@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
-import { FiUsers, FiTag, FiWifi, FiCheckCircle } from 'react-icons/fi';
+import { FiUsers, FiTag, FiWifi, FiCheckCircle, FiClock } from 'react-icons/fi';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
@@ -17,7 +17,6 @@ export default function DashboardPage() {
   if (loading) return <Loader message="Loading dashboard..." />;
   if (!stats) return <div>Failed to load stats.</div>;
 
-  // Helper for the stat cards
   const StatCard = ({ title, value, icon: Icon, color, bg }) => (
     <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
       <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: bg, color: color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -35,40 +34,19 @@ export default function DashboardPage() {
       <div className="page-header">
         <div>
           <h1>Dashboard</h1>
-          <p>Welcome back. Here is what is happening on your network.</p>
+          <p>
+            Welcome back. Here is what is happening on your network
+            {stats.todayEAT ? ` (today: ${stats.todayEAT}, EAT)` : ''}.
+          </p>
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
-        <StatCard 
-          title="Active Guests Online" 
-          value={stats.activeGuests} 
-          icon={FiUsers} 
-          color="var(--primary)" 
-          bg="var(--primary-soft)" 
-        />
-        <StatCard 
-          title="Vouchers Used" 
-          value={stats.totalVouchers - stats.unusedVouchers} 
-          icon={FiCheckCircle} 
-          color="var(--success)" 
-          bg="var(--success-soft)" 
-        />
-        <StatCard 
-          title="Unused Vouchers" 
-          value={stats.unusedVouchers} 
-          icon={FiTag} 
-          color="var(--warning)" 
-          bg="var(--warning-soft)" 
-        />
-        <StatCard 
-          title="Total Routers" 
-          value={stats.totalRouters} 
-          icon={FiWifi} 
-          color="var(--gray)" 
-          bg="var(--light)" 
-        />
+        <StatCard title="Active Guests Online" value={stats.activeGuests} icon={FiUsers} color="var(--primary)" bg="var(--primary-soft)" />
+        <StatCard title="Vouchers Used Today" value={stats.vouchersUsedToday} icon={FiClock} color="var(--info)" bg="#eff6ff" />
+        <StatCard title="Vouchers Used (total)" value={stats.totalVouchers - stats.unusedVouchers} icon={FiCheckCircle} color="var(--success)" bg="var(--success-soft)" />
+        <StatCard title="Unused Vouchers" value={stats.unusedVouchers} icon={FiTag} color="var(--warning)" bg="var(--warning-soft)" />
+        <StatCard title="Total Routers" value={stats.totalRouters} icon={FiWifi} color="var(--gray)" bg="var(--light)" />
       </div>
     </div>
   );

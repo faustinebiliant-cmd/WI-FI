@@ -7,7 +7,7 @@ export default function AuditLogPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiClient.get('/platform/audit-logs')
+    apiClient.get('/platform/audit-logs?today=true')
       .then(res => setLogs(res.data.data))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
@@ -17,19 +17,19 @@ export default function AuditLogPage() {
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ marginBottom: '30px' }}>
         <h1 style={{ margin: 0 }}>Audit Logs</h1>
-        <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Recent actions taken by Platform Admins.</p>
+        <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Today's actions taken by Platform Admins (EAT).</p>
       </div>
 
       <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
         {loading ? (
           <Loader message="Loading logs..." />
         ) : logs.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center' }}>No audit logs yet.</div>
+          <div style={{ padding: '40px', textAlign: 'center' }}>No audit logs today.</div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
               <tr>
-                <th style={{ padding: '12px 20px', color: '#6b7280' }}>Time</th>
+                <th style={{ padding: '12px 20px', color: '#6b7280' }}>Time (EAT)</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280' }}>Admin</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280' }}>Action</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280' }}>Details</th>
@@ -39,7 +39,7 @@ export default function AuditLogPage() {
               {logs.map((log) => (
                 <tr key={log.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                   <td style={{ padding: '16px 20px', fontSize: '13px', color: '#6b7280' }}>
-                    {new Date(log.created_at).toLocaleString()}
+                    {log.created_at_eat}
                   </td>
                   <td style={{ padding: '16px 20px' }}>{log.admin_email}</td>
                   <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{log.action}</td>

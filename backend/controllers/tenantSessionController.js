@@ -1,6 +1,7 @@
 const supabase = require('../config/supabase');
 const { isValidUUID } = require('../utils/validators');
 const { getRouter } = require('../services/routers/routerFactory');
+const { formatDateTimeEAT } = require('../utils/tz');
 
 // GET /api/tenant/sessions/active
 const getActiveSessions = async (req, res) => {
@@ -17,7 +18,15 @@ const getActiveSessions = async (req, res) => {
       .order('started_at', { ascending: false });
 
     if (error) throw error;
-    return res.status(200).json({ success: true, data });
+
+    // Attach EAT-formatted start time so the UI does not
+    // depend on the browser's local timezone.
+    const enriched = (data || []).map((s) => ({
+      ...s,
+      started_at_eat: formatDateTimeEAT(s.started_at),
+    }));
+
+    return res.status(200).json({ success: true, data: enriched });
   } catch (error) {
     console.error('Get active sessions error:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch active sessions' });
@@ -49,12 +58,12 @@ const disconnectSession = async (req, res) => {
     const adapter = getRouter(session.routers);
     await adapter.disconnectUser(session.mac_address);
 
-    // 3. Mark the session as ended in the database
+    // 3. Mark the session as ended
     await supabase
       .from('sessions')
-      .update({ 
+      .update({
         ended_at: new Date(),
-        disconnect_reason: 'Disconnected by Tenant Admin'
+        disconnect_reason: 'Disconnected by Tenant Admin',
       })
       .eq('id', id);
 
