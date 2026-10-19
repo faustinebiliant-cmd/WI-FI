@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
+import ConfirmDialog from '../shared/components/ConfirmDialog';
 
 export default function SessionsPage() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => { fetchSessions(); }, []);
 
@@ -15,13 +19,17 @@ export default function SessionsPage() {
       .finally(() => setLoading(false));
   };
 
-  const handleDisconnect = async (id) => {
-    if (!window.confirm('Are you sure you want to disconnect this guest?')) return;
+  const confirmDisconnect = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
     try {
-      await apiClient.post(`/platform/sessions/${id}/disconnect`);
+      await apiClient.post(`/platform/sessions/${deleteTarget.id}/disconnect`);
+      setDeleteTarget(null);
       fetchSessions();
     } catch (error) {
       alert('Failed to disconnect guest');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -56,7 +64,7 @@ export default function SessionsPage() {
                   <td style={{ padding: '16px 20px', fontFamily: 'monospace' }}>{session.mac_address}</td>
                   <td style={{ padding: '16px 20px' }}>{session.started_at_eat}</td>
                   <td style={{ padding: '16px 20px' }}>
-                    <button onClick={() => handleDisconnect(session.id)} style={{ padding: '6px 12px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                    <button onClick={() => setDeleteTarget(session)} style={{ padding: '6px 12px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
                       Disconnect
                     </button>
                   </td>
@@ -66,6 +74,18 @@ export default function SessionsPage() {
           </table>
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Force Disconnect Guest"
+        message={`Are you sure you want to disconnect ${deleteTarget?.mac_address}? They will be kicked off the network immediately.`}
+        confirmLabel="Disconnect"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={isDeleting}
+        onConfirm={confirmDisconnect}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

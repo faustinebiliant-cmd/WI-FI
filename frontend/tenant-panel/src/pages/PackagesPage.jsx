@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
+import ConfirmDialog from '../shared/components/ConfirmDialog';
 
 export default function PackagesPage() {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   
+  // Form state
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     price_tzs: '',
@@ -14,6 +17,10 @@ export default function PackagesPage() {
     duration_unit: 'hours',
     speed_mbps: 5
   });
+
+  // Delete state
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => { fetchPackages(); }, []);
 
@@ -30,14 +37,13 @@ export default function PackagesPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    // Convert duration to minutes based on the selected unit
     let duration_minutes = formData.duration_value;
     if (formData.duration_unit === 'hours') duration_minutes *= 60;
     if (formData.duration_unit === 'days') duration_minutes *= 1440;
     if (formData.duration_unit === 'weeks') duration_minutes *= 10080;
 
-    // Convert speed to Kbps
     const speed_kbps = formData.speed_mbps * 1024;
 
     try {
@@ -52,17 +58,23 @@ export default function PackagesPage() {
       setFormData({ name: '', price_tzs: '', duration_value: 1, duration_unit: 'hours', speed_mbps: 5 });
       fetchPackages();
     } catch (error) {
-      alert('Failed to create package');
+      alert(error.response?.data?.error || 'Failed to create package');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this package? This cannot be undone.')) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
     try {
-      await apiClient.delete(`/tenant/packages/${id}`);
+      await apiClient.delete(`/tenant/packages/${deleteTarget.id}`);
+      setDeleteTarget(null); // Close modal
       fetchPackages();
     } catch (error) {
-      alert('Failed to delete package');
+      alert(error.response?.data?.error || 'Failed to delete package');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -102,7 +114,7 @@ export default function PackagesPage() {
                   <td style={{ padding: '16px 20px' }}>{pkg.duration_minutes} mins</td>
                   <td style={{ padding: '16px 20px' }}>{pkg.speed_down_kbps / 1024} Mbps</td>
                   <td style={{ padding: '16px 20px' }}>
-                    <button onClick={() => handleDelete(pkg.id)} style={{ padding: '6px 12px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                    <button onClick={() => setDeleteTarget(pkg)} style={{ padding: '6px 12px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
                       Delete
                     </button>
                   </td>
@@ -119,28 +131,43 @@ export default function PackagesPage() {
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '100%', maxWidth: '500px' }}>
             <h2 style={{ marginTop: 0 }}>Create Package</h2>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <input required type="text" placeholder="Package Name (e.g. Daily 5Mbps)" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ padding: '10px' }} />
-              <input required type="number" placeholder="Price (TZS)" value={formData.price_tzs} onChange={e => setFormData({...formData, price_tzs: e.target.value})} style={{ padding: '10px' }} />
+              <input required type="text" placeholder="Package Name (e.g. Daily 5Mbps)" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ padding: '10px' }} disabled={isSubmitting} />
+              <input required type="number" placeholder="Price (TZS)" value={formData.price_tzs} onChange={e => setFormData({...formData, price_tzs: e.target.value})} style={{ padding: '10px' }} disabled={isSubmitting} />
               
               <div style={{ display: 'flex', gap: '10px' }}>
-                <input required type="number" min="1" placeholder="Duration" value={formData.duration_value} onChange={e => setFormData({...formData, duration_value: e.target.value})} style={{ padding: '10px', flex: 1 }} />
-                <select value={formData.duration_unit} onChange={e => setFormData({...formData, duration_unit: e.target.value})} style={{ padding: '10px', flex: 1 }}>
+                <input required type="number" min="1" placeholder="Duration" value={formData.duration_value} onChange={e => setFormData({...formData, duration_value: e.target.value})} style={{ padding: '10px', flex: 1 }} disabled={isSubmitting} />
+                <select value={formData.duration_unit} onChange={e => setFormData({...formData, duration_unit: e.target.value})} style={{ padding: '10px', flex: 1 }} disabled={isSubmitting}>
                   <option value="hours">Hours</option>
                   <option value="days">Days</option>
                   <option value="weeks">Weeks</option>
                 </select>
               </div>
 
-              <input required type="number" min="1" placeholder="Speed (Mbps)" value={formData.speed_mbps} onChange={e => setFormData({...formData, speed_mbps: e.target.value})} style={{ padding: '10px' }} />
+              <input required type="number" min="1" placeholder="Speed (Mbps)" value={formData.speed_mbps} onChange={e => setFormData({...formData, speed_mbps: e.target.value})} style={{ padding: '10px' }} disabled={isSubmitting} />
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
-                <button type="button" onClick={() => setShowModal(false)} style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px' }}>Cancel</button>
-                <button type="submit" style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>Save Package</button>
+                <button type="button" onClick={() => setShowModal(false)} disabled={isSubmitting} style={{ padding: '10px 20px', cursor: isSubmitting ? 'not-allowed' : 'pointer', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px' }}>Cancel</button>
+                <button type="submit" disabled={isSubmitting} style={{ padding: '10px 20px', cursor: isSubmitting ? 'not-allowed' : 'pointer', backgroundColor: isSubmitting ? '#93c5fd' : '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>
+                  {isSubmitting ? 'Saving...' : 'Save Package'}
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* NEW CUSTOM DELETE MODAL */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete Package"
+        message={`Are you sure you want to delete "${deleteTarget?.name}"? This will permanently delete all vouchers tied to this package.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

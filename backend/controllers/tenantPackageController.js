@@ -33,7 +33,11 @@ const createPackage = async (req, res) => {
 const deletePackage = async (req, res) => {
   const { id } = req.params;
   const { error } = await supabase.from('packages').delete().eq('id', id).eq('tenant_id', req.tenantId);
-  if (error) return res.status(500).json({ success: false, error: 'Failed to delete package' });
+  
+  if (error) {
+    console.error('Delete package error:', error);
+    return res.status(500).json({ success: false, error: 'Cannot delete package. It may have active vouchers tied to it.' });
+  }
   return res.status(200).json({ success: true, message: 'Package deleted' });
 };
 

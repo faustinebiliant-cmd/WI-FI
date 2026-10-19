@@ -4,12 +4,13 @@
 .page-header p { color: var(--gray); font-size: 14px; margin: 4px 0 0 0; }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; border: none; border-radius: var(--radius); font-weight: 600; font-size: 14px; cursor: pointer; transition: all var(--transition); }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 .btn-primary { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(26, 86, 219, 0.25); }
-.btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-dark); transform: translateY(-1px); }
 .btn-danger { background: var(--danger-soft); color: var(--danger); border: 1px solid #fecaca; }
-.btn-danger:hover { background: var(--danger); color: white; }
+.btn-danger:hover:not(:disabled) { background: var(--danger); color: white; }
 .btn-secondary { background: white; color: var(--dark); border: 1px solid var(--border); }
-.btn-secondary:hover { background: var(--light); }
+.btn-secondary:hover:not(:disabled) { background: var(--light); }
 
 .table-container { background: var(--white); border-radius: var(--radius-md); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
 table { width: 100%; border-collapse: collapse; text-align: left; }
