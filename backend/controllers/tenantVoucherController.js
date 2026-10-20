@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const db = require('../config/supabase');
+const db = require('../config/db');
 const { getTodayRangeEAT } = require('../utils/tz');
 
 const generateCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();

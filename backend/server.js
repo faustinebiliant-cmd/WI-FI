@@ -11,6 +11,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const db = require('./config/db'); // Import DB directly
 
 // ------------------------------------------------------------
 // App
@@ -69,20 +70,12 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // ------------------------------------------------------------
-// Health
-// ------------------------------------------------------------
-// ------------------------------------------------------------
-// Health
+// Health Check (Updated for Postgres)
 // ------------------------------------------------------------
 app.get('/api/health', async (req, res) => {
   try {
     // A tiny query to prove the DB connection works
-    const { error } = await require('./config/supabase')
-      .from('tenants')
-      .select('id')
-      .limit(1);
-
-    if (error) throw error;
+    await db.query('SELECT id FROM tenants LIMIT 1');
 
     res.json({
       status: 'ok',
@@ -117,6 +110,7 @@ app.use('/api/tenant', tenantRoutes);
 
 const portalRoutes = require('./routes/portal');
 app.use('/api/portal', portalRoutes);
+
 // ------------------------------------------------------------
 // 404
 // ------------------------------------------------------------

@@ -1,4 +1,4 @@
-const db = require('../config/supabase');
+const db = require('../config/db');
 const { getTodayRangeEAT, formatDateEAT } = require('../utils/tz');
 
 const getDashboardStats = async (req, res) => {

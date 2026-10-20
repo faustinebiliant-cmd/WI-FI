@@ -1,4 +1,4 @@
-const db = require('../config/supabase');
+const db = require('../config/db');
 const { verifyPassword } = require('../services/password');
 const { signTenantToken } = require('../services/jwt');
 

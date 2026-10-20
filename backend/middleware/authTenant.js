@@ -2,7 +2,7 @@
 // OSWAGOTech WiFi - Tenant Auth Middleware
 // ============================================================
 const { verifyTenantToken } = require('../services/jwt');
-const supabase = require('../config/supabase');
+const supabase = require('../config/db');
 
 const authTenant = async (req, res, next) => {
   try {

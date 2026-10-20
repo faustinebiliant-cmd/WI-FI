@@ -1,7 +1,7 @@
 // ============================================================
 // OSWAGOTech WiFi - Platform Audit Log Controller
 // ============================================================
-const supabase = require('../config/supabase');
+const supabase = require('../config/db');
 const { getTodayRangeEAT, formatDateTimeEAT } = require('../utils/tz');
 
 // GET /api/platform/audit-logs?page=1&limit=50&today=true

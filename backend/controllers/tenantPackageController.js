@@ -1,4 +1,4 @@
-const db = require('../config/supabase');
+const db = require('../config/db');
 
 const listPackages = async (req, res) => {
   const { rows } = await db.query('SELECT * FROM packages WHERE tenant_id = $1 ORDER BY created_at DESC', [req.tenantId]);

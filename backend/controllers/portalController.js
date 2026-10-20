@@ -1,4 +1,4 @@
-const db = require('../config/supabase');
+const db = require('../config/db');
 const { getRouter } = require('../services/routers/routerFactory');
 const { isValidMACAddress, isValidIPAddress, isValidVoucherCode } = require('../utils/validators');
 

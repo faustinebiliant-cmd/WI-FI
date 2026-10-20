@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const supabase = require('../config/db');
 const { isValidUUID } = require('../utils/validators');
 const { getRouter } = require('../services/routers/routerFactory');
 const { formatDateTimeEAT } = require('../utils/tz');

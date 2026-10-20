@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const db = require('../config/supabase');
+const db = require('../config/db');
 const { hashPassword } = require('../services/password');
 const { signTenantToken } = require('../services/jwt');
 const { isValidEmail, isValidPhone, isSafeText } = require('../utils/validators');

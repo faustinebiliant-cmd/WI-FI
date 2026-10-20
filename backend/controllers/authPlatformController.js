@@ -1,7 +1,7 @@
 // ============================================================
 // OSWAGOTech WiFi - Platform Auth Controller
 // ============================================================
-const supabase = require('../config/supabase');
+const supabase = require('../config/db');
 const { verifyPassword } = require('../services/password');
 const { signAdminToken } = require('../services/jwt');
 

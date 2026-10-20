@@ -1,5 +1,5 @@
 const { verifyAdminToken, verifyTenantToken } = require('../services/jwt');
-const supabase = require('../config/supabase');
+const supabase = require('../config/db');
 
 const authPlatform = async (req, res, next) => {
   try {

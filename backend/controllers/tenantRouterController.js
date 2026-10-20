@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const db = require('../config/supabase');
+const db = require('../config/db');
 const { isValidIPAddress, isSafeText } = require('../utils/validators');
 const { encrypt } = require('../utils/encryption');
 

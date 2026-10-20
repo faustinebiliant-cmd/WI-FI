@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const supabase = require('../config/db');
 
 const listAllRouters = async (req, res) => {
   try {
