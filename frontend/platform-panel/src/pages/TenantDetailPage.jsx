@@ -43,8 +43,8 @@ export default function TenantDetailPage() {
         is_impersonation: true
       }));
 
-      // Redirect to the tenant panel (Port 3001)
-      window.location.href = 'http://69.62.105.119:3001';
+      // Redirect to the tenant panel
+      window.location.href = 'http://69.62.105.119/tenant/';
       
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to start impersonation');

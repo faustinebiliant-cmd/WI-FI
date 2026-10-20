@@ -31,7 +31,7 @@ const TenantShell = () => {
     try { await apiClient.post('/tenant/auth/end-impersonation'); } catch (e) {}
     localStorage.removeItem('tenantToken');
     localStorage.removeItem('tenantUser');
-    window.location.href = 'http://69.62.105.119:3002';
+    window.location.href = 'http://69.62.105.119/platform/';
   };
 
   const menuItems = [

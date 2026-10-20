@@ -6,7 +6,7 @@ export default function RoutersPage() {
   const [routers, setRouters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     name: '',
     location_label: '',
@@ -69,7 +69,7 @@ export default function RoutersPage() {
             </thead>
             <tbody>
               {routers.map((router) => {
-                const portalUrl = `http://69.62.105.119:3000/?router=${router.router_token}&mac=11:22:33:44:55:66`;
+                const portalUrl = `http://69.62.105.119/portal/?router=${router.router_token}&mac=11:22:33:44:55:66`;
                 return (
                   <tr key={router.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                     <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{router.name}</td>
@@ -98,12 +98,12 @@ export default function RoutersPage() {
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '100%', maxWidth: '500px' }}>
             <h2 style={{ marginTop: 0 }}>Add New Router</h2>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <input required type="text" placeholder="Router Name (e.g. Main Lobby)" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ padding: '10px' }} />
-              <input type="text" placeholder="Location (e.g. Reception)" value={formData.location_label} onChange={e => setFormData({...formData, location_label: e.target.value})} style={{ padding: '10px' }} />
-              <input required type="text" placeholder="IP Address (e.g. 192.168.88.1)" value={formData.ip_address} onChange={e => setFormData({...formData, ip_address: e.target.value})} style={{ padding: '10px' }} />
-              <input required type="text" placeholder="API Username" value={formData.api_username} onChange={e => setFormData({...formData, api_username: e.target.value})} style={{ padding: '10px' }} />
-              <input required type="password" placeholder="API Password" value={formData.api_password} onChange={e => setFormData({...formData, api_password: e.target.value})} style={{ padding: '10px' }} />
-              
+              <input required type="text" placeholder="Router Name (e.g. Main Lobby)" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} style={{ padding: '10px' }} />
+              <input type="text" placeholder="Location (e.g. Reception)" value={formData.location_label} onChange={e => setFormData({ ...formData, location_label: e.target.value })} style={{ padding: '10px' }} />
+              <input required type="text" placeholder="IP Address (e.g. 192.168.88.1)" value={formData.ip_address} onChange={e => setFormData({ ...formData, ip_address: e.target.value })} style={{ padding: '10px' }} />
+              <input required type="text" placeholder="API Username" value={formData.api_username} onChange={e => setFormData({ ...formData, api_username: e.target.value })} style={{ padding: '10px' }} />
+              <input required type="password" placeholder="API Password" value={formData.api_password} onChange={e => setFormData({ ...formData, api_password: e.target.value })} style={{ padding: '10px' }} />
+
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
                 <button type="button" onClick={() => setShowModal(false)} style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px' }}>Cancel</button>
                 <button type="submit" style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>Save Router</button>
