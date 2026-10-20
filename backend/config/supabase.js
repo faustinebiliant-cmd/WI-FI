@@ -1,27 +1,29 @@
 // ============================================================
-// OSWAGOTech WiFi - Supabase Connection
-// ------------------------------------------------------------
-// The service-role key bypasses RLS. This client is backend
-// only. Never import it from any frontend.
+// OSWAGOTech WiFi - Database Connection (Raw PostgreSQL)
 // ============================================================
-
-const { createClient } = require('@supabase/supabase-js');
+const { Pool } = require('pg');
 const env = require('./env');
 
-const supabase = createClient(
-  env.SUPABASE_URL,
-  env.SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false
-    }
-  }
-);
+const pool = new Pool({
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT || 5432,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  ssl: false // Local server connection, no SSL needed
+});
 
-if (env.IS_DEV) {
-  console.log('Supabase connected');
-}
+pool.on('connect', () => {
+  if (env.IS_DEV) console.log('PostgreSQL connected');
+});
 
-module.exports = supabase;
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle PostgreSQL client', err);
+  process.exit(-1);
+});
+
+// Export query to act as a direct bridge to Postgres
+module.exports = {
+  query: (text, params) => pool.query(text, params),
+  pool
+};

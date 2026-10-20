@@ -1,8 +1,5 @@
-// ============================================================
-// OSWAGOTech WiFi - Tenant Voucher Controller
-// ============================================================
 const crypto = require('crypto');
-const supabase = require('../config/supabase');
+const db = require('../config/supabase');
 const { getTodayRangeEAT } = require('../utils/tz');
 
 const generateCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();
@@ -11,88 +8,69 @@ const generateVouchers = async (req, res) => {
   try {
     const { package_id, quantity } = req.body;
     const count = parseInt(quantity) || 100;
+    if (count < 1 || count > 500) return res.status(400).json({ success: false, error: 'Generate between 1 and 500' });
 
-    if (count < 1 || count > 500) {
-      return res.status(400).json({ success: false, error: 'Generate between 1 and 500' });
-    }
+    const pkgCheck = await db.query('SELECT id FROM packages WHERE id = $1 AND tenant_id = $2', [package_id, req.tenantId]);
+    if (pkgCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'Package not found' });
 
-    const { data: pkg } = await supabase
-      .from('packages')
-      .select('id')
-      .eq('id', package_id)
-      .eq('tenant_id', req.tenantId)
-      .single();
-    if (!pkg) return res.status(404).json({ success: false, error: 'Package not found' });
-
-    const vouchersToInsert = [];
+    const vouchers = [];
     for (let i = 0; i < count; i++) {
-      vouchersToInsert.push({
-        tenant_id: req.tenantId,
-        package_id: package_id,
-        code: generateCode(),
-        status: 'unused',
-        created_by: req.tenantUser.id,
-      });
+      const code = generateCode();
+      const { rows } = await db.query(
+        `INSERT INTO vouchers (tenant_id, package_id, code, status, created_by) 
+         VALUES ($1, $2, $3, 'unused', $4) RETURNING code`,
+        [req.tenantId, package_id, code, req.tenantUser.id]
+      );
+      vouchers.push(rows[0].code);
     }
 
-    const { data, error } = await supabase.from('vouchers').insert(vouchersToInsert).select();
-    if (error) throw error;
-
-    return res.status(201).json({
-      success: true,
-      message: `Generated ${count} vouchers`,
-      data: data.map((v) => v.code),
-    });
+    return res.status(201).json({ success: true, message: `Generated ${count} vouchers`, data: vouchers });
   } catch (error) {
     return res.status(500).json({ success: false, error: 'Failed to generate vouchers' });
   }
 };
 
-// GET /api/tenant/vouchers?page=1&limit=50&today=true
-// - today=true filters to vouchers CREATED today in EAT
-// - ?today=true&scope=used filters to vouchers USED today in EAT
 const listVouchers = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const offset = (page - 1) * limit;
 
-    let query = supabase
-      .from('vouchers')
-      .select('*, packages (name)', { count: 'exact' })
-      .eq('tenant_id', req.tenantId);
+    let query = `
+      SELECT v.*, p.name as package_name 
+      FROM vouchers v LEFT JOIN packages p ON v.package_id = p.id 
+      WHERE v.tenant_id = $1
+    `;
+    const params = [req.tenantId];
 
     if (req.query.today === 'true') {
       const { start, end } = getTodayRangeEAT();
       if (req.query.scope === 'used') {
-        query = query
-          .gte('used_at', start.toISOString())
-          .lte('used_at', end.toISOString());
+        query += ` AND v.used_at >= $2 AND v.used_at <= $3`;
       } else {
-        query = query
-          .gte('created_at', start.toISOString())
-          .lte('created_at', end.toISOString());
+        query += ` AND v.created_at >= $2 AND v.created_at <= $3`;
       }
+      params.push(start.toISOString(), end.toISOString());
     }
 
-    const { data, error, count } = await query
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    const countRes = await db.query(`SELECT COUNT(*) FROM (${query}) AS sub`, params);
+    const total = parseInt(countRes.rows[0].count);
 
-    if (error) throw error;
+    query += ` ORDER BY v.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    params.push(limit, offset);
+
+    const { rows } = await db.query(query, params);
+
+    // Format for frontend
+    const formattedData = rows.map(r => ({
+      ...r,
+      packages: { name: r.package_name }
+    }));
 
     return res.status(200).json({
       success: true,
-      data,
-      pagination: {
-        total: count,
-        page,
-        limit,
-        pages: Math.ceil(count / limit),
-      },
-      filter: req.query.today === 'true'
-        ? { today: true, scope: req.query.scope === 'used' ? 'used' : 'created' }
-        : null,
+      data: formattedData,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) }
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: 'Failed to list vouchers' });
@@ -102,18 +80,12 @@ const listVouchers = async (req, res) => {
 const revokeVoucher = async (req, res) => {
   try {
     const { id } = req.params;
-    const { data, error } = await supabase
-      .from('vouchers')
-      .update({ status: 'cancelled' })
-      .eq('id', id)
-      .eq('tenant_id', req.tenantId)
-      .select()
-      .single();
-
-    if (error || !data) {
-      return res.status(404).json({ success: false, error: 'Voucher not found' });
-    }
-    return res.status(200).json({ success: true, data });
+    const { rows } = await db.query(
+      "UPDATE vouchers SET status = 'cancelled' WHERE id = $1 AND tenant_id = $2 RETURNING *",
+      [id, req.tenantId]
+    );
+    if (rows.length === 0) return res.status(404).json({ success: false, error: 'Voucher not found' });
+    return res.status(200).json({ success: true, data: rows[0] });
   } catch (error) {
     return res.status(500).json({ success: false, error: 'Failed to revoke voucher' });
   }

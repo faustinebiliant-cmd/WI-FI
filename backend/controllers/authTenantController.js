@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+const db = require('../config/supabase');
 const { verifyPassword } = require('../services/password');
 const { signTenantToken } = require('../services/jwt');
 
@@ -9,11 +9,14 @@ const login = async (req, res) => {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    const { data: user } = await supabase
-      .from('tenant_users')
-      .select('*, tenants(subscription_status)')
-      .eq('email', cleanEmail)
-      .maybeSingle();
+    const { rows } = await db.query(`
+      SELECT u.*, t.subscription_status 
+      FROM tenant_users u
+      JOIN tenants t ON u.tenant_id = t.id
+      WHERE u.email = $1
+    `, [cleanEmail]);
+
+    const user = rows[0];
 
     const FAILED = { success: false, error: 'Invalid credentials' };
     if (!user) return res.status(401).json(FAILED);
@@ -29,13 +32,13 @@ const login = async (req, res) => {
       full_name: user.full_name
     });
 
-    await supabase.from('tenant_users').update({ last_login_at: new Date() }).eq('id', user.id);
+    await db.query('UPDATE tenant_users SET last_login_at = NOW() WHERE id = $1', [user.id]);
 
     return res.status(200).json({
       success: true,
       token,
       user: { id: user.id, full_name: user.full_name, email: user.email, role: user.role },
-      tenant_status: user.tenants?.subscription_status
+      tenant_status: user.subscription_status
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: 'Internal server error' });
@@ -47,12 +50,11 @@ const endImpersonationSelf = async (req, res) => {
     if (!req.tenantUser.is_impersonation) {
       return res.status(400).json({ success: false, error: 'Not in an impersonation session' });
     }
-    // Mark session ended
-    await supabase
-      .from('impersonation_sessions')
-      .update({ ended_at: new Date(), ended_by: 'tenant' })
-      .eq('tenant_user_id', req.tenantUser.id)
-      .is('ended_at', null);
+    await db.query(`
+      UPDATE impersonation_sessions 
+      SET ended_at = NOW(), ended_by = 'tenant' 
+      WHERE tenant_user_id = $1 AND ended_at IS NULL
+    `, [req.tenantUser.id]);
 
     return res.status(200).json({ success: true, message: 'Impersonation ended' });
   } catch (error) {

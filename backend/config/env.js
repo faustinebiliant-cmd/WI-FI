@@ -61,10 +61,13 @@ if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
 }
 
 // ------------------------------------------------------------
-// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
+// Raw PostgreSQL Credentials (Replaces Supabase)
 // ------------------------------------------------------------
-const SUPABASE_URL = requireString('SUPABASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = requireString('SUPABASE_SERVICE_ROLE_KEY');
+const DB_HOST = requireString('DB_HOST');
+const DB_PORT = trimmed(process.env.DB_PORT) || '5432';
+const DB_USER = requireString('DB_USER');
+const DB_PASSWORD = requireString('DB_PASSWORD');
+const DB_NAME = requireString('DB_NAME');
 
 // ------------------------------------------------------------
 // JWT_SECRET and ADMIN_JWT_SECRET
@@ -110,6 +113,14 @@ if (ROUTER_MODE !== 'mock' && ROUTER_MODE !== 'real') {
 }
 
 // ------------------------------------------------------------
+// ROUTER_ENCRYPTION_KEY (must be exactly 32 chars for AES-256)
+// ------------------------------------------------------------
+const ROUTER_ENCRYPTION_KEY = requireString('ROUTER_ENCRYPTION_KEY', 32);
+if (ROUTER_ENCRYPTION_KEY.length !== 32) {
+  fail('ROUTER_ENCRYPTION_KEY must be exactly 32 characters long.');
+}
+
+// ------------------------------------------------------------
 // Frozen export. Nothing downstream reads process.env.
 // ------------------------------------------------------------
 const env = Object.freeze({
@@ -118,8 +129,11 @@ const env = Object.freeze({
   IS_PROD,
   PORT,
 
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY,
+  DB_HOST,
+  DB_PORT,
+  DB_USER,
+  DB_PASSWORD,
+  DB_NAME,
 
   JWT_SECRET,
   ADMIN_JWT_SECRET,
@@ -127,7 +141,8 @@ const env = Object.freeze({
 
   ALLOWED_ORIGINS,
 
-  ROUTER_MODE
+  ROUTER_MODE,
+  ROUTER_ENCRYPTION_KEY
 });
 
 module.exports = env;
