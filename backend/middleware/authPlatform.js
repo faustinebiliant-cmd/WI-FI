@@ -1,5 +1,5 @@
 const { verifyAdminToken, verifyTenantToken } = require('../services/jwt');
-const supabase = require('../config/db');
+const db = require('../config/db');
 
 const authPlatform = async (req, res, next) => {
   try {
@@ -29,12 +29,11 @@ const authPlatform = async (req, res, next) => {
 
     // 3. If it's an impersonation token, check the session table
     if (decoded.impersonation_token_id) {
-      const { data: session } = await supabase
-        .from('impersonation_sessions')
-        .select('*')
-        .eq('token_id', decoded.impersonation_token_id)
-        .is('ended_at', null)
-        .single();
+      const { rows } = await db.query(
+        'SELECT * FROM impersonation_sessions WHERE token_id = $1 AND ended_at IS NULL',
+        [decoded.impersonation_token_id]
+      );
+      const session = rows[0];
 
       if (!session || new Date(session.expires_at) < new Date()) {
         return res.status(401).json({ success: false, error: 'Impersonation session expired or ended' });
@@ -45,11 +44,11 @@ const authPlatform = async (req, res, next) => {
     }
 
     // 4. Normal platform admin flow
-    const { data: admin } = await supabase
-      .from('platform_admins')
-      .select('id, email, full_name, is_active')
-      .eq('id', decoded.id)
-      .single();
+    const { rows } = await db.query(
+      'SELECT id, email, full_name, is_active FROM platform_admins WHERE id = $1',
+      [decoded.id]
+    );
+    const admin = rows[0];
 
     if (!admin || !admin.is_active) {
       return res.status(401).json({ success: false, error: 'Admin account not found or deactivated' });
@@ -58,6 +57,7 @@ const authPlatform = async (req, res, next) => {
     req.admin = admin;
     next();
   } catch (error) {
+    console.error('Auth Platform Error:', error);
     return res.status(500).json({ success: false, error: 'Authentication error' });
   }
 };

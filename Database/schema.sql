@@ -201,17 +201,3 @@ CREATE INDEX idx_packages_tenant_created ON public.packages(tenant_id, created_a
 CREATE INDEX idx_vouchers_tenant_created ON public.vouchers(tenant_id, created_at DESC);
 CREATE INDEX idx_sessions_tenant_started ON public.sessions(tenant_id, started_at DESC);
 CREATE INDEX idx_audit_created ON public.platform_audit_logs(created_at DESC);
-
--- ==========================================
--- ENABLE ROW LEVEL SECURITY (RLS)
--- ==========================================
-ALTER TABLE public.platform_admins ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tenant_users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.routers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.packages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vouchers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.impersonation_sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.platform_audit_logs ENABLE ROW LEVEL SECURITY;

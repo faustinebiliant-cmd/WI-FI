@@ -2,7 +2,7 @@
 // OSWAGOTech WiFi - Tenant Auth Middleware
 // ============================================================
 const { verifyTenantToken } = require('../services/jwt');
-const supabase = require('../config/db');
+const db = require('../config/db');
 
 const authTenant = async (req, res, next) => {
   try {
@@ -22,12 +22,11 @@ const authTenant = async (req, res, next) => {
 
     // Handle Impersonation (Admin acting as Tenant)
     if (decoded.impersonation_token_id) {
-      const { data: session } = await supabase
-        .from('impersonation_sessions')
-        .select('*')
-        .eq('token_id', decoded.impersonation_token_id)
-        .is('ended_at', null)
-        .single();
+      const { rows } = await db.query(
+        'SELECT * FROM impersonation_sessions WHERE token_id = $1 AND ended_at IS NULL',
+        [decoded.impersonation_token_id]
+      );
+      const session = rows[0];
 
       if (!session || new Date(session.expires_at) < new Date()) {
         return res.status(401).json({ success: false, error: 'Impersonation session expired or ended' });
@@ -39,13 +38,13 @@ const authTenant = async (req, res, next) => {
     }
 
     // Normal Tenant User Flow
-    const { data: user, error } = await supabase
-      .from('tenant_users')
-      .select('id, tenant_id, email, full_name, role, is_active')
-      .eq('id', decoded.id)
-      .single();
+    const { rows } = await db.query(
+      'SELECT id, tenant_id, email, full_name, role, is_active FROM tenant_users WHERE id = $1',
+      [decoded.id]
+    );
+    const user = rows[0];
 
-    if (error || !user) {
+    if (!user) {
       return res.status(401).json({ success: false, error: 'Tenant user not found' });
     }
 

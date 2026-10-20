@@ -61,7 +61,6 @@ const listVouchers = async (req, res) => {
 
     const { rows } = await db.query(query, params);
 
-    // Format for frontend
     const formattedData = rows.map(r => ({
       ...r,
       packages: { name: r.package_name }

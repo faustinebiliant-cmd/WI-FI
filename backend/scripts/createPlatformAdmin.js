@@ -1,9 +1,9 @@
 // ============================================================
-// OSWAGOTech WiFi - Create Platform Admin
+// OSWAGOTech WiFi - Create Platform Admin (Raw PostgreSQL)
 // Run: node scripts/createPlatformAdmin.js
 // ============================================================
 const readline = require('readline');
-const supabase = require('../config/supabase');
+const db = require('../config/db');
 const { hashPassword } = require('../services/password');
 
 const rl = readline.createInterface({
@@ -26,29 +26,28 @@ const run = async () => {
 
   const cleanEmail = email.toLowerCase().trim();
   
-  // Check if exists
-  const { data: existing } = await supabase.from('platform_admins').select('id').eq('email', cleanEmail).maybeSingle();
-  if (existing) {
-    console.log('Admin with this email already exists.');
-    process.exit(1);
-  }
+  try {
+    // Check if exists
+    const { rows } = await db.query('SELECT id FROM platform_admins WHERE email = $1', [cleanEmail]);
+    if (rows.length > 0) {
+      console.log('Admin with this email already exists.');
+      process.exit(1);
+    }
 
-  const hash = await hashPassword(password);
+    const hash = await hashPassword(password);
 
-  const { error } = await supabase.from('platform_admins').insert({
-    email: cleanEmail,
-    full_name: fullName,
-    password_hash: hash,
-    is_active: true
-  });
+    await db.query(
+      `INSERT INTO platform_admins (email, full_name, password_hash, is_active) 
+       VALUES ($1, $2, $3, true)`,
+      [cleanEmail, fullName, hash]
+    );
 
-  if (error) {
+    console.log('Platform admin created successfully!');
+    process.exit(0);
+  } catch (error) {
     console.error('Failed to create admin:', error.message);
     process.exit(1);
   }
-
-  console.log('Platform admin created successfully!');
-  process.exit(0);
 };
 
 run();

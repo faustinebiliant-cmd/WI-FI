@@ -1,3 +1,6 @@
+// ============================================================
+// OSWAGOTech WiFi - Tenant Router Controller
+// ============================================================
 const crypto = require('crypto');
 const db = require('../config/db');
 const { isValidIPAddress, isSafeText } = require('../utils/validators');
@@ -16,7 +19,7 @@ const createRouter = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Name, IP, Username and Password are required' });
     }
 
-    // RESTORED VALIDATION
+    // RESTORED VALIDATORS
     if (!isSafeText(name) || !isSafeText(api_username)) {
       return res.status(400).json({ success: false, error: 'Invalid characters in name or username' });
     }
@@ -25,6 +28,7 @@ const createRouter = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid IP address format' });
     }
 
+    // Encrypt the password
     const encryptedPassword = encrypt(api_password);
     if (!encryptedPassword) return res.status(500).json({ success: false, error: 'Encryption failed' });
 
@@ -38,7 +42,7 @@ const createRouter = async (req, res) => {
 
     return res.status(201).json({ success: true, data: rows[0] });
   } catch (error) {
-    console.error(error);
+    console.error('Create router error:', error);
     return res.status(500).json({ success: false, error: 'Failed to create router' });
   }
 };

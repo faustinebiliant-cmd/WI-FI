@@ -1,0 +1,48 @@
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name 69.62.105.119;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:5001/api/;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /portal {
+        return 301 /portal/;
+    }
+
+    location /portal/ {
+        alias /home/biliant/WI-FI/frontend/portal/dist/;
+        try_files $uri $uri/ /portal/index.html;
+    }
+
+    location = /tenant {
+        return 301 /tenant/;
+    }
+
+    location /tenant/ {
+        alias /home/biliant/WI-FI/frontend/tenant-panel/dist/;
+        try_files $uri $uri/ /tenant/index.html;
+    }
+
+    location = /platform {
+        return 301 /platform/;
+    }
+
+    location /platform/ {
+        alias /home/biliant/WI-FI/frontend/platform-panel/dist/;
+        try_files $uri $uri/ /platform/index.html;
+    }
+
+    location / {
+        return 200 "Wi-Fi platform server is running. Use /portal/, /tenant/, or /platform/.\n";
+        add_header Content-Type text/plain;
+    }
+}

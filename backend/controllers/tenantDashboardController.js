@@ -1,3 +1,6 @@
+// ============================================================
+// OSWAGOTech WiFi - Tenant Dashboard Controller
+// ============================================================
 const db = require('../config/db');
 const { getTodayRangeEAT, formatDateEAT } = require('../utils/tz');
 
@@ -5,11 +8,19 @@ const getDashboardStats = async (req, res) => {
   try {
     const tenantId = req.tenantId;
 
+    // 1. Active sessions (guests online right now)
     const activeSessions = await db.query('SELECT COUNT(*) FROM sessions WHERE tenant_id = $1 AND ended_at IS NULL', [tenantId]);
+    
+    // 2. Total vouchers generated
     const totalVouchers = await db.query('SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1', [tenantId]);
+    
+    // 3. Unused vouchers
     const unusedVouchers = await db.query("SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1 AND status = 'unused'", [tenantId]);
+    
+    // 4. Total routers
     const totalRouters = await db.query('SELECT COUNT(*) FROM routers WHERE tenant_id = $1', [tenantId]);
 
+    // 5. Vouchers USED TODAY (EAT day boundaries, converted to UTC)
     const today = getTodayRangeEAT();
     const vouchersUsedToday = await db.query(
       "SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1 AND status = 'active' AND used_at >= $2 AND used_at <= $3",

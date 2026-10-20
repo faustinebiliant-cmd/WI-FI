@@ -1,7 +1,7 @@
 // ============================================================
 // OSWAGOTech WiFi - Platform Auth Controller
 // ============================================================
-const supabase = require('../config/db');
+const db = require('../config/db');
 const { verifyPassword } = require('../services/password');
 const { signAdminToken } = require('../services/jwt');
 
@@ -15,12 +15,12 @@ const login = async (req, res) => {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // 1. Find the admin
-    const { data: admin } = await supabase
-      .from('platform_admins')
-      .select('*')
-      .eq('email', cleanEmail)
-      .maybeSingle();
+    // 1. Find the admin using Raw SQL
+    const { rows } = await db.query(
+      'SELECT * FROM platform_admins WHERE email = $1', 
+      [cleanEmail]
+    );
+    const admin = rows[0];
 
     // Use a generic error message so attackers can't guess valid emails
     const FAILED = { success: false, error: 'Invalid credentials' };
@@ -40,10 +40,10 @@ const login = async (req, res) => {
     });
 
     // 4. Update last login time
-    await supabase
-      .from('platform_admins')
-      .update({ last_login_at: new Date() })
-      .eq('id', admin.id);
+    await db.query(
+      'UPDATE platform_admins SET last_login_at = NOW() WHERE id = $1',
+      [admin.id]
+    );
 
     return res.status(200).json({
       success: true,

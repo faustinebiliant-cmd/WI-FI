@@ -1,18 +1,15 @@
 // ============================================================
-// OSWAGOTech WiFi - Background Router Pinger
-// Run this as a cron job or alongside your server to keep
-// the "status" column in the database accurate.
+// OSWAGOTech WiFi - Background Router Pinger (Raw PostgreSQL)
 // ============================================================
-const supabase = require('../config/supabase');
+const db = require('../config/db');
 const { getRouter } = require('../services/routers/routerFactory');
 
 const pingAllRouters = async () => {
   console.log('[Pinger] Checking router statuses...');
   
   try {
-    // 1. Get all routers
-    const { data: routers, error } = await supabase.from('routers').select('*');
-    if (error) throw error;
+    // 1. Get all routers using Raw SQL
+    const { rows: routers } = await db.query('SELECT * FROM routers');
 
     for (const r of routers) {
       try {
@@ -24,15 +21,15 @@ const pingAllRouters = async () => {
           const status = await adapter.checkStatus();
           
           if (status.online) {
-            await supabase
-              .from('routers')
-              .update({ status: 'online', last_seen_at: new Date() })
-              .eq('id', r.id);
+            await db.query(
+              'UPDATE routers SET status = $1, last_seen_at = NOW() WHERE id = $2',
+              ['online', r.id]
+            );
           } else {
-            await supabase
-              .from('routers')
-              .update({ status: 'offline' })
-              .eq('id', r.id);
+            await db.query(
+              'UPDATE routers SET status = $1 WHERE id = $2',
+              ['offline', r.id]
+            );
           }
         }
       } catch (err) {

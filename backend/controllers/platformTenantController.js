@@ -10,8 +10,6 @@ const createTenant = async (req, res) => {
     if (!business_name || !owner_name || !owner_email || !owner_phone) {
       return res.status(400).json({ success: false, error: 'All fields are required' });
     }
-
-    // RESTORED VALIDATION
     if (!isSafeText(business_name) || !isSafeText(owner_name)) {
       return res.status(400).json({ success: false, error: 'Invalid characters in name' });
     }
@@ -135,7 +133,6 @@ const impersonateTenant = async (req, res) => {
       tenant_user: { full_name: owner.full_name, email: owner.email }
     });
   } catch (error) {
-    console.error('Impersonation error:', error);
     return res.status(500).json({ success: false, error: 'Failed to start impersonation' });
   }
 };
