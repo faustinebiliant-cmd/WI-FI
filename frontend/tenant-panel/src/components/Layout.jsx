@@ -31,7 +31,7 @@ export default function Layout({ children }) {
       // Clear local storage and go back to the Platform Panel
       localStorage.removeItem('tenantToken');
       localStorage.removeItem('tenantUser');
-      window.location.href = 'http://localhost:3002';
+      window.location.href = 'http://69.62.105.119:3001';
     }
   };
 
