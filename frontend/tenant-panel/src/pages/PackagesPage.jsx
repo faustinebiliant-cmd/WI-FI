@@ -8,7 +8,6 @@ export default function PackagesPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   
-  // Form state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -18,7 +17,6 @@ export default function PackagesPage() {
     speed_mbps: 5
   });
 
-  // Delete state
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -69,7 +67,7 @@ export default function PackagesPage() {
     setIsDeleting(true);
     try {
       await apiClient.delete(`/tenant/packages/${deleteTarget.id}`);
-      setDeleteTarget(null); // Close modal
+      setDeleteTarget(null);
       fetchPackages();
     } catch (error) {
       alert(error.response?.data?.error || 'Failed to delete package');
@@ -80,40 +78,40 @@ export default function PackagesPage() {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '30px' }}>
         <div>
           <h1 style={{ margin: 0 }}>WiFi Packages</h1>
           <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Set your own prices, speeds, and durations.</p>
         </div>
-        <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>
+        <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', width: '100%', maxWidth: '200px' }}>
           + Create Package
         </button>
       </div>
 
-      <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+      <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {loading ? (
           <Loader message="Loading packages..." />
         ) : packages.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center' }}>No packages yet.</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
               <tr>
-                <th style={{ padding: '12px 20px', color: '#6b7280' }}>Name</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280' }}>Price</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280' }}>Duration</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280' }}>Speed</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280' }}>Action</th>
+                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Name</th>
+                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Price</th>
+                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Duration</th>
+                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Speed</th>
+                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {packages.map((pkg) => (
                 <tr key={pkg.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{pkg.name}</td>
-                  <td style={{ padding: '16px 20px' }}>TZS {pkg.price_tzs.toLocaleString()}</td>
-                  <td style={{ padding: '16px 20px' }}>{pkg.duration_minutes} mins</td>
-                  <td style={{ padding: '16px 20px' }}>{pkg.speed_down_kbps / 1024} Mbps</td>
-                  <td style={{ padding: '16px 20px' }}>
+                  <td style={{ padding: '16px 20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{pkg.name}</td>
+                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>TZS {pkg.price_tzs.toLocaleString()}</td>
+                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{pkg.duration_minutes} mins</td>
+                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{pkg.speed_down_kbps / 1024} Mbps</td>
+                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
                     <button onClick={() => setDeleteTarget(pkg)} style={{ padding: '6px 12px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
                       Delete
                     </button>
@@ -125,9 +123,8 @@ export default function PackagesPage() {
         )}
       </div>
 
-      {/* CREATE MODAL */}
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '100%', maxWidth: '500px' }}>
             <h2 style={{ marginTop: 0 }}>Create Package</h2>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -156,7 +153,6 @@ export default function PackagesPage() {
         </div>
       )}
 
-      {/* NEW CUSTOM DELETE MODAL */}
       <ConfirmDialog
         open={!!deleteTarget}
         title="Delete Package"

@@ -1,25 +1,23 @@
-const supabase = require('../config/db');
+const db = require('../config/db');
 const { getRouter } = require('../services/routers/routerFactory');
 const { formatDateTimeEAT } = require('../utils/tz');
 
-// GET /api/platform/sessions
 const listAllSessions = async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('sessions')
-      .select(`
-        *,
-        tenants (business_name),
-        routers (name)
-      `)
-      .is('ended_at', null)
-      .order('started_at', { ascending: false });
+    const { rows } = await db.query(`
+      SELECT s.*, t.business_name as tenant_name, r.name as router_name
+      FROM sessions s
+      JOIN tenants t ON s.tenant_id = t.id
+      JOIN routers r ON s.router_id = r.id
+      WHERE s.ended_at IS NULL
+      ORDER BY s.started_at DESC
+    `);
 
-    if (error) throw error;
-
-    const enriched = (data || []).map((s) => ({
+    const enriched = rows.map((s) => ({
       ...s,
       started_at_eat: formatDateTimeEAT(s.started_at),
+      tenants: { business_name: s.tenant_name },
+      routers: { name: s.router_name }
     }));
 
     return res.status(200).json({ success: true, data: enriched });
@@ -28,31 +26,21 @@ const listAllSessions = async (req, res) => {
   }
 };
 
-// POST /api/platform/sessions/:id/disconnect
 const forceDisconnect = async (req, res) => {
   try {
     const { id } = req.params;
+    const { rows } = await db.query('SELECT s.*, r.* FROM sessions s JOIN routers r ON s.router_id = r.id WHERE s.id = $1', [id]);
+    const session = rows[0];
+    
+    if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
 
-    const { data: session, error } = await supabase
-      .from('sessions')
-      .select('*, routers(*)')
-      .eq('id', id)
-      .single();
-
-    if (error || !session) {
-      return res.status(404).json({ success: false, error: 'Session not found' });
-    }
-
-    const router = getRouter(session.routers);
+    const router = getRouter(session);
     await router.disconnectUser(session.mac_address);
 
-    await supabase
-      .from('sessions')
-      .update({
-        ended_at: new Date(),
-        disconnect_reason: 'Force disconnected by Platform Admin',
-      })
-      .eq('id', id);
+    await db.query(
+      `UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'Force disconnected by Platform Admin' WHERE id = $1`,
+      [id]
+    );
 
     return res.status(200).json({ success: true, message: 'Guest disconnected successfully' });
   } catch (error) {

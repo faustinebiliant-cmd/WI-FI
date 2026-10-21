@@ -31,7 +31,9 @@ const TenantShell = () => {
     try { await apiClient.post('/tenant/auth/end-impersonation'); } catch (e) {}
     localStorage.removeItem('tenantToken');
     localStorage.removeItem('tenantUser');
-    window.location.href = 'http://69.62.105.119/platform/';
+    
+    // Redirect back to platform login for local testing
+    window.location.href = 'http://69.62.105.119/platform/login';
   };
 
   const menuItems = [
@@ -77,7 +79,8 @@ const ProtectedRoute = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      {/* Added basename="/tenant" so React Router knows the app lives in a subfolder */}
+      <BrowserRouter basename="/tenant">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           

@@ -47,7 +47,8 @@ const ProtectedRoute = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      {/* Added basename="/platform" so React Router knows the app lives in a subfolder */}
+      <BrowserRouter basename="/platform">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           

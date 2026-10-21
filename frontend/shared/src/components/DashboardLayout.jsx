@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { FiMenu, FiX } from 'react-icons/fi';
+import ConfirmDialog from './ConfirmDialog';
 import '../styles/variables.css';
 import '../styles/base.css';
 import '../styles/components.css';
@@ -14,35 +16,46 @@ export default function DashboardLayout({
   children 
 }) {
   const location = useLocation();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleLogout = () => {
-    if (window.confirm('Are you sure you want to log out?')) {
-      onLogout();
-    }
+  const handleLogoutClick = () => setShowLogoutConfirm(true);
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false);
+    onLogout();
   };
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--light)' }}>
       
+      {/* MOBILE TOP BAR WITH HAMBURGER */}
+      <div className="mobile-topbar">
+        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: 'var(--success)' }}>
+          {title}
+        </h2>
+        <button 
+          onClick={() => setIsMobileMenuOpen(true)} 
+          className="hamburger-btn"
+        >
+          <FiMenu size={28} />
+        </button>
+      </div>
+
       {/* SIDEBAR */}
-      <aside style={{ 
-        width: 'var(--sidebar-w)', 
-        background: 'var(--dark)', 
-        color: 'white', 
-        position: 'fixed', 
-        inset: '0 auto 0 0', 
-        display: 'flex', 
-        flexDirection: 'column',
-        boxShadow: '4px 0 24px rgba(0,0,0,0.1)',
-        zIndex: 10
-      }}>
-        <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#10b981', letterSpacing: '-0.5px' }}>
-            {title}
-          </h2>
-          <span style={{ fontSize: '12px', color: 'var(--gray-light)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-            {subtitle}
-          </span>
+      <aside className={`sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
+        <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: 'var(--success)', letterSpacing: '-0.5px' }}>
+              {title}
+            </h2>
+            <span style={{ fontSize: '12px', color: 'var(--gray-light)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              {subtitle}
+            </span>
+          </div>
+          {/* Close button inside the sidebar for mobile */}
+          <button className="mobile-close-btn" onClick={() => setIsMobileMenuOpen(false)}>
+            <FiX size={24} color="white" />
+          </button>
         </div>
 
         <nav style={{ flex: 1, padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: '4px', overflowY: 'auto' }}>
@@ -52,6 +65,7 @@ export default function DashboardLayout({
               <Link 
                 key={item.path} 
                 to={item.path}
+                onClick={() => setIsMobileMenuOpen(false)}
                 style={{
                   padding: '10px 16px',
                   borderRadius: '8px',
@@ -85,27 +99,36 @@ export default function DashboardLayout({
               <div style={{ fontSize: '11px', color: 'var(--gray-light)' }}>Signed in</div>
             </div>
           </div>
-          <button onClick={handleLogout} className="btn btn-danger" style={{ width: '100%' }}>
+          <button onClick={handleLogoutClick} className="btn btn-danger" style={{ width: '100%' }}>
             Logout
           </button>
         </div>
       </aside>
 
+      {/* MOBILE OVERLAY (DARKENS THE SCREEN BEHIND THE MENU) */}
+      {isMobileMenuOpen && (
+        <div className="mobile-overlay" onClick={() => setIsMobileMenuOpen(false)} />
+      )}
+
       {/* MAIN CONTENT AREA */}
-      <div style={{ flex: 1, marginLeft: 'var(--sidebar-w)', display: 'flex', flexDirection: 'column' }}>
-        
-        <header style={{ height: 'var(--header-h)', background: 'white', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', padding: '0 32px', position: 'sticky', top: 0, zIndex: 5 }}>
-           <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--gray)' }}>
-              System Status: <span style={{ color: 'var(--success)' }}>● Online</span>
-           </div>
-        </header>
-
+      <div className="main-content">
         {banner}
-
-        <main style={{ padding: '32px', flex: 1 }}>
+        <main className="page-content">
           {children}
         </main>
       </div>
+
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title="Log Out"
+        message="Are you sure you want to log out of your account?"
+        confirmLabel="Log Out"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={false}
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </div>
   );
 }
