@@ -43,7 +43,7 @@ export default function TenantDetailPage() {
         is_impersonation: true
       }));
 
-      // Redirect to the tenant panel
+      // Redirect to the tenant panel (Localhost URL)
       window.location.href = 'http://69.62.105.119/tenant/';
       
     } catch (err) {
@@ -57,69 +57,72 @@ export default function TenantDetailPage() {
 
   return (
     <div>
-      <Link to="/" style={{ color: '#2563eb', textDecoration: 'none', marginBottom: '20px', display: 'inline-block' }}>
+      <Link to="/" style={{ color: 'var(--primary)', textDecoration: 'none', marginBottom: '20px', display: 'inline-block', fontWeight: '600' }}>
         &larr; Back to Tenants
       </Link>
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '30px' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '30px' }}>
         <div>
           <h1 style={{ margin: 0 }}>{tenant.business_name}</h1>
-          <p style={{ color: '#6b7280', marginTop: '5px' }}>Tenant ID: {tenant.id}</p>
+          <p style={{ color: 'var(--gray)', marginTop: '5px' }}>Tenant ID: {tenant.id}</p>
         </div>
-        <div>
+        <div style={{ width: '100%', maxWidth: '250px' }}>
           <button 
             onClick={() => setShowImpersonate(true)}
-            style={{ padding: '10px 20px', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+            className="btn btn-primary"
+            style={{ width: '100%', backgroundColor: '#f59e0b', boxShadow: 'none' }}
           >
             Impersonate Owner
           </button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+      {/* Responsive Grid: Stacks on mobile, 2 columns on desktop */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
         
         {/* Owner Info Card */}
-        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-          <h3 style={{ marginTop: 0, borderBottom: '1px solid #e5e7eb', paddingBottom: '10px' }}>Owner Details</h3>
-          <p><strong>Name:</strong> {tenant.owner_name}</p>
-          <p><strong>Email:</strong> {tenant.owner_email}</p>
-          <p><strong>Phone:</strong> {tenant.owner_phone}</p>
-          <p><strong>Status:</strong> {tenant.subscription_status}</p>
+        <div className="card">
+          <h3 style={{ marginTop: 0, borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>Owner Details</h3>
+          <p style={{ marginBottom: '10px' }}><strong>Name:</strong> {tenant.owner_name}</p>
+          <p style={{ marginBottom: '10px' }}><strong>Email:</strong> {tenant.owner_email}</p>
+          <p style={{ marginBottom: '10px' }}><strong>Phone:</strong> {tenant.owner_phone}</p>
+          <p style={{ marginBottom: '10px' }}><strong>Status:</strong> <span className={`badge ${tenant.subscription_status === 'active' ? 'badge-success' : 'badge-warning'}`}>{tenant.subscription_status}</span></p>
         </div>
 
         {/* Stats Card */}
-        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-          <h3 style={{ marginTop: 0, borderBottom: '1px solid #e5e7eb', paddingBottom: '10px' }}>System Stats</h3>
-          <p><strong>Routers Registered:</strong> {tenant.router_count}</p>
-          <p><strong>Active Guests Right Now:</strong> {tenant.active_sessions}</p>
+        <div className="card">
+          <h3 style={{ marginTop: 0, borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>System Stats</h3>
+          <p style={{ marginBottom: '10px' }}><strong>Routers Registered:</strong> {tenant.router_count}</p>
+          <p style={{ marginBottom: '10px' }}><strong>Active Guests Right Now:</strong> {tenant.active_guests || tenant.active_sessions}</p>
         </div>
 
       </div>
 
       {/* IMPERSONATION MODAL */}
       {showImpersonate && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '100%', maxWidth: '500px' }}>
+        <div className="modal-overlay">
+          <div className="modal-content">
             <h2 style={{ marginTop: 0 }}>Impersonate Tenant</h2>
-            <p style={{ color: '#6b7280', fontSize: '14px' }}>
-              You will be logged into the Tenant Panel as <strong>{tenant.owner_name}</strong>. This action is logged in the audit trail.
+            <p style={{ color: 'var(--gray)', fontSize: '14px' }}>
+              As <strong>{tenant.owner_name}</strong>
             </p>
             
-            {error && <div style={{ color: 'red', marginBottom: '15px' }}>{error}</div>}
+            {error && <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>{error}</div>}
 
             <form onSubmit={handleImpersonate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <textarea 
                 required
-                placeholder="Why are you impersonating? (e.g. Client reported an issue with voucher codes) - min 10 chars"
+                placeholder="Reason"
                 value={reason}
                 onChange={e => setReason(e.target.value)}
-                style={{ padding: '10px', height: '100px', resize: 'vertical', fontFamily: 'inherit' }}
+                className="form-control"
+                style={{ height: '100px', resize: 'vertical', fontFamily: 'inherit' }}
               />
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button type="button" onClick={() => setShowImpersonate(false)} style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px' }}>
+                <button type="button" onClick={() => setShowImpersonate(false)} className="btn btn-secondary" style={{ flex: 1 }}>
                   Cancel
                 </button>
-                <button type="submit" disabled={working} style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>
+                <button type="submit" disabled={working} className="btn btn-primary" style={{ flex: 2, backgroundColor: '#f59e0b', boxShadow: 'none' }}>
                   {working ? 'Starting...' : 'Start Impersonation'}
                 </button>
               </div>

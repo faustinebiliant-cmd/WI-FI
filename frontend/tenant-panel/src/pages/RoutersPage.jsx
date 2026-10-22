@@ -69,7 +69,7 @@ export default function RoutersPage() {
             </thead>
             <tbody>
               {routers.map((router) => {
-                const portalUrl = `http://69.62.105.119/portal/?router=${router.router_token}&mac=11:22:33:44:55:66`;
+               const portalUrl = `http://69.62.105.119/portal/?router=${router.router_token}&mac=11:22:33:44:55:66`; 
                 return (
                   <tr key={router.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                     <td style={{ padding: '16px 20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{router.name}</td>

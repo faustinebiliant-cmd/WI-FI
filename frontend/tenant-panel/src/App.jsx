@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import DashboardLayout from './shared/components/DashboardLayout';
-import { FiHome, FiTag, FiPackage, FiWifi, FiActivity } from 'react-icons/fi';
+import { FiHome, FiTag, FiPackage, FiWifi, FiActivity, FiSettings } from 'react-icons/fi';
 import apiClient from './api/client';
 
 // Import Pages
@@ -12,6 +12,7 @@ import PackagesPage from './pages/PackagesPage';
 import VouchersPage from './pages/VouchersPage';
 import RoutersPage from './pages/RoutersPage';
 import SessionsPage from './pages/SessionsPage';
+import ProfilePage from './pages/ProfilePage';
 
 const TenantShell = () => {
   const { user, logout } = useAuth();
@@ -42,6 +43,7 @@ const TenantShell = () => {
     { path: '/packages', label: 'Packages', icon: FiPackage },
     { path: '/routers', label: 'Routers', icon: FiWifi },
     { path: '/sessions', label: 'Active Sessions', icon: FiActivity },
+    { path: '/profile', label: 'Settings', icon: FiSettings }, // Add this
   ];
 
   const banner = isImpersonating ? (
@@ -90,6 +92,7 @@ export default function App() {
             <Route path="/vouchers" element={<VouchersPage />} />
             <Route path="/routers" element={<RoutersPage />} />
             <Route path="/sessions" element={<SessionsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

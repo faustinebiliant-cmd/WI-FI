@@ -24,6 +24,8 @@ CREATE TABLE public.tenants (
     trial_ends_at date,
     monthly_fee_tzs numeric,
     payment_mode varchar(50) DEFAULT 'manual',
+    lipa_namba varchar(50),
+    payout_provider varchar(50),
     notes text,
     logo_url text,
     created_at timestamptz DEFAULT now() NOT NULL
@@ -195,6 +197,7 @@ CREATE INDEX idx_sessions_tenant ON public.sessions(tenant_id);
 -- Lookup indexes
 CREATE INDEX idx_vouchers_code ON public.vouchers(tenant_id, code);
 CREATE INDEX idx_sessions_active ON public.sessions(tenant_id, ended_at);
+CREATE INDEX idx_vouchers_tenant_status ON public.vouchers(tenant_id, status);
 
 -- Sorting indexes for Pagination (Newest first)
 CREATE INDEX idx_packages_tenant_created ON public.packages(tenant_id, created_at DESC);
