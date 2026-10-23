@@ -33,6 +33,13 @@ export default function App() {
       .catch(() => setErrorMessage('Invalid or inactive router.'));
   }, [routerToken]);
 
+  // Helper to format time for guests (Days/Hours instead of just minutes)
+  const formatDuration = (mins) => {
+    if (mins >= 1440 && mins % 1440 === 0) return `${mins / 1440} Day${mins / 1440 > 1 ? 's' : ''}`;
+    if (mins >= 60 && mins % 60 === 0) return `${mins / 60} Hour${mins / 60 > 1 ? 's' : ''}`;
+    return `${mins} Mins`;
+  };
+
   const handleRedeem = async (e) => {
     e.preventDefault();
     if (!voucherCode) return;
@@ -66,14 +73,12 @@ export default function App() {
     setErrorMessage('');
 
     try {
-      // Call our new mock backend endpoint
       await apiClient.post('/portal/pay', {
         router_token: routerToken,
         package_id: selectedPackage.id,
         phone_number: phoneNumber
       });
       
-      // Show the success screen
       setSuccessData({ 
         duration_minutes: selectedPackage.duration_minutes, 
         speed_down_mbps: selectedPackage.speed_down_kbps / 1024 
@@ -91,7 +96,7 @@ export default function App() {
         <div className="card" style={{ maxWidth: '400px', textAlign: 'center', padding: '40px' }}>
           <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'var(--success)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', margin: '0 auto 20px' }}>✓</div>
           <h1 style={{ fontSize: '24px', marginBottom: '10px' }}>Connected!</h1>
-          <p style={{ color: 'var(--gray)', marginBottom: '20px' }}>You have internet access for <strong>{successData.duration_minutes} minutes</strong> at <strong>{successData.speed_down_mbps} Mbps</strong>.</p>
+          <p style={{ color: 'var(--gray)', marginBottom: '20px' }}>You have internet access for <strong>{formatDuration(successData.duration_minutes)}</strong> at <strong>{successData.speed_down_mbps} Mbps</strong>.</p>
           <button onClick={() => window.location.reload()} className="btn btn-secondary" style={{ width: '100%' }}>Done</button>
         </div>
       </div>
@@ -109,13 +114,11 @@ export default function App() {
         
         {errorMessage && <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '20px', fontSize: '13px' }}>{errorMessage}</div>}
 
-        {/* TABS */}
         <div style={{ display: 'flex', borderBottom: '2px solid #e5e7eb', marginBottom: '20px' }}>
           <button onClick={() => { setActiveTab('buy'); setErrorMessage(''); setSelectedPackage(null); }} style={{ flex: 1, padding: '10px', background: 'none', border: 'none', borderBottom: activeTab === 'buy' ? '2px solid var(--primary)' : 'none', fontWeight: activeTab === 'buy' ? 'bold' : 'normal', color: activeTab === 'buy' ? 'var(--primary)' : 'var(--gray)', cursor: 'pointer', marginBottom: '-2px' }}>Buy WiFi</button>
           <button onClick={() => { setActiveTab('voucher'); setErrorMessage(''); setSelectedPackage(null); }} style={{ flex: 1, padding: '10px', background: 'none', border: 'none', borderBottom: activeTab === 'voucher' ? '2px solid var(--primary)' : 'none', fontWeight: activeTab === 'voucher' ? 'bold' : 'normal', color: activeTab === 'voucher' ? 'var(--primary)' : 'var(--gray)', cursor: 'pointer', marginBottom: '-2px' }}>Have a Voucher?</button>
         </div>
 
-        {/* BUY WIFI TAB */}
         {activeTab === 'buy' && (
           <div>
             {!selectedPackage ? (
@@ -124,12 +127,12 @@ export default function App() {
                   <div key={pkg.id} onClick={() => handleBuy(pkg)} style={{ padding: '15px', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white' }}>
                     <div style={{ textAlign: 'left' }}>
                       <div style={{ fontWeight: 'bold' }}>{pkg.name}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--gray)' }}>{pkg.duration_minutes} mins at {pkg.speed_down_kbps / 1024} Mbps</div>
+                      <div style={{ fontSize: '12px', color: 'var(--gray)' }}>{formatDuration(pkg.duration_minutes)} at {pkg.speed_down_kbps / 1024} Mbps</div>
                     </div>
                     <div style={{ fontWeight: 'bold', color: 'var(--primary)' }}>TZS {pkg.price_tzs.toLocaleString()}</div>
                   </div>
                 )) : (
-                  <p style={{ color: 'var(--gray)' }}>No packages available at this hotel yet.</p>
+                  <p style={{ color: 'var(--gray)' }}>No packages available at this time.</p>
                 )}
               </div>
             ) : (
@@ -161,7 +164,6 @@ export default function App() {
           </div>
         )}
 
-        {/* VOUCHER TAB */}
         {activeTab === 'voucher' && (
           <form onSubmit={handleRedeem}>
             <p style={{ color: 'var(--gray)', marginBottom: '20px', fontSize: '14px' }}>Enter your voucher code to connect.</p>
@@ -182,7 +184,7 @@ export default function App() {
           </form>
         )}
 
-        <p style={{ fontSize: '12px', color: 'var(--gray-light)', marginTop: '30px' }}>Powered by OSWAGOTech WiFi</p>
+        <p style={{ fontSize: '12px', color: 'var(--gray-light)', marginTop: '30px' }}>Powered by OSWAGOTech</p>
       </div>
     </div>
   );

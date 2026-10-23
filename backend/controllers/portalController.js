@@ -70,7 +70,7 @@ const redeemVoucher = async (req, res) => {
 
     // A5: CHECK IF ROUTER IS OFFLINE
     if (router.status === 'offline') {
-      return res.status(400).json({ success: false, error: 'Router is currently offline. Please contact the hotel staff.' });
+      return res.status(400).json({ success: false, error: 'Router is currently offline. Please contact the management.' });
     }
 
     // A2: ATOMIC UPDATE (Prevent race condition)
