@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = '/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -23,7 +23,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('adminToken');
       localStorage.removeItem('admin');
-      window.location.href = '/login';
+      window.location.href = import.meta.env.VITE_PLATFORM_BASE + '/login';
     }
     return Promise.reject(error);
   }

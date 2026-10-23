@@ -18,15 +18,27 @@ const cleanExpiredSessions = async () => {
     console.log(`[Cleaner] Found ${rows.length} expired sessions. Kicking users...`);
 
     for (const session of rows) {
+      let kickSuccess = false;
+      let disconnectReason = 'Time Expired';
+
       try {
         // 1. Tell the Router to kick the user
         const adapter = getRouter(session);
-        await adapter.disconnectUser(session.mac_address);
+        const result = await adapter.disconnectUser(session.mac_address);
+        if (result && result.ok) {
+          kickSuccess = true;
+        }
+      } catch (err) {
+        // If the router fails, we log it but we DO NOT stop the database update
+        console.error(`[Cleaner] Failed to kick MAC ${session.mac_address}:`, err.message);
+        disconnectReason = 'Expired (router unreachable)';
+      }
 
-        // 2. Mark the session as ended
+      try {
+        // 2. Mark the session as ended (even if router failed)
         await db.query(
-          "UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'Time Expired' WHERE id = $1",
-          [session.session_id]
+          "UPDATE sessions SET ended_at = NOW(), disconnect_reason = $1 WHERE id = $2",
+          [disconnectReason, session.session_id]
         );
 
         // 3. Mark the voucher as expired
@@ -35,9 +47,13 @@ const cleanExpiredSessions = async () => {
           [session.voucher_id]
         );
 
-        console.log(`[Cleaner] Kicked MAC ${session.mac_address}`);
-      } catch (err) {
-        console.error(`[Cleaner] Failed to kick MAC ${session.mac_address}:`, err.message);
+        if (kickSuccess) {
+          console.log(`[Cleaner] Kicked MAC ${session.mac_address}`);
+        } else {
+          console.log(`[Cleaner] Marked MAC ${session.mac_address} as ended in database (router was offline).`);
+        }
+      } catch (dbErr) {
+        console.error(`[Cleaner] Database update failed for session ${session.session_id}:`, dbErr.message);
       }
     }
   } catch (error) {

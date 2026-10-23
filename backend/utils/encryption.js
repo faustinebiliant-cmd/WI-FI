@@ -3,10 +3,9 @@
 // Used to encrypt MikroTik API passwords before saving to DB
 // ============================================================
 const crypto = require('crypto');
+const env = require('../config/env');
 
-// We need a 32-byte key for AES-256. 
-// We will read it from env, or fallback for dev if missing.
-const ENCRYPTION_KEY = process.env.ROUTER_ENCRYPTION_KEY || '12345678901234567890123456789012'; 
+const ENCRYPTION_KEY = env.ROUTER_ENCRYPTION_KEY; 
 const ALGORITHM = 'aes-256-gcm';
 
 const encrypt = (text) => {

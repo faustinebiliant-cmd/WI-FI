@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('adminToken');
     localStorage.removeItem('admin');
     setAdmin(null);
-    window.location.href = '/login';
+    window.location.href = import.meta.env.VITE_PLATFORM_BASE + '/login';
   };
 
   return (

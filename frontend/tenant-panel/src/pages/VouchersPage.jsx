@@ -50,6 +50,25 @@ export default function VouchersPage() {
     }
   };
 
+  // Helper to format remaining time nicely
+  const getRemainingTime = (expiresAt) => {
+    if (!expiresAt) return null;
+    const now = new Date();
+    const expires = new Date(expiresAt);
+    const diffMs = expires - now;
+    
+    if (diffMs <= 0) return 'Expired';
+    
+    const diffMins = Math.floor(diffMs / 60000);
+    const days = Math.floor(diffMins / 1440);
+    const hours = Math.floor((diffMins % 1440) / 60);
+    const mins = diffMins % 60;
+
+    if (days > 0) return `${days}d ${hours}h left`;
+    if (hours > 0) return `${hours}h ${mins}m left`;
+    return `${mins}m left`;
+  };
+
   return (
     <div>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
@@ -100,12 +119,19 @@ export default function VouchersPage() {
                   <td style={{ padding: '16px 20px', fontFamily: 'monospace', fontSize: '16px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{v.code}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{v.packages?.name}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
-                    <span className={`badge ${v.status === 'unused' ? 'badge-success' :
-                        v.status === 'active' ? 'badge-warning' :
-                          'badge-danger'
-                      }`}>
-                      {v.status}
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span className={`badge ${v.status === 'unused' ? 'badge-success' :
+                          v.status === 'active' ? 'badge-warning' :
+                            'badge-danger'
+                        }`} style={{ width: 'fit-content' }}>
+                        {v.status}
+                      </span>
+                      {v.status === 'active' && v.expires_at && (
+                        <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '500' }}>
+                          {getRemainingTime(v.expires_at)}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -114,7 +140,6 @@ export default function VouchersPage() {
         )}
       </div>
 
-      {/* Pagination - now sits perfectly below the table and scrolls with it */}
       {!loading && vouchers.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', width: 'max-content', minWidth: '100%', gap: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}>
           <button className="btn btn-secondary" disabled={page === 1} onClick={() => fetchVouchers(page - 1)}>

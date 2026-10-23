@@ -37,7 +37,7 @@ export default function PackagesPage() {
     e.preventDefault();
     setIsSubmitting(true);
     
-    let duration_minutes = formData.duration_value;
+    let duration_minutes = parseInt(formData.duration_value, 10);
     if (formData.duration_unit === 'hours') duration_minutes *= 60;
     if (formData.duration_unit === 'days') duration_minutes *= 1440;
     if (formData.duration_unit === 'weeks') duration_minutes *= 10080;
@@ -76,6 +76,13 @@ export default function PackagesPage() {
     }
   };
 
+  // Helper to format minutes nicely for the table
+  const formatDuration = (mins) => {
+    if (mins >= 1440 && mins % 1440 === 0) return `${mins / 1440} Days`;
+    if (mins >= 60 && mins % 60 === 0) return `${mins / 60} Hours`;
+    return `${mins} Mins`;
+  };
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '30px' }}>
@@ -109,7 +116,7 @@ export default function PackagesPage() {
                 <tr key={pkg.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                   <td style={{ padding: '16px 20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{pkg.name}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>TZS {pkg.price_tzs.toLocaleString()}</td>
-                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{pkg.duration_minutes} mins</td>
+                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{formatDuration(pkg.duration_minutes)}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{pkg.speed_down_kbps / 1024} Mbps</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
                     <button onClick={() => setDeleteTarget(pkg)} style={{ padding: '6px 12px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
@@ -129,7 +136,7 @@ export default function PackagesPage() {
             <h2 style={{ marginTop: 0 }}>Create Package</h2>
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <input required type="text" placeholder="Package Name (e.g. Daily 5Mbps)" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ padding: '10px' }} disabled={isSubmitting} />
-              <input required type="number" placeholder="Price (TZS)" value={formData.price_tzs} onChange={e => setFormData({...formData, price_tzs: e.target.value})} style={{ padding: '10px' }} disabled={isSubmitting} />
+              <input required type="number" min="0" placeholder="Price (TZS)" value={formData.price_tzs} onChange={e => setFormData({...formData, price_tzs: e.target.value})} style={{ padding: '10px' }} disabled={isSubmitting} />
               
               <div style={{ display: 'flex', gap: '10px' }}>
                 <input required type="number" min="1" placeholder="Duration" value={formData.duration_value} onChange={e => setFormData({...formData, duration_value: e.target.value})} style={{ padding: '10px', flex: 1 }} disabled={isSubmitting} />

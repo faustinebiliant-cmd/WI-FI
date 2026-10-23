@@ -1,9 +1,24 @@
 server {
     listen 80;
     listen [::]:80;
+    server_name oswagolink.co.tz www.oswagolink.co.tz;
 
-    server_name 69.62.105.119;
+    # Redirect all HTTP traffic to HTTPS
+    return 301 https://$host$request_uri;
+}
 
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name oswagolink.co.tz www.oswagolink.co.tz;
+
+    # SSL Certificates managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/oswagolink.co.tz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/oswagolink.co.tz/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # API Proxy (Backend)
     location /api/ {
         proxy_pass http://127.0.0.1:5001/api/;
         proxy_http_version 1.1;
@@ -14,35 +29,35 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # Root Domain Redirect (Goes to Tenant Login for now)
+    location = / {
+        return 301 https://oswagolink.co.tz/tenant/login;
+    }
+
+    # Portal (Guest App)
     location = /portal {
         return 301 /portal/;
     }
-
     location /portal/ {
-        alias /home/biliant/WI-FI/frontend/portal/dist/;
+        alias /var/www/wifi-app/portal/;
         try_files $uri $uri/ /portal/index.html;
     }
 
+    # Tenant Panel (Hotel App)
     location = /tenant {
         return 301 /tenant/;
     }
-
     location /tenant/ {
-        alias /home/biliant/WI-FI/frontend/tenant-panel/dist/;
+        alias /var/www/wifi-app/tenant/;
         try_files $uri $uri/ /tenant/index.html;
     }
 
+    # Platform Panel (Admin App)
     location = /platform {
         return 301 /platform/;
     }
-
     location /platform/ {
-        alias /home/biliant/WI-FI/frontend/platform-panel/dist/;
+        alias /var/www/wifi-app/platform/;
         try_files $uri $uri/ /platform/index.html;
-    }
-
-    location / {
-        return 200 "Wi-Fi platform server is running. Use /portal/, /tenant/, or /platform/.\n";
-        add_header Content-Type text/plain;
     }
 }

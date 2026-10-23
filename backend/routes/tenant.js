@@ -4,6 +4,7 @@
 const express = require('express');
 const router = express.Router();
 const authTenant = require('../middleware/authTenant');
+const { tenantLoginLimiter } = require('../middleware/rateLimiter');
 
 const { login, endImpersonationSelf } = require('../controllers/authTenantController');
 const { listPackages, createPackage, deletePackage } = require('../controllers/tenantPackageController');
@@ -14,7 +15,7 @@ const { getDashboardStats } = require('../controllers/tenantDashboardController'
 const { updateProfile, getProfile } = require('../controllers/tenantProfileController');
 
 // --- Public Routes ---
-router.post('/auth/login', login);
+router.post('/auth/login', tenantLoginLimiter, login);
 
 // --- Protected Routes (Require Auth) ---
 router.use(authTenant);
