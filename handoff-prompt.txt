@@ -3,17 +3,19 @@
 ## 1. PROJECT IDENTITY
 I am building OSWAGOTech WiFi, a multi-tenant hotspot billing SaaS for hotels and guest houses in Tanzania. The business model is voucher-based: guests buy a paper code at reception, enter it on a captive portal, and get WiFi for a set duration and speed.
 
-## 2. CURRENT STATUS: LIVE ON VPS (IP ONLY)
-- The system is fully deployed and running live.
+## 2. CURRENT STATUS: LIVE ON VPS (DOMAIN + SSL)
+- The system is fully deployed, running live, and secured with HTTPS.
 - VPS: Hostinger (Ubuntu 24.04 LTS, IP: 69.62.105.119, User: biliant).
-- Domain: NONE YET. Everything is accessed via the raw IP address for now.
+- Domain: oswagolink.co.tz (DNS managed at Sakurahost, A-record points to VPS).
+- SSL: Let's Encrypt certificate installed via Certbot, auto-renewal is active.
 - Database: Raw PostgreSQL running locally on the VPS (wifi_app database). RLS is disabled because the backend handles security.
 - Process Manager: PM2 (wifi-backend process).
 - Web Server: Nginx serving the three React apps and proxying /api to http://127.0.0.1:5001.
 - Live URLs:
-  - Portal: http://69.62.105.119/portal/
-  - Tenant: http://69.62.105.119/tenant/
-  - Platform: http://69.62.105.119/platform/
+  - Root (Redirects to Tenant): https://oswagolink.co.tz
+  - Tenant Login: https://oswagolink.co.tz/tenant/login
+  - Portal: https://oswagolink.co.tz/portal/
+  - Platform: https://oswagolink.co.tz/platform/
 
 ## 3. ARCHITECTURE & SECURITY RULES
 - 3 Frontends (React + Vite): portal, tenant-panel, platform-panel.
@@ -23,6 +25,7 @@ I am building OSWAGOTech WiFi, a multi-tenant hotspot billing SaaS for hotels an
 - Security Rules: JWT_SECRET and ADMIN_JWT_SECRET are 32+ chars and strictly different. Router passwords are encrypted using AES-256. tenant_id is ALWAYS extracted from the JWT middleware.
 - Timezone: All timestamps are handled in EAT (Africa/Dar_es_Salaam, UTC+3). Backend calculates EAT ranges and sends _eat formatted strings to the frontend.
 - Router Paths: Vite base paths are set to /portal/, /tenant/, and /platform/. React Router basenames match these paths.
+- CORS: The VPS .env ALLOWED_ORIGINS must include https://oswagolink.co.tz and https://www.oswagolink.co.tz.
 
 ## 4. THE XCOPY RULE (CRITICAL FOR FRONTEND)
 Vite crashes if you import from outside its folder. We keep master UI files in frontend/shared/src/ and copy them into each app.
@@ -36,25 +39,35 @@ Never edit files directly inside frontend/[app]/src/shared.
 ## 5. DATABASE SCHEMA (10 Tables + RPC)
 - platform_admins, tenants, tenant_users, routers, packages, payments, vouchers, sessions, impersonation_sessions, platform_audit_logs.
 - RPC: create_tenant_with_owner (Atomic function).
+- Recent Updates: Added `lipa_namba` and `payout_provider` to tenants table. Added `idx_vouchers_tenant_status` index.
 - The payments table already has columns for future payment gateways (gateway_reference, guest_phone, status).
 
-## 6. WHAT IS CURRENTLY PAUSED (AzamPay)
+## 6. AUTOMATED SESSION CLEANER (NEW)
+- We created a background service: `backend/services/sessionCleaner.js`.
+- It runs every 60 seconds via `server.js`.
+- It checks the `vouchers` table for any voucher where `expires_at < NOW()`.
+- If found, it calls the router adapter to kick the user, updates the session's `ended_at` time, and sets the voucher status to `expired`.
+- This prevents guests from getting free internet after their time runs out.
+
+## 7. WHAT IS CURRENTLY PAUSED (AzamPay)
 - Integration of AzamPay to allow guests to pay with Mobile Money directly on the Portal is PAUSED.
 - Reason: AzamPay requires a BRELA Business Name Certificate, TIN, and KYC submission. I have not registered my business yet. I will resume this later.
+- The UI for "Buy WiFi" (with mock payments) is already built and working.
 
-## 7. HARDWARE STRATEGY & FUTURE PLANS
+## 8. HARDWARE STRATEGY & FUTURE PLANS
 My goal is to offer a low-cost hardware setup to hotels in Tanzania and support both MikroTik and TP-Link Omada.
-- Current Hardware Strategy: To minimize costs for the hotel, I will use MikroTik routers with built-in WiFi (like the hAP ac2) OR a MikroTik router paired with a TP-Link EAP225 Access Point.
+- Hardware Bought: MikroTik hEX (RB750Gr3) and TP-Link EAP225-Outdoor.
+- Current Setup: Testing MikroTik using a Dell laptop with a USB-to-Ethernet adapter, using Windows Internet Connection Sharing (ICS) to provide internet.
 - MikroTik Mode (V1): The MikroTik handles the hotspot and routing. The EAP225 acts as a dumb Access Point (DHCP disabled, connected to MikroTik LAN).
-- Omada Mode (V2): In the future, I want to support Omada directly. I will build OmadaRouter.js using standard RADIUS authentication. The EAP225 will connect to an Omada Controller, and my backend will authenticate users via RADIUS.
+- Omada Mode (V2): In the future, I want to support Omada directly. I will build OmadaRouter.js using standard RADIUS authentication.
 
-## 8. VPN AUTOMATION GOAL (FUTURE V1.1)
+## 9. VPN AUTOMATION GOAL (FUTURE V1.1)
 Currently, VPN setup (WireGuard) between the VPS and the MikroTik is manual. 
 - Future Goal: Automate this inside the Tenant Panel.
 - How: When a Tenant adds a router, the Node.js backend should automatically generate WireGuard keys, assign a unique VPN IP (e.g., 10.0.0.5), append the config to the VPS wg0.conf file, reload the VPN, and send the .conf file to the Tenant so they can import it into WinBox.
 - Action: Do not build this until the manual hardware setup is tested and proven.
 
-## 9. HOW WE WORK
+## 10. HOW WE WORK
 - Give me FULL files, not diffs or code snippets.
 - Tell me exact commands to run (I use Windows Command Prompt locally, and VPS terminal via SSH).
 - No emojis in code.

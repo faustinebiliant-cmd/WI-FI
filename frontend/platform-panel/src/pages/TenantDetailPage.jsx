@@ -43,7 +43,7 @@ export default function TenantDetailPage() {
         is_impersonation: true
       }));
 
-      // Redirect to the tenant panel (Localhost URL)
+      // Redirect to the tenant panel
       window.location.href = 'https://oswagolink.co.tz/tenant/';
       
     } catch (err) {

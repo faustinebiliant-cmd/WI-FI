@@ -69,14 +69,15 @@ export default function RoutersPage() {
             </thead>
             <tbody>
               {routers.map((router) => {
-               `https://oswagolink.co.tz/portal/?router=${router.router_token}&mac=11:22:33:44:55:66`;
+                const portalUrl = `https://oswagolink.co.tz/portal/?router=${router.router_token}&mac=11:22:33:44:55:66`;
                 return (
                   <tr key={router.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                     <td style={{ padding: '16px 20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{router.name}</td>
                     <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{router.location_label || '-'}</td>
                     <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
                       <span style={{ padding: '4px 10px', borderRadius: '50px', fontSize: '12px', fontWeight: 'bold', backgroundColor: router.status === 'online' ? '#ecfdf5' : '#fef2f2', color: router.status === 'online' ? '#059669' : '#dc2626' }}>
-                        {router.status.toUpperCase()}
+                        {/* Added safety check so it doesn't crash if status is empty */}
+                        {(router.status || 'offline').toUpperCase()}
                       </span>
                     </td>
                     <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
