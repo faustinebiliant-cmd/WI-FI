@@ -57,20 +57,20 @@ export default function VouchersPage() {
           <h1 style={{ margin: 0 }}>Vouchers</h1>
           <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Generate codes to sell to your guests.</p>
         </div>
-        
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '300px' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'var(--gray)' }}>
-            <input 
-              type="checkbox" 
-              checked={todayOnly} 
-              onChange={(e) => { setTodayOnly(e.target.checked); }} 
+            <input
+              type="checkbox"
+              checked={todayOnly}
+              onChange={(e) => { setTodayOnly(e.target.checked); }}
               style={{ width: '18px', height: '18px' }}
             />
             Today only (EAT)
           </label>
-          <button 
-            onClick={() => { setShowModal(true); setGeneratedCodes(null); }} 
-            className="btn btn-primary" 
+          <button
+            onClick={() => { setShowModal(true); setGeneratedCodes(null); }}
+            className="btn btn-primary"
             style={{ width: '100%' }}
           >
             + Generate Vouchers
@@ -100,7 +100,10 @@ export default function VouchersPage() {
                   <td style={{ padding: '16px 20px', fontFamily: 'monospace', fontSize: '16px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{v.code}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{v.packages?.name}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
-                    <span className={`badge ${v.status === 'unused' ? 'badge-success' : 'badge-warning'}`}>
+                    <span className={`badge ${v.status === 'unused' ? 'badge-success' :
+                        v.status === 'active' ? 'badge-warning' :
+                          'badge-danger'
+                      }`}>
                       {v.status}
                     </span>
                   </td>

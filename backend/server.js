@@ -156,6 +156,10 @@ setInterval(() => {
   });
 }, 5 * 60 * 1000); // 5 minutes
 
+// Start the session expiration checker
+const { startSessionCleaner } = require('./services/sessionCleaner');
+startSessionCleaner();
+
 // ------------------------------------------------------------
 // Start
 // ------------------------------------------------------------
