@@ -45,6 +45,10 @@ const portalUrl = `http://localhost:3000/portal/?router=${router.router_token}&m
 When you are 100% finished building a feature, change the files above to these exact lines before you run git push.
 
 ### 1. API Clients (All 3 apps)
+Files:
+- frontend/platform-panel/src/api/client.js
+- frontend/tenant-panel/src/api/client.js
+- frontend/portal/src/api/client.js
 Code:
 const API_URL = '/api';
 
@@ -60,19 +64,19 @@ Code:
 ### 3. Impersonation Redirect (Platform to Tenant)
 File: frontend/platform-panel/src/pages/TenantDetailPage.jsx
 Code:
-window.location.href = 'http://69.62.105.119/tenant/';
+window.location.href = 'https://oswagolink.co.tz/tenant/';
 
 ### 4. End Impersonation Redirect (Tenant to Platform)
 Files:
 - frontend/tenant-panel/src/App.jsx
 - frontend/tenant-panel/src/components/Layout.jsx
 Code:
-window.location.href = 'http://69.62.105.119/platform/login';
+window.location.href = 'https://oswagolink.co.tz/platform/login';
 
 ### 5. Test Portal Link
 File: frontend/tenant-panel/src/pages/RoutersPage.jsx
 Code:
-const portalUrl = `http://69.62.105.119/portal/?router=${router.router_token}&mac=11:22:33:44:55:66`;
+const portalUrl = `https://oswagolink.co.tz/portal/?router=${router.router_token}&mac=11:22:33:44:55:66`;
 
 ---
 

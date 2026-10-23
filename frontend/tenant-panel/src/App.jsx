@@ -34,7 +34,7 @@ const TenantShell = () => {
     localStorage.removeItem('tenantUser');
     
     // Redirect back to platform login for local testing
-    window.location.href = 'http://69.62.105.119/platform/login';
+    window.location.href = 'https://oswagolink.co.tz/platform/login';
   };
 
   const menuItems = [
