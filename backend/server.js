@@ -149,7 +149,7 @@ app.use((err, req, res, next) => {
 // Start the Router Pinger (runs every 5 minutes)
 // ------------------------------------------------------------
 const { exec } = require('child_process');
-setInterval(() => {
+const pingerInterval = setInterval(() => {
   exec('node scripts/pingRouters.js', (err, stdout, stderr) => {
     if (err) console.error('Pinger error:', err.message);
     if (stdout) console.log(stdout.trim());
@@ -158,12 +158,14 @@ setInterval(() => {
 
 // Start the session expiration checker
 const { startSessionCleaner } = require('./services/sessionCleaner');
-startSessionCleaner();
+// (Note: startSessionCleaner currently doesn't return the interval, 
+// but for graceful shutdown we mainly need to stop accepting web traffic 
+// and close the DB.)
 
 // ------------------------------------------------------------
-// Start
+// Start Server
 // ------------------------------------------------------------
-app.listen(env.PORT, () => {
+const server = app.listen(env.PORT, () => {
   console.log('========================================');
   console.log('   OSWAGOTECH WIFI');
   console.log('========================================');
@@ -172,3 +174,36 @@ app.listen(env.PORT, () => {
   console.log(`   Router mode: ${env.ROUTER_MODE}`);
   console.log('========================================');
 });
+
+// ------------------------------------------------------------
+// C5: Graceful Shutdown
+// ------------------------------------------------------------
+const gracefulShutdown = (signal) => {
+  console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
+  
+  // 1. Stop accepting new requests
+  server.close(() => {
+    console.log('HTTP server closed.');
+    
+    // 2. Stop background tasks
+    clearInterval(pingerInterval);
+    console.log('Background tasks stopped.');
+    
+    // 3. Close database connection
+    db.pool.end(() => {
+      console.log('Database connection closed.');
+      console.log('Shutdown complete. Exiting.');
+      process.exit(0);
+    });
+  });
+
+  // Force exit after 10 seconds if something hangs
+  setTimeout(() => {
+    console.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+};
+
+// Listen for PM2 or ctrl+c signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

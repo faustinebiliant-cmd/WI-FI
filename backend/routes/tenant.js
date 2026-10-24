@@ -1,10 +1,7 @@
-// ============================================================
-// OSWAGOTech WiFi - Tenant Routes
-// ============================================================
 const express = require('express');
 const router = express.Router();
 const authTenant = require('../middleware/authTenant');
-const { tenantLoginLimiter } = require('../middleware/rateLimiter');
+const { tenantLoginLimiter, tenantGlobalLimiter } = require('../middleware/rateLimiter');
 
 const { login, endImpersonationSelf } = require('../controllers/authTenantController');
 const { listPackages, createPackage, deletePackage } = require('../controllers/tenantPackageController');
@@ -14,34 +11,27 @@ const { getActiveSessions, disconnectSession } = require('../controllers/tenantS
 const { getDashboardStats } = require('../controllers/tenantDashboardController');
 const { updateProfile, getProfile } = require('../controllers/tenantProfileController');
 
-// --- Public Routes ---
 router.post('/auth/login', tenantLoginLimiter, login);
 
-// --- Protected Routes (Require Auth) ---
 router.use(authTenant);
-router.get('/dashboard', getDashboardStats);
+router.use(tenantGlobalLimiter);
 
+router.get('/dashboard', getDashboardStats);
 router.get('/profile', getProfile);
 router.put('/profile', updateProfile);
-
-// Auth Helpers
 router.post('/auth/end-impersonation', endImpersonationSelf);
 
-// Packages
 router.get('/packages', listPackages);
 router.post('/packages', createPackage);
 router.delete('/packages/:id', deletePackage);
 
-// Routers
 router.get('/routers', listRouters);
 router.post('/routers', createRouter);
 
-// Vouchers
 router.post('/vouchers/generate', generateVouchers);
 router.get('/vouchers', listVouchers);
 router.patch('/vouchers/:id/revoke', revokeVoucher);
 
-// Sessions
 router.get('/sessions/active', getActiveSessions);
 router.post('/sessions/:id/disconnect', disconnectSession);
 

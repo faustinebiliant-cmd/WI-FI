@@ -1,6 +1,3 @@
-// ============================================================
-// OSWAGOTech WiFi - Rate Limiter
-// ============================================================
 const rateLimit = require('express-rate-limit');
 const env = require('../config/env');
 
@@ -11,41 +8,41 @@ const limitMessage = (error) => ({
   error
 });
 
-// ------------------------------------------------------------
-// Platform Login Limiter (Strict)
-// ------------------------------------------------------------
 const platformLoginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: devMax(5), // 5 attempts in prod, 50 in dev
+  windowMs: 15 * 60 * 1000,
+  max: devMax(5),
   standardHeaders: true,
   legacyHeaders: false,
   message: limitMessage('Too many login attempts. Please try again in 15 minutes.')
 });
 
-// ------------------------------------------------------------
-// Tenant Login Limiter (Strict - 10 Minutes)
-// ------------------------------------------------------------
 const tenantLoginLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: devMax(5), // 5 attempts in prod, 50 in dev
+  windowMs: 10 * 60 * 1000,
+  max: devMax(5),
   standardHeaders: true,
   legacyHeaders: false,
   message: limitMessage('Too many login attempts. Please try again in 10 minutes.')
 });
 
-// ------------------------------------------------------------
-// Voucher Redemption Limiter (Protects against brute-force - 10 Minutes)
-// ------------------------------------------------------------
 const redeemLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: devMax(5), // 5 attempts in prod, 100 in dev
+  windowMs: 10 * 60 * 1000,
+  max: devMax(10),
   standardHeaders: true,
   legacyHeaders: false,
-  message: limitMessage('Too many attempts. Please wait 5 minutes and try again.')
+  message: limitMessage('Too many attempts. Please wait 10 minutes and try again.')
+});
+
+const tenantGlobalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: devMax(100),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: limitMessage('Too many requests. Please slow down.')
 });
 
 module.exports = {
   platformLoginLimiter,
   tenantLoginLimiter,
-  redeemLimiter
+  redeemLimiter,
+  tenantGlobalLimiter
 };

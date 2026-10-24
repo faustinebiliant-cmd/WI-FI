@@ -7,11 +7,32 @@ const generateCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();
 const generateVouchers = async (req, res) => {
   try {
     const { package_id, quantity } = req.body;
-    const count = parseInt(quantity) || 100;
-    if (count < 1 || count > 500) return res.status(400).json({ success: false, error: 'Generate between 1 and 500' });
+    
+    let count = parseInt(quantity) || 50; 
+    if (count < 1 || count > 50) {
+      return res.status(400).json({ success: false, error: 'You can generate between 1 and 50 vouchers at a time.' });
+    }
 
     const pkgCheck = await db.query('SELECT id FROM packages WHERE id = $1 AND tenant_id = $2', [package_id, req.tenantId]);
     if (pkgCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'Package not found' });
+
+    // CHECK THE HOURLY LIMIT (150 PER HOUR)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const countRes = await db.query(
+      'SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1 AND created_at >= $2',
+      [req.tenantId, oneHourAgo]
+    );
+    const generatedLastHour = parseInt(countRes.rows[0].count);
+    const remainingAllowance = 150 - generatedLastHour;
+
+    if (remainingAllowance <= 0) {
+      return res.status(400).json({ success: false, error: 'You have reached the maximum limit per hour. Please wait before generating more.' });
+    }
+
+    // If they ask for 50, but only have 20 left, we only give them 20.
+    if (count > remainingAllowance) {
+      count = remainingAllowance;
+    }
 
     const vouchers = [];
     for (let i = 0; i < count; i++) {

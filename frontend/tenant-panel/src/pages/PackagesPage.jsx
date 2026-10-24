@@ -9,6 +9,8 @@ export default function PackagesPage() {
   const [showModal, setShowModal] = useState(false);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  
   const [formData, setFormData] = useState({
     name: '',
     price_tzs: '',
@@ -36,6 +38,7 @@ export default function PackagesPage() {
   const handleCreate = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setErrorMsg('');
     
     let duration_minutes = parseInt(formData.duration_value, 10);
     if (formData.duration_unit === 'hours') duration_minutes *= 60;
@@ -56,7 +59,7 @@ export default function PackagesPage() {
       setFormData({ name: '', price_tzs: '', duration_value: 1, duration_unit: 'hours', speed_mbps: 5 });
       fetchPackages();
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to create package');
+      setErrorMsg(error.response?.data?.error || 'Failed to create package');
     } finally {
       setIsSubmitting(false);
     }
@@ -70,13 +73,12 @@ export default function PackagesPage() {
       setDeleteTarget(null);
       fetchPackages();
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to delete package');
+      console.error(error);
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // Helper to format minutes nicely for the table
   const formatDuration = (mins) => {
     if (mins >= 1440 && mins % 1440 === 0) return `${mins / 1440} Days`;
     if (mins >= 60 && mins % 60 === 0) return `${mins / 60} Hours`;
@@ -90,7 +92,7 @@ export default function PackagesPage() {
           <h1 style={{ margin: 0 }}>WiFi Packages</h1>
           <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Set your own prices, speeds, and durations.</p>
         </div>
-        <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', width: '100%', maxWidth: '200px' }}>
+        <button onClick={() => { setShowModal(true); setErrorMsg(''); }} style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', width: '100%', maxWidth: '200px' }}>
           + Create Package
         </button>
       </div>
@@ -134,6 +136,13 @@ export default function PackagesPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '100%', maxWidth: '500px' }}>
             <h2 style={{ marginTop: 0 }}>Create Package</h2>
+            
+            {errorMsg && (
+              <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
+                {errorMsg}
+              </div>
+            )}
+
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <input required type="text" placeholder="Package Name (e.g. Daily 5Mbps)" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ padding: '10px' }} disabled={isSubmitting} />
               <input required type="number" min="0" placeholder="Price (TZS)" value={formData.price_tzs} onChange={e => setFormData({...formData, price_tzs: e.target.value})} style={{ padding: '10px' }} disabled={isSubmitting} />

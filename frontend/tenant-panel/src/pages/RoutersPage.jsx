@@ -7,6 +7,9 @@ export default function RoutersPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   
+  // New error state
+  const [errorMsg, setErrorMsg] = useState('');
+
   const [formData, setFormData] = useState({
     name: '',
     location_label: '',
@@ -30,13 +33,14 @@ export default function RoutersPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    setErrorMsg('');
     try {
       await apiClient.post('/tenant/routers', formData);
       setShowModal(false);
       setFormData({ name: '', location_label: '', ip_address: '', api_username: '', api_password: '' });
       fetchRouters();
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to create router');
+      setErrorMsg(error.response?.data?.error || 'Failed to create router');
     }
   };
 
@@ -47,7 +51,7 @@ export default function RoutersPage() {
           <h1 style={{ margin: 0 }}>Routers</h1>
           <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Manage your MikroTik hardware.</p>
         </div>
-        <button onClick={() => setShowModal(true)} style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', width: '100%', maxWidth: '200px' }}>
+        <button onClick={() => { setShowModal(true); setErrorMsg(''); }} style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', width: '100%', maxWidth: '200px' }}>
           + Add Router
         </button>
       </div>
@@ -70,7 +74,6 @@ export default function RoutersPage() {
             <tbody>
               {routers.map((router) => {
                 const portalUrl = `${import.meta.env.VITE_PORTAL_BASE}/?router=${router.router_token}&mac=11:22:33:44:55:66`;
-                // Clean the status string so minor DB typos don't break colors
                 const statusText = (router.status || 'offline').trim().toLowerCase();
                 const isOnline = statusText === 'online';
 
@@ -107,6 +110,13 @@ export default function RoutersPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '100%', maxWidth: '500px' }}>
             <h2 style={{ marginTop: 0 }}>Add New Router</h2>
+            
+            {errorMsg && (
+              <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
+                {errorMsg}
+              </div>
+            )}
+
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <input required type="text" placeholder="Router Name (e.g. Main Lobby)" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ padding: '10px' }} />
               <input type="text" placeholder="Location (e.g. Reception)" value={formData.location_label} onChange={e => setFormData({...formData, location_label: e.target.value})} style={{ padding: '10px' }} />

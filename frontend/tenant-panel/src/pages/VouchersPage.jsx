@@ -8,9 +8,13 @@ export default function VouchersPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState('');
-  const [quantity, setQuantity] = useState(10);
+  
+  // Changed to empty string so it starts blank
+  const [quantity, setQuantity] = useState(''); 
+  
   const [generatedCodes, setGeneratedCodes] = useState(null);
   const [todayOnly, setTodayOnly] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -41,16 +45,25 @@ export default function VouchersPage() {
 
   const handleGenerate = async (e) => {
     e.preventDefault();
+    setErrorMsg('');
+    
+    // Safety check: If they bypass the UI and send nothing
+    const numQuantity = parseInt(quantity);
+    if (!numQuantity || numQuantity < 1 || numQuantity > 50) {
+      setErrorMsg('Please enter a number between 1 and 50.');
+      return;
+    }
+
     try {
-      const res = await apiClient.post('/tenant/vouchers/generate', { package_id: selectedPackage, quantity });
+      const res = await apiClient.post('/tenant/vouchers/generate', { package_id: selectedPackage, quantity: numQuantity });
       setGeneratedCodes(res.data.data);
+      setQuantity(''); // Reset to empty after successful generation
       fetchVouchers(1);
     } catch (error) {
-      alert('Failed to generate vouchers');
+      setErrorMsg(error.response?.data?.error || 'Failed to generate vouchers');
     }
   };
 
-  // Helper to format remaining time nicely
   const getRemainingTime = (expiresAt) => {
     if (!expiresAt) return null;
     const now = new Date();
@@ -88,7 +101,7 @@ export default function VouchersPage() {
             Today only (EAT)
           </label>
           <button
-            onClick={() => { setShowModal(true); setGeneratedCodes(null); }}
+            onClick={() => { setShowModal(true); setGeneratedCodes(null); setErrorMsg(''); }}
             className="btn btn-primary"
             style={{ width: '100%' }}
           >
@@ -158,6 +171,13 @@ export default function VouchersPage() {
         <div className="modal-overlay">
           <div className="modal-content">
             <h2 style={{ marginTop: 0 }}>Generate Vouchers</h2>
+            
+            {errorMsg && (
+              <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
+                {errorMsg}
+              </div>
+            )}
+
             {!generatedCodes ? (
               <form onSubmit={handleGenerate}>
                 <div className="form-group">
@@ -167,12 +187,29 @@ export default function VouchersPage() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Quantity</label>
-                  <input className="form-control" required type="number" min="1" max="500" value={quantity} onChange={e => setQuantity(e.target.value)} />
+                  <label>Quantity (Max 50)</label>
+                  {/* Changed type to text to remove the '0' starting value */}
+                  <input 
+                    className="form-control" 
+                    required 
+                    type="text" 
+                    inputMode="numeric" 
+                    pattern="[0-9]*" 
+                    placeholder="e.g 10" 
+                    maxLength={2}
+                    value={quantity} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      // Only allow numbers
+                      if (/^\d*$/.test(val)) {
+                        setQuantity(val);
+                      }
+                    }} 
+                  />
                 </div>
                 <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
                   <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary">Cancel</button>
-                  <button type="submit" className="btn btn-primary">Generate</button>
+                  <button type="submit" className="btn btn-primary" disabled={!quantity}>Generate</button>
                 </div>
               </form>
             ) : (

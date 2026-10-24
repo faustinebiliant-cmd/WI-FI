@@ -18,6 +18,9 @@ export default function App() {
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [phoneNumber, setPhoneNumber] = useState('');
 
+  // Security lockout state
+  const [lockoutTimeLeft, setLockoutTimeLeft] = useState(0);
+
   const queryParams = new URLSearchParams(window.location.search);
   const routerToken = queryParams.get('router');
   const macAddress = queryParams.get('mac') || '00:00:00:00:00:00';
@@ -33,7 +36,29 @@ export default function App() {
       .catch(() => setErrorMessage('Invalid or inactive router.'));
   }, [routerToken]);
 
-  // Helper to format time for guests (Days/Hours instead of just minutes)
+  // Handle the lockout countdown timer
+  useEffect(() => {
+    const checkLockout = () => {
+      const lockoutUntil = localStorage.getItem('portal_lockout_until');
+      if (lockoutUntil) {
+        const remaining = Math.ceil((parseInt(lockoutUntil) - Date.now()) / 1000);
+        if (remaining > 0) {
+          setLockoutTimeLeft(remaining);
+        } else {
+          localStorage.removeItem('portal_lockout_until');
+          localStorage.removeItem('portal_fail_count');
+          setLockoutTimeLeft(0);
+          setErrorMessage('');
+        }
+      }
+    };
+
+    checkLockout();
+    const interval = setInterval(checkLockout, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Helper to format time for guests
   const formatDuration = (mins) => {
     if (mins >= 1440 && mins % 1440 === 0) return `${mins / 1440} Day${mins / 1440 > 1 ? 's' : ''}`;
     if (mins >= 60 && mins % 60 === 0) return `${mins / 60} Hour${mins / 60 > 1 ? 's' : ''}`;
@@ -42,7 +67,8 @@ export default function App() {
 
   const handleRedeem = async (e) => {
     e.preventDefault();
-    if (!voucherCode) return;
+    if (!voucherCode || lockoutTimeLeft > 0) return;
+    
     setStatus('loading');
     setErrorMessage('');
 
@@ -53,10 +79,26 @@ export default function App() {
         mac_address: macAddress,
         ip_address: ipAddress
       });
+      // Success! Reset the fail counter
+      localStorage.removeItem('portal_fail_count');
       setSuccessData(res.data.data);
       setStatus('success');
     } catch (error) {
-      setErrorMessage(error.response?.data?.error || 'Connection failed.');
+      // FAIL! Increment the counter
+      let fails = parseInt(localStorage.getItem('portal_fail_count') || '0');
+      fails++;
+      localStorage.setItem('portal_fail_count', fails.toString());
+
+      if (fails >= 5) {
+        // Lock them out for 10 minutes (600,000 milliseconds)
+        const lockoutUntil = Date.now() + (10 * 60 * 1000);
+        localStorage.setItem('portal_lockout_until', lockoutUntil.toString());
+        setLockoutTimeLeft(600);
+        setErrorMessage('Too many invalid attempts. Please wait 10 minutes before trying again.');
+      } else {
+        const attemptsLeft = 5 - fails;
+        setErrorMessage(`${error.response?.data?.error || 'Connection failed.'} (${attemptsLeft} attempts left)`);
+      }
       setStatus('error');
     }
   };
@@ -173,18 +215,23 @@ export default function App() {
               placeholder="000000" 
               value={voucherCode}
               onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-              disabled={status === 'loading'}
+              disabled={status === 'loading' || lockoutTimeLeft > 0}
               maxLength={6}
               style={{ textAlign: 'center', fontSize: '20px', letterSpacing: '4px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '15px' }}
               autoComplete="off"
             />
-            <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={status === 'loading' || voucherCode.length < 6}>
-              {status === 'loading' ? 'Connecting...' : 'Connect'}
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              style={{ width: '100%', backgroundColor: lockoutTimeLeft > 0 ? '#93c5fd' : 'var(--primary)', cursor: lockoutTimeLeft > 0 ? 'not-allowed' : 'pointer' }} 
+              disabled={status === 'loading' || voucherCode.length < 6 || lockoutTimeLeft > 0}
+            >
+              {status === 'loading' ? 'Connecting...' : lockoutTimeLeft > 0 ? `Locked (${Math.floor(lockoutTimeLeft / 60)}:${String(lockoutTimeLeft % 60).padStart(2, '0')})` : 'Connect'}
             </button>
           </form>
         )}
 
-        <p style={{ fontSize: '12px', color: 'var(--gray-light)', marginTop: '30px' }}>Powered by OSWAGOTech</p>
+        <p style={{ fontSize: '12px', color: 'var(--gray-light)', marginTop: '30px' }}>Powered by OSWAGOTech WiFi</p>
       </div>
     </div>
   );

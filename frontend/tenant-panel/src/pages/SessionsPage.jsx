@@ -14,9 +14,7 @@ export default function SessionsPage() {
 
   const fetchSessions = async () => {
     try {
-      // Note: The endpoint differs depending on if it's tenant or platform, 
-      // but the table layout is the same.
-      const res = await apiClient.get(window.location.pathname.includes('platform') ? '/platform/sessions' : '/tenant/sessions/active');
+      const res = await apiClient.get('/tenant/sessions/active');
       setSessions(res.data.data);
     } catch (error) {
       console.error(error);
@@ -29,27 +27,21 @@ export default function SessionsPage() {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      const endpoint = window.location.pathname.includes('platform') 
-        ? `/platform/sessions/${deleteTarget.id}/disconnect` 
-        : `/tenant/sessions/${deleteTarget.id}/disconnect`;
-      
-      await apiClient.post(endpoint);
+      await apiClient.post(`/tenant/sessions/${deleteTarget.id}/disconnect`);
       setDeleteTarget(null);
       fetchSessions();
     } catch (error) {
-      alert('Failed to disconnect guest');
+      console.error('Failed to disconnect guest', error);
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const isPlatform = window.location.pathname.includes('platform');
-
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ marginBottom: '30px' }}>
         <h1 style={{ margin: 0 }}>Active Sessions</h1>
-        <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Guests currently connected{isPlatform ? ' across all routers' : ' to your WiFi'}.</p>
+        <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Guests currently connected to your WiFi.</p>
       </div>
 
       <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
@@ -61,8 +53,7 @@ export default function SessionsPage() {
           <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
               <tr>
-                {isPlatform && <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Tenant</th>}
-                {!isPlatform && <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Voucher Code</th>}
+                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Voucher Code</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Router</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>MAC Address</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Started (EAT)</th>
@@ -72,11 +63,7 @@ export default function SessionsPage() {
             <tbody>
               {sessions.map((s) => (
                 <tr key={s.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  {isPlatform ? (
-                    <td style={{ padding: '16px 20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{s.tenants?.business_name}</td>
-                  ) : (
-                    <td style={{ padding: '16px 20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{s.vouchers?.code}</td>
-                  )}
+                  <td style={{ padding: '16px 20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{s.vouchers?.code}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{s.routers?.name}</td>
                   <td style={{ padding: '16px 20px', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{s.mac_address}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{s.started_at_eat}</td>
