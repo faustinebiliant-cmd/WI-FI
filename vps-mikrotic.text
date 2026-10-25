@@ -1,0 +1,304 @@
+========================================
+WIREGUARD VPS ↔ MIKROTIK REBUILD
+========================================
+
+NETWORK DESIGN
+
+VPS WireGuard IP:       10.20.0.1/24
+MikroTik WireGuard IP:  10.20.0.2/24
+VPS public IP:          69.62.105.119
+WireGuard port:         UDP 51820
+MikroTik API:           10.20.0.2:8728
+
+Do not route:
+- Guest internet traffic
+- MikroTik LAN 192.168.88.0/24
+
+Do not open publicly:
+- 8728
+- 5001
+- 5432
+
+
+========================================
+PART 1: VPS
+========================================
+
+Run on the VPS:
+
+sudo apt update
+
+sudo apt install wireguard netcat-openbsd -y
+
+sudo mkdir -p /etc/wireguard
+
+Generate a new VPS key pair:
+
+sudo bash -c 'umask 077; wg genkey > /etc/wireguard/server_private.key; wg pubkey < /etc/wireguard/server_private.key > /etc/wireguard/server_public.key'
+
+Display only the VPS public key:
+
+sudo cat /etc/wireguard/server_public.key
+
+Copy that public key somewhere safe.
+
+Never share or display the VPS private key.
+
+
+========================================
+PART 2: MIKROTIK
+========================================
+
+Run on the MikroTik terminal:
+
+/interface/wireguard/add name=wg-vps listen-port=51820
+
+Display the MikroTik public key:
+
+/interface/wireguard/print detail where name=wg-vps
+
+Copy only the MikroTik public-key value.
+
+Do not share the MikroTik private key.
+
+Assign the MikroTik WireGuard address:
+
+/ip/address/add address=10.20.0.2/24 interface=wg-vps comment="VPS API tunnel"
+
+Add the VPS as a MikroTik peer.
+
+Replace PASTE_VPS_PUBLIC_KEY with the VPS public key:
+
+/interface/wireguard/peers/add interface=wg-vps public-key="PASTE_VPS_PUBLIC_KEY" endpoint-address=69.62.105.119 endpoint-port=51820 allowed-address=10.20.0.1/32 persistent-keepalive=25s comment="WI-FI VPS"
+
+
+========================================
+PART 3: VPS CONFIGURATION
+========================================
+
+Run on the VPS:
+
+sudo nano /etc/wireguard/wg0.conf
+
+Paste this:
+
+[Interface]
+Address = 10.20.0.1/24
+ListenPort = 51820
+PrivateKey = PASTE_VPS_PRIVATE_KEY
+
+[Peer]
+PublicKey = PASTE_MIKROTIK_PUBLIC_KEY
+AllowedIPs = 10.20.0.2/32
+
+Replace:
+
+PASTE_VPS_PRIVATE_KEY
+with the content of:
+
+/etc/wireguard/server_private.key
+
+Replace:
+
+PASTE_MIKROTIK_PUBLIC_KEY
+with the MikroTik public key.
+
+Do not add quotation marks.
+Do not add spaces inside either key.
+Do not paste a public key into the PrivateKey line.
+
+Save Nano:
+
+Ctrl + O
+Enter
+Ctrl + X
+
+Protect the configuration:
+
+sudo chmod 600 /etc/wireguard/wg0.conf
+
+Validate it:
+
+sudo wg-quick strip wg0
+
+If there is no error, continue.
+
+
+========================================
+PART 4: VPS FIREWALL
+========================================
+
+Run on the VPS:
+
+sudo ufw allow 51820/udp
+
+sudo ufw status verbose
+
+You should see:
+
+22/tcp
+80/tcp
+443/tcp
+51820/udp
+
+Do not add ports 8728, 5001, or 5432.
+
+
+========================================
+PART 5: START WIREGUARD ON THE VPS
+========================================
+
+Run on the VPS:
+
+sudo systemctl enable --now wg-quick@wg0
+
+Check the tunnel:
+
+sudo wg show
+
+You should see:
+
+interface: wg0
+
+Wait for the MikroTik peer to connect. Then look for:
+
+latest handshake
+transfer
+
+
+========================================
+PART 6: ALLOW THE MIKROTIK API ONLY THROUGH WIREGUARD
+========================================
+
+Run on the MikroTik:
+
+/ip/firewall/filter/add chain=input action=accept in-interface=wg-vps protocol=tcp dst-port=8728 src-address=10.20.0.1 place-before=0 comment="Allow VPS API through WireGuard"
+
+Restrict the MikroTik API service:
+
+/ip/service/set [find name=api] address=10.20.0.1/32 disabled=no
+
+Check the API service:
+
+/ip/service/print detail where name=api
+
+
+========================================
+PART 7: TEST THE TUNNEL FROM THE VPS
+========================================
+
+Run on the VPS:
+
+ping -c 3 10.20.0.2
+
+Expected result:
+
+3 packets transmitted
+3 received
+0% packet loss
+
+Test the MikroTik API port:
+
+nc -vz -w 5 10.20.0.2 8728
+
+Expected result:
+
+Connection to 10.20.0.2 8728 port succeeded
+
+
+========================================
+PART 8: ADD THE ROUTER TO YOUR APPLICATION
+========================================
+
+In the Tenant Panel, add the router with:
+
+Router IP:
+10.20.0.2
+
+API port:
+8728
+
+Use the correct MikroTik API username and password.
+
+Do not use:
+
+69.62.105.119
+
+Do not add ROUTER_HOST to the backend .env if your backend reads the router address from the database.
+
+Keep mock mode enabled until the tunnel and API test succeed.
+
+Then enable real router mode using your application's actual configuration.
+
+
+========================================
+PART 9: VERIFY REBOOT PERSISTENCE
+========================================
+
+First confirm WireGuard is enabled:
+
+sudo systemctl is-enabled wg-quick@wg0
+
+Expected:
+
+enabled
+
+Reboot the VPS only when ready:
+
+sudo reboot
+
+Reconnect after the VPS returns:
+
+ssh biliant@69.62.105.119
+
+Check WireGuard:
+
+sudo systemctl is-active wg-quick@wg0
+
+Expected:
+
+active
+
+Check the tunnel:
+
+sudo wg show
+
+Check the backend:
+
+pm2 status
+
+Expected:
+
+wifi-backend   online
+
+Test the MikroTik again:
+
+ping -c 3 10.20.0.2
+
+nc -vz -w 5 10.20.0.2 8728
+
+
+========================================
+IMPORTANT SECURITY RULES
+========================================
+
+Never put WireGuard private keys in GitHub.
+
+Never send private keys in chat.
+
+Never open MikroTik API port 8728 to the public internet.
+
+Never open VPS PostgreSQL port 5432 publicly.
+
+Never route the guest LAN through the VPS for this design.
+
+WireGuard is managed by systemd:
+
+systemctl status wg-quick@wg0
+
+Node.js is managed by PM2:
+
+pm2 status
+
+Restarting PM2 does not stop WireGuard.
+Restarting WireGuard does not delete your application data.

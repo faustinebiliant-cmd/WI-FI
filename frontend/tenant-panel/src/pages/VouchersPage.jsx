@@ -5,13 +5,11 @@ import Loader from '../shared/components/Loader';
 export default function VouchersPage() {
   const [vouchers, setVouchers] = useState([]);
   const [packages, setPackages] = useState([]);
+  const [routers, setRouters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState('');
-  
-  // Changed to empty string so it starts blank
   const [quantity, setQuantity] = useState(''); 
-  
   const [generatedCodes, setGeneratedCodes] = useState(null);
   const [todayOnly, setTodayOnly] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -36,9 +34,13 @@ export default function VouchersPage() {
   }, [todayOnly]);
 
   useEffect(() => {
-    apiClient.get('/tenant/packages').then(res => {
-      setPackages(res.data.data);
-      if (res.data.data.length > 0) setSelectedPackage(res.data.data[0].id);
+    Promise.all([
+      apiClient.get('/tenant/packages'),
+      apiClient.get('/tenant/routers')
+    ]).then(([pkgRes, routerRes]) => {
+      setPackages(pkgRes.data.data);
+      setRouters(routerRes.data.data);
+      if (pkgRes.data.data.length > 0) setSelectedPackage(pkgRes.data.data[0].id);
     });
     fetchVouchers(1);
   }, [fetchVouchers]);
@@ -47,7 +49,6 @@ export default function VouchersPage() {
     e.preventDefault();
     setErrorMsg('');
     
-    // Safety check: If they bypass the UI and send nothing
     const numQuantity = parseInt(quantity);
     if (!numQuantity || numQuantity < 1 || numQuantity > 50) {
       setErrorMsg('Please enter a number between 1 and 50.');
@@ -57,17 +58,21 @@ export default function VouchersPage() {
     try {
       const res = await apiClient.post('/tenant/vouchers/generate', { package_id: selectedPackage, quantity: numQuantity });
       setGeneratedCodes(res.data.data);
-      setQuantity(''); // Reset to empty after successful generation
+      setQuantity('');
       fetchVouchers(1);
     } catch (error) {
       setErrorMsg(error.response?.data?.error || 'Failed to generate vouchers');
     }
   };
 
+  // FIXED: Helper function to safely handle EAT time string
   const getRemainingTime = (expiresAt) => {
     if (!expiresAt) return null;
+    
+    // Format: "YYYY-MM-DD HH:MM" -> replace space with 'T' for JavaScript Date
+    const safeDateString = expiresAt.replace(' ', 'T');
     const now = new Date();
-    const expires = new Date(expiresAt);
+    const expires = new Date(safeDateString);
     const diffMs = expires - now;
     
     if (diffMs <= 0) return 'Expired';
@@ -81,6 +86,8 @@ export default function VouchersPage() {
     if (hours > 0) return `${hours}h ${mins}m left`;
     return `${mins}m left`;
   };
+
+  const hasMultipleRouters = routers.length > 1;
 
   return (
     <div>
@@ -122,6 +129,7 @@ export default function VouchersPage() {
             <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
               <tr>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Code</th>
+                {hasMultipleRouters && <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Router</th>}
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Package</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Status</th>
               </tr>
@@ -130,6 +138,13 @@ export default function VouchersPage() {
               {vouchers.map((v) => (
                 <tr key={v.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                   <td style={{ padding: '16px 20px', fontFamily: 'monospace', fontSize: '16px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{v.code}</td>
+                  
+                  {hasMultipleRouters && (
+                    <td style={{ padding: '16px 20px', fontWeight: 'bold', color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                      {v.packages?.router_name || 'Any'}
+                    </td>
+                  )}
+
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{v.packages?.name}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -183,24 +198,26 @@ export default function VouchersPage() {
                 <div className="form-group">
                   <label>Package</label>
                   <select className="form-control" required value={selectedPackage} onChange={e => setSelectedPackage(e.target.value)}>
-                    {packages.map(p => <option key={p.id} value={p.id}>{p.name} - TZS {p.price_tzs}</option>)}
+                    {packages.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {hasMultipleRouters ? `${p.name} - TZS ${p.price_tzs} (${p.router_name || 'No Router'})` : `${p.name} - TZS ${p.price_tzs}`}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="form-group">
                   <label>Quantity (Max 50)</label>
-                  {/* Changed type to text to remove the '0' starting value */}
                   <input 
                     className="form-control" 
                     required 
                     type="text" 
                     inputMode="numeric" 
                     pattern="[0-9]*" 
-                    placeholder="e.g 10" 
+                    placeholder="e.g. 50" 
                     maxLength={2}
                     value={quantity} 
                     onChange={e => {
                       const val = e.target.value;
-                      // Only allow numbers
                       if (/^\d*$/.test(val)) {
                         setQuantity(val);
                       }

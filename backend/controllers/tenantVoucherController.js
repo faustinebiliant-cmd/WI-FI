@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const db = require('../config/db');
-const { getTodayRangeEAT } = require('../utils/tz');
+const { getTodayRangeEAT, formatDateTimeEAT } = require('../utils/tz');
 
 const generateCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();
 
@@ -29,7 +29,6 @@ const generateVouchers = async (req, res) => {
       return res.status(400).json({ success: false, error: 'You have reached the maximum limit per hour. Please wait before generating more.' });
     }
 
-    // If they ask for 50, but only have 20 left, we only give them 20.
     if (count > remainingAllowance) {
       count = remainingAllowance;
     }
@@ -58,8 +57,10 @@ const listVouchers = async (req, res) => {
     const offset = (page - 1) * limit;
 
     let query = `
-      SELECT v.*, p.name as package_name 
-      FROM vouchers v LEFT JOIN packages p ON v.package_id = p.id 
+      SELECT v.*, p.name as package_name, r.name as router_name 
+      FROM vouchers v 
+      LEFT JOIN packages p ON v.package_id = p.id 
+      LEFT JOIN routers r ON p.router_id = r.id
       WHERE v.tenant_id = $1
     `;
     const params = [req.tenantId];
@@ -82,10 +83,23 @@ const listVouchers = async (req, res) => {
 
     const { rows } = await db.query(query, params);
 
-    const formattedData = rows.map(r => ({
-      ...r,
-      packages: { name: r.package_name }
-    }));
+    // Convert UTC expires_at to EAT string so frontend time math works
+    const formattedData = rows.map(r => {
+      let expiresAtEat = null;
+      if (r.expires_at) {
+        // THIS IS THE FIX: We use the exact timezone converter from your utils
+        expiresAtEat = formatDateTimeEAT(r.expires_at);
+      }
+
+      return {
+        ...r,
+        expires_at: expiresAtEat, // Override with safe EAT time
+        packages: { 
+          name: r.package_name,
+          router_name: r.router_name 
+        }
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -93,6 +107,7 @@ const listVouchers = async (req, res) => {
       pagination: { total, page, limit, pages: Math.ceil(total / limit) }
     });
   } catch (error) {
+    console.error(error);
     return res.status(500).json({ success: false, error: 'Failed to list vouchers' });
   }
 };

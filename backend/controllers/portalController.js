@@ -20,10 +20,10 @@ const getPortalInfo = async (req, res) => {
 
     const router = routerRes.rows[0];
 
-    // Fetch active packages for this tenant
+    // Fetch active packages ONLY for this specific router
     const packagesRes = await db.query(
-      'SELECT id, name, price_tzs, duration_minutes, speed_down_kbps FROM packages WHERE tenant_id = $1 AND is_active = true',
-      [router.tenant_id]
+      'SELECT id, name, price_tzs, duration_minutes, speed_down_kbps FROM packages WHERE tenant_id = $1 AND router_id = $2 AND is_active = true',
+      [router.tenant_id, router.id]
     );
 
     return res.status(200).json({
@@ -49,7 +49,6 @@ const redeemVoucher = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
 
-    // SECURITY VALIDATIONS
     if (!isValidMACAddress(mac_address)) {
       return res.status(400).json({ success: false, error: 'Invalid device MAC address' });
     }
@@ -63,53 +62,44 @@ const redeemVoucher = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid voucher format' });
     }
 
-    // Verify router exists
     const routerRes = await db.query('SELECT * FROM routers WHERE router_token = $1', [router_token]);
     const router = routerRes.rows[0];
     if (!router) return res.status(404).json({ success: false, error: 'Router not found' });
 
-    // A5: CHECK IF ROUTER IS OFFLINE
     if (router.status === 'offline') {
       return res.status(400).json({ success: false, error: 'Router is currently offline. Please contact the management.' });
     }
 
-    // A2: ATOMIC UPDATE (Prevent race condition)
-    // We mark the voucher as active ONLY IF it is still unused.
-    // The RETURNING clause gives us the voucher details to use for the router.
+    // ATOMIC UPDATE: Check status AND check that the voucher's package belongs to this router
     const claimRes = await db.query(`
       UPDATE vouchers 
       SET status = 'active', used_at = NOW(), expires_at = NOW() + (SELECT duration_minutes FROM packages WHERE id = vouchers.package_id) * INTERVAL '1 minute'
       WHERE tenant_id = $1 AND code = $2 AND status = 'unused'
+      AND package_id IN (SELECT id FROM packages WHERE router_id = $3)
       RETURNING id, package_id, expires_at
-    `, [router.tenant_id, cleanCode]);
+    `, [router.tenant_id, cleanCode, router.id]);
 
-    // If no rows were updated, the voucher was either invalid or already used
     if (claimRes.rows.length === 0) {
-      // Let's check if it exists at all, just to give a better error message
       const checkRes = await db.query('SELECT status FROM vouchers WHERE tenant_id = $1 AND code = $2', [router.tenant_id, cleanCode]);
       if (checkRes.rows.length > 0) {
-        return res.status(400).json({ success: false, error: 'Voucher has already been used or expired' });
+        return res.status(400).json({ success: false, error: 'Voucher has already been used, expired, or is not valid for this router.' });
       }
       return res.status(404).json({ success: false, error: 'Invalid voucher code' });
     }
 
     const claimedVoucher = claimRes.rows[0];
 
-    // Get the package details for the router adapter
     const pkgRes = await db.query('SELECT duration_minutes, speed_down_kbps FROM packages WHERE id = $1', [claimedVoucher.package_id]);
     const pkg = pkgRes.rows[0];
 
-    // Tell Router to authorize
     const adapter = getRouter(router);
     const routerResult = await adapter.createVoucher(cleanCode, pkg.duration_minutes, pkg.speed_down_kbps);
 
     if (!routerResult.ok) {
-      // If the router fails, we must revert the voucher back to unused so the guest doesn't lose it
       await db.query("UPDATE vouchers SET status = 'unused', used_at = NULL, expires_at = NULL WHERE id = $1", [claimedVoucher.id]);
       return res.status(500).json({ success: false, error: 'Router failed to authorize connection' });
     }
 
-    // Create session
     await db.query(
       `INSERT INTO sessions (tenant_id, router_id, voucher_id, mac_address, ip_address, started_at) 
        VALUES ($1, $2, $3, $4, $5, NOW())`,

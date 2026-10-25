@@ -16,6 +16,7 @@ const getActiveSessions = async (req, res) => {
 
     const enriched = rows.map((s) => ({
       ...s,
+      // Convert UTC from database to EAT string for the frontend
       started_at_eat: formatDateTimeEAT(s.started_at),
       vouchers: { code: s.voucher_code },
       routers: { name: s.router_name }

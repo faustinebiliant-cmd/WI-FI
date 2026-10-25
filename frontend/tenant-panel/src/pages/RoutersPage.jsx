@@ -10,6 +10,12 @@ export default function RoutersPage() {
   // New error state
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Delete Modal States
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteInput, setDeleteInput] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
   const [formData, setFormData] = useState({
     name: '',
     location_label: '',
@@ -44,6 +50,25 @@ export default function RoutersPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (deleteInput !== 'DELETE') {
+      setDeleteError('Please type DELETE exactly as shown.');
+      return;
+    }
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      await apiClient.delete(`/tenant/routers/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      setDeleteInput('');
+      fetchRouters();
+    } catch (error) {
+      setDeleteError(error.response?.data?.error || 'Failed to delete router');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '30px' }}>
@@ -69,6 +94,7 @@ export default function RoutersPage() {
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Location</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Status</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Portal URL</th>
+                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -98,6 +124,11 @@ export default function RoutersPage() {
                         Test Portal Link
                       </a>
                     </td>
+                    <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
+                      <button onClick={() => setDeleteTarget(router)} style={{ padding: '6px 12px', backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -106,6 +137,7 @@ export default function RoutersPage() {
         )}
       </div>
 
+      {/* CREATE ROUTER MODAL */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '100%', maxWidth: '500px' }}>
@@ -132,6 +164,66 @@ export default function RoutersPage() {
           </div>
         </div>
       )}
+
+      {/* DELETE ROUTER MODAL (STRICT) */}
+      {deleteTarget && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '100%', maxWidth: '450px', borderTop: '4px solid var(--danger)' }}>
+            <h2 style={{ marginTop: 0, color: 'var(--danger)' }}>Delete Router</h2>
+            <p style={{ color: 'var(--dark)', fontSize: '14px', marginBottom: '20px' }}>
+              Are you absolutely sure you want to delete <strong>{deleteTarget.name}</strong>? <br/><br/>
+              This will permanently delete the router, all packages linked to it, and all unused vouchers.
+            </p>
+            
+            {deleteError && (
+              <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
+                {deleteError}
+              </div>
+            )}
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '8px' }}>
+                Please type <strong>DELETE</strong> to confirm.
+              </label>
+              <input 
+                type="text" 
+                value={deleteInput} 
+                onChange={e => setDeleteInput(e.target.value)} 
+                placeholder="DELETE"
+                style={{ width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '14px' }}
+                autoComplete="off"
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button 
+                type="button" 
+                onClick={() => { setDeleteTarget(null); setDeleteInput(''); setDeleteError(''); }} 
+                disabled={isDeleting}
+                style={{ padding: '10px 20px', cursor: isDeleting ? 'not-allowed' : 'pointer', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDelete}
+                disabled={deleteInput !== 'DELETE' || isDeleting}
+                style={{ 
+                  padding: '10px 20px', 
+                  cursor: (deleteInput !== 'DELETE' || isDeleting) ? 'not-allowed' : 'pointer', 
+                  backgroundColor: (deleteInput !== 'DELETE' || isDeleting) ? '#fca5a5' : '#dc2626', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '4px', 
+                  fontWeight: 'bold' 
+                }}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Router'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

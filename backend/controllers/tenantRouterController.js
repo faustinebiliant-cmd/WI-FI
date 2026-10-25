@@ -19,7 +19,6 @@ const createRouter = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Name, IP, Username and Password are required' });
     }
 
-    // RESTORED VALIDATORS
     if (!isSafeText(name) || !isSafeText(api_username)) {
       return res.status(400).json({ success: false, error: 'Invalid characters in name or username' });
     }
@@ -28,7 +27,6 @@ const createRouter = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid IP address format' });
     }
 
-    // Encrypt the password
     const encryptedPassword = encrypt(api_password);
     if (!encryptedPassword) return res.status(500).json({ success: false, error: 'Encryption failed' });
 
@@ -47,4 +45,25 @@ const createRouter = async (req, res) => {
   }
 };
 
-module.exports = { listRouters, createRouter };
+const deleteRouter = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if router exists and belongs to this tenant
+    const checkRes = await db.query('SELECT id FROM routers WHERE id = $1 AND tenant_id = $2', [id, req.tenantId]);
+    if (checkRes.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Router not found or unauthorized' });
+    }
+
+    // Delete the router. The database schema has ON DELETE CASCADE for packages and sessions,
+    // so deleting the router will automatically delete its packages and vouchers.
+    await db.query('DELETE FROM routers WHERE id = $1 AND tenant_id = $2', [id, req.tenantId]);
+
+    return res.status(200).json({ success: true, message: 'Router and all associated data deleted successfully' });
+  } catch (error) {
+    console.error('Delete router error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to delete router' });
+  }
+};
+
+module.exports = { listRouters, createRouter, deleteRouter };

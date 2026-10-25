@@ -5,6 +5,7 @@ import ConfirmDialog from '../shared/components/ConfirmDialog';
 
 export default function PackagesPage() {
   const [packages, setPackages] = useState([]);
+  const [routers, setRouters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   
@@ -16,13 +17,17 @@ export default function PackagesPage() {
     price_tzs: '',
     duration_value: 1,
     duration_unit: 'hours',
-    speed_mbps: 5
+    speed_mbps: 5,
+    router_id: ''
   });
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => { fetchPackages(); }, []);
+  useEffect(() => { 
+    fetchPackages(); 
+    fetchRouters();
+  }, []);
 
   const fetchPackages = async () => {
     try {
@@ -32,6 +37,19 @@ export default function PackagesPage() {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRouters = async () => {
+    try {
+      const res = await apiClient.get('/tenant/routers');
+      setRouters(res.data.data);
+      // Set default router if available
+      if (res.data.data.length > 0) {
+        setFormData(prev => ({ ...prev, router_id: res.data.data[0].id }));
+      }
+    } catch (error) {
+      console.error(error);
     }
   };
 
@@ -53,10 +71,11 @@ export default function PackagesPage() {
         price_tzs: parseFloat(formData.price_tzs),
         duration_minutes: duration_minutes,
         speed_down_kbps: speed_kbps,
-        speed_up_kbps: speed_kbps
+        speed_up_kbps: speed_kbps,
+        router_id: formData.router_id
       });
       setShowModal(false);
-      setFormData({ name: '', price_tzs: '', duration_value: 1, duration_unit: 'hours', speed_mbps: 5 });
+      setFormData({ name: '', price_tzs: '', duration_value: 1, duration_unit: 'hours', speed_mbps: 5, router_id: routers[0]?.id || '' });
       fetchPackages();
     } catch (error) {
       setErrorMsg(error.response?.data?.error || 'Failed to create package');
@@ -106,6 +125,7 @@ export default function PackagesPage() {
           <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
               <tr>
+                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Router</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Name</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Price</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Duration</th>
@@ -116,6 +136,7 @@ export default function PackagesPage() {
             <tbody>
               {packages.map((pkg) => (
                 <tr key={pkg.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '16px 20px', fontWeight: 'bold', whiteSpace: 'nowrap', color: 'var(--primary)' }}>{pkg.router_name || 'All Routers'}</td>
                   <td style={{ padding: '16px 20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{pkg.name}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>TZS {pkg.price_tzs.toLocaleString()}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{formatDuration(pkg.duration_minutes)}</td>
@@ -144,6 +165,16 @@ export default function PackagesPage() {
             )}
 
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label>Select Router</label>
+                <select className="form-control" required value={formData.router_id} onChange={e => setFormData({...formData, router_id: e.target.value})} disabled={isSubmitting}>
+                  <option value="" disabled>-- Select a Router --</option>
+                  {routers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+                <p style={{ fontSize: '12px', color: 'var(--gray)', marginTop: '4px' }}>This package will only work on this specific router.</p>
+              </div>
+
               <input required type="text" placeholder="Package Name (e.g. Daily 5Mbps)" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ padding: '10px' }} disabled={isSubmitting} />
               <input required type="number" min="0" placeholder="Price (TZS)" value={formData.price_tzs} onChange={e => setFormData({...formData, price_tzs: e.target.value})} style={{ padding: '10px' }} disabled={isSubmitting} />
               
