@@ -35,28 +35,26 @@ class MikroTikRouter {
 
   /**
    * Creates a Hotspot User on the MikroTik.
-   * @param {string} code - The voucher code (e.g. "011847")
-   * @param {number} durationMinutes - How long the guest gets
-   * @param {number} speedLimitKbps - The speed limit (e.g. 5120 for 5Mbps)
    */
   async createVoucher(code, durationMinutes, speedLimitKbps) {
     let conn;
     try {
       conn = await this.getConnection();
 
-      // MikroTik expects speed limits in the format "Upload/Download" 
-      // e.g., "5120k/5120k" for 5Mbps symmetric
-      const rateLimit = `${speedLimitKbps}k/${speedLimitKbps}k`;
-
       // MikroTik limit-uptime expects format like "1h30m" or "1440m"
       const limitUptime = `${durationMinutes}m`;
+
+      // PAUSED: The rate-limit string is temporarily removed to prevent API crashes.
+      // We will fix this in the next step.
+      
+      const rateLimit = `${speedLimitKbps}k/${speedLimitKbps}k`;
 
       // Add the user to the Hotspot Server
       await conn.write('/ip/hotspot/user/add', [
         `=name=${code}`,
         `=password=${code}`, // The password is the same as the username
         `=limit-uptime=${limitUptime}`,
-        `=rate-limit=${rateLimit}`,
+        // `=rate-limit=${rateLimit}`, // <--- WE COMMENTED THIS OUT SO YOU CAN CONNECT
         '=profile=default'
       ]);
 
@@ -85,7 +83,7 @@ class MikroTikRouter {
         ip: user.address,
         voucherCode: user.user,
         startedAt: user['login-by'],
-        expiresAt: null // Router doesn't give us exact expiry here, we track that in DB
+        expiresAt: null 
       }));
     } catch (error) {
       console.error('[MikroTik] Failed to fetch active users:', error.message);
@@ -97,7 +95,6 @@ class MikroTikRouter {
 
   /**
    * Kicks a user off the WiFi immediately.
-   * @param {string} macAddress - The device MAC address to disconnect
    */
   async disconnectUser(macAddress) {
     let conn;
@@ -111,7 +108,7 @@ class MikroTikRouter {
 
       if (active.length > 0) {
         const id = active[0]['.id'];
-        // Remove the active connection
+        // Remove the active connection using the internal ID
         await conn.write('/ip/hotspot/active/remove', [`=.id=${id}`]);
       }
 
