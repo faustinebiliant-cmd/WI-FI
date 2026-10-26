@@ -10,21 +10,20 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState('');
   const [successData, setSuccessData] = useState(null);
   
-  // Tabs: 'buy' or 'voucher'
   const [activeTab, setActiveTab] = useState('buy');
-  
-  // Form states
   const [voucherCode, setVoucherCode] = useState('');
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [phoneNumber, setPhoneNumber] = useState('');
-
-  // Security lockout state
   const [lockoutTimeLeft, setLockoutTimeLeft] = useState(0);
 
   const queryParams = new URLSearchParams(window.location.search);
   const routerToken = queryParams.get('router');
   const macAddress = queryParams.get('mac') || '00:00:00:00:00:00';
   const ipAddress = queryParams.get('ip') || null;
+  
+  // NEW: Capture the MikroTik login URLs
+  const loginUrl = queryParams.get('login') || null;
+  const origUrl = queryParams.get('orig') || null;
 
   useEffect(() => {
     if (!routerToken) {
@@ -36,7 +35,6 @@ export default function App() {
       .catch(() => setErrorMessage('Invalid or inactive router.'));
   }, [routerToken]);
 
-  // Handle the lockout countdown timer
   useEffect(() => {
     const checkLockout = () => {
       const lockoutUntil = localStorage.getItem('portal_lockout_until');
@@ -58,7 +56,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Helper to format time for guests
   const formatDuration = (mins) => {
     if (mins >= 1440 && mins % 1440 === 0) return `${mins / 1440} Day${mins / 1440 > 1 ? 's' : ''}`;
     if (mins >= 60 && mins % 60 === 0) return `${mins / 60} Hour${mins / 60 > 1 ? 's' : ''}`;
@@ -77,20 +74,57 @@ export default function App() {
         router_token: routerToken,
         code: voucherCode,
         mac_address: macAddress,
-        ip_address: ipAddress
+        ip_address: ipAddress,
+        login_url: loginUrl, // Send to backend
+        orig_url: origUrl    // Send to backend
       });
-      // Success! Reset the fail counter
+      
       localStorage.removeItem('portal_fail_count');
       setSuccessData(res.data.data);
       setStatus('success');
+
+      // NEW: If we have the MikroTik login URL, submit it to actually unlock the internet!
+      if (loginUrl) {
+        // MikroTik expects the username and password to be the voucher code
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = loginUrl;
+
+        const usernameInput = document.createElement('input');
+        usernameInput.type = 'hidden';
+        usernameInput.name = 'username';
+        usernameInput.value = voucherCode.toUpperCase();
+        form.appendChild(usernameInput);
+
+        const passwordInput = document.createElement('input');
+        passwordInput.type = 'hidden';
+        passwordInput.name = 'password';
+        passwordInput.value = voucherCode.toUpperCase();
+        form.appendChild(passwordInput);
+
+        // If there is an original URL (e.g. apple.com), tell MikroTik to go there after login
+        if (origUrl) {
+          const dstInput = document.createElement('input');
+          dstInput.type = 'hidden';
+          dstInput.name = 'dst';
+          dstInput.value = origUrl;
+          form.appendChild(dstInput);
+        }
+
+        document.body.appendChild(form);
+        
+        // Wait 2 seconds so they can see the "Connected!" screen, then unlock the internet
+        setTimeout(() => {
+          form.submit();
+        }, 2000);
+      }
+
     } catch (error) {
-      // FAIL! Increment the counter
       let fails = parseInt(localStorage.getItem('portal_fail_count') || '0');
       fails++;
       localStorage.setItem('portal_fail_count', fails.toString());
 
       if (fails >= 5) {
-        // Lock them out for 10 minutes (600,000 milliseconds)
         const lockoutUntil = Date.now() + (10 * 60 * 1000);
         localStorage.setItem('portal_lockout_until', lockoutUntil.toString());
         setLockoutTimeLeft(600);
@@ -139,7 +173,13 @@ export default function App() {
           <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'var(--success)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', margin: '0 auto 20px' }}>✓</div>
           <h1 style={{ fontSize: '24px', marginBottom: '10px' }}>Connected!</h1>
           <p style={{ color: 'var(--gray)', marginBottom: '20px' }}>You have internet access for <strong>{formatDuration(successData.duration_minutes)}</strong> at <strong>{successData.speed_down_mbps} Mbps</strong>.</p>
-          <button onClick={() => window.location.reload()} className="btn btn-secondary" style={{ width: '100%' }}>Done</button>
+          
+          {loginUrl && (
+            <p style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 'bold' }}>Unlocking internet...</p>
+          )}
+          {!loginUrl && (
+            <button onClick={() => window.location.reload()} className="btn btn-secondary" style={{ width: '100%' }}>Done</button>
+          )}
         </div>
       </div>
     );

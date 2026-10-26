@@ -43,7 +43,7 @@ const getPortalInfo = async (req, res) => {
 // POST /api/portal/redeem
 const redeemVoucher = async (req, res) => {
   try {
-    const { router_token, code, mac_address, ip_address } = req.body;
+    const { router_token, code, mac_address, ip_address, login_url, orig_url } = req.body;
 
     if (!router_token || !code || !mac_address) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
