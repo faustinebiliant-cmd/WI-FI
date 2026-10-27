@@ -1,6 +1,5 @@
 // ============================================================
 // OSWAGOTech WiFi - MikroTik Router Adapter
-// Uses node-routeros to communicate with real hardware.
 // ============================================================
 const RouterOSAPI = require('node-routeros').RouterOSAPI;
 const { decrypt } = require('../../utils/encryption');
@@ -10,8 +9,6 @@ class MikroTikRouter {
     this.ip = routerRecord.ip_address;
     this.port = routerRecord.api_port || 8728;
     this.username = routerRecord.api_username;
-    
-    // Decrypt the password before connecting
     this.password = decrypt(routerRecord.api_password_encrypted);
     
     if (!this.password) {
@@ -19,42 +16,28 @@ class MikroTikRouter {
     }
   }
 
-  // Helper to establish the connection
   async getConnection() {
     const conn = new RouterOSAPI({
       host: this.ip,
       user: this.username,
       password: this.password,
       port: this.port,
-      timeout: 5 // 5 seconds timeout
+      timeout: 5
     });
-
     await conn.connect();
     return conn;
   }
 
-  /**
-   * Creates a Hotspot User on the MikroTik.
-   */
   async createVoucher(code, durationMinutes, speedLimitKbps) {
     let conn;
     try {
       conn = await this.getConnection();
-
-      // MikroTik limit-uptime expects format like "1h30m" or "1440m"
       const limitUptime = `${durationMinutes}m`;
-
-      // PAUSED: The rate-limit string is temporarily removed to prevent API crashes.
-      // We will fix this in the next step.
       
-      const rateLimit = `${speedLimitKbps}k/${speedLimitKbps}k`;
-
-      // Add the user to the Hotspot Server
       await conn.write('/ip/hotspot/user/add', [
         `=name=${code}`,
-        `=password=${code}`, // The password is the same as the username
+        `=password=${code}`,
         `=limit-uptime=${limitUptime}`,
-        // `=rate-limit=${rateLimit}`, // <--- WE COMMENTED THIS OUT SO YOU CAN CONNECT
         '=profile=default'
       ]);
 
@@ -67,15 +50,43 @@ class MikroTikRouter {
     }
   }
 
-  /**
-   * Fetches currently active guests from the router.
-   */
-  async getActiveUsers() {
+  // NEW: This is the only function we are adding to this file
+  async removeVoucher(code) {
     let conn;
     try {
       conn = await this.getConnection();
       
-      // Ask for all active hotspot connections
+      try {
+        const active = await conn.write('/ip/hotspot/active/print', [`?user=${code}`]);
+        if (active.length > 0) {
+          await conn.write('/ip/hotspot/active/remove', [`=.id=${active[0]['.id']}`]);
+        }
+      } catch (err) {
+        if (err.message && !err.message.includes('!empty')) throw err;
+      }
+
+      try {
+        const user = await conn.write('/ip/hotspot/user/print', [`?name=${code}`]);
+        if (user.length > 0) {
+          await conn.write('/ip/hotspot/user/remove', [`=.id=${user[0]['.id']}`]);
+        }
+      } catch (err) {
+        if (err.message && !err.message.includes('!empty')) throw err;
+      }
+
+      return { ok: true };
+    } catch (error) {
+      console.error(`[MikroTik] Failed to remove voucher ${code}:`, error.message);
+      return { ok: false, error: error.message };
+    } finally {
+      if (conn) conn.close();
+    }
+  }
+
+  async getActiveUsers() {
+    let conn;
+    try {
+      conn = await this.getConnection();
       const active = await conn.write('/ip/hotspot/active/print');
 
       return active.map(user => ({
@@ -93,22 +104,16 @@ class MikroTikRouter {
     }
   }
 
-  /**
-   * Kicks a user off the WiFi immediately.
-   */
   async disconnectUser(macAddress) {
     let conn;
     try {
       conn = await this.getConnection();
-
-      // Find the active connection ID for this MAC
       const active = await conn.write('/ip/hotspot/active/print', [
         `?mac-address=${macAddress}`
       ]);
 
       if (active.length > 0) {
         const id = active[0]['.id'];
-        // Remove the active connection using the internal ID
         await conn.write('/ip/hotspot/active/remove', [`=.id=${id}`]);
       }
 
@@ -121,9 +126,6 @@ class MikroTikRouter {
     }
   }
 
-  /**
-   * Pings the router to check if it is online.
-   */
   async checkStatus() {
     let conn;
     try {

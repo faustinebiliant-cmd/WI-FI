@@ -17,6 +17,10 @@ export default function VouchersPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // State for the revoke confirmation
+  const [revokeTarget, setRevokeTarget] = useState(null);
+  const [isRevoking, setIsRevoking] = useState(false);
+
   const fetchVouchers = useCallback(async (pageNumber = 1) => {
     setLoading(true);
     try {
@@ -65,11 +69,23 @@ export default function VouchersPage() {
     }
   };
 
-  // FIXED: Helper function to safely handle EAT time string
+  // NEW: The function that talks to the backend
+  const confirmRevoke = async () => {
+    if (!revokeTarget) return;
+    setIsRevoking(true);
+    try {
+      await apiClient.patch(`/tenant/vouchers/${revokeTarget.id}/revoke`);
+      setRevokeTarget(null);
+      fetchVouchers(page); // Refresh the list
+    } catch (error) {
+      alert(error.response?.data?.error || 'Failed to revoke voucher');
+    } finally {
+      setIsRevoking(false);
+    }
+  };
+
   const getRemainingTime = (expiresAt) => {
     if (!expiresAt) return null;
-    
-    // Format: "YYYY-MM-DD HH:MM" -> replace space with 'T' for JavaScript Date
     const safeDateString = expiresAt.replace(' ', 'T');
     const now = new Date();
     const expires = new Date(safeDateString);
@@ -132,6 +148,8 @@ export default function VouchersPage() {
                 {hasMultipleRouters && <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Router</th>}
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Package</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Status</th>
+                {/* NEW ACTION COLUMN */}
+                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -160,6 +178,19 @@ export default function VouchersPage() {
                         </span>
                       )}
                     </div>
+                  </td>
+                  {/* NEW BUTTON */}
+                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
+                    {v.status !== 'cancelled' ? (
+                      <button 
+                        onClick={() => setRevokeTarget(v)}
+                        style={{ padding: '6px 12px', backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                      >
+                        Revoke
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: '13px', color: '#9ca3af' }}>Revoked</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -242,6 +273,35 @@ export default function VouchersPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* NEW: Revoke Confirmation Modal */}
+      {revokeTarget && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }}>
+            <h2 style={{ marginTop: 0, color: 'var(--danger)' }}>Revoke Voucher?</h2>
+            <p style={{ color: 'var(--dark)', fontSize: '14px', marginBottom: '20px' }}>
+              Are you sure you want to revoke voucher <strong>{revokeTarget.code}</strong>?<br/><br/>
+              This will immediately kick the guest off the WiFi and they will not be able to use this code again.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button 
+                onClick={() => setRevokeTarget(null)} 
+                disabled={isRevoking}
+                style={{ padding: '10px 20px', cursor: isRevoking ? 'not-allowed' : 'pointer', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmRevoke}
+                disabled={isRevoking}
+                style={{ padding: '10px 20px', cursor: isRevoking ? 'not-allowed' : 'pointer', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
+              >
+                {isRevoking ? 'Revoking...' : 'Yes, Revoke'}
+              </button>
+            </div>
           </div>
         </div>
       )}

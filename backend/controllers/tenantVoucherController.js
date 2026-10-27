@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const db = require('../config/db');
 const { getTodayRangeEAT, formatDateTimeEAT } = require('../utils/tz');
+const { getRouter } = require('../services/routers/routerFactory');
 
 const generateCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();
 
@@ -16,7 +17,6 @@ const generateVouchers = async (req, res) => {
     const pkgCheck = await db.query('SELECT id FROM packages WHERE id = $1 AND tenant_id = $2', [package_id, req.tenantId]);
     if (pkgCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'Package not found' });
 
-    // CHECK THE HOURLY LIMIT (150 PER HOUR)
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const countRes = await db.query(
       'SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1 AND created_at >= $2',
@@ -83,17 +83,14 @@ const listVouchers = async (req, res) => {
 
     const { rows } = await db.query(query, params);
 
-    // Convert UTC expires_at to EAT string so frontend time math works
     const formattedData = rows.map(r => {
       let expiresAtEat = null;
       if (r.expires_at) {
-        // THIS IS THE FIX: We use the exact timezone converter from your utils
         expiresAtEat = formatDateTimeEAT(r.expires_at);
       }
-
       return {
         ...r,
-        expires_at: expiresAtEat, // Override with safe EAT time
+        expires_at: expiresAtEat,
         packages: { 
           name: r.package_name,
           router_name: r.router_name 
@@ -112,16 +109,40 @@ const listVouchers = async (req, res) => {
   }
 };
 
+// UPDATED: This now tells the MikroTik to kick the user
 const revokeVoucher = async (req, res) => {
   try {
     const { id } = req.params;
-    const { rows } = await db.query(
-      "UPDATE vouchers SET status = 'cancelled' WHERE id = $1 AND tenant_id = $2 RETURNING *",
-      [id, req.tenantId]
+    
+    // 1. Find the voucher and its router
+    const vRes = await db.query(
+      `SELECT v.id, v.code, p.router_id FROM vouchers v
+       JOIN packages p ON p.id = v.package_id
+       WHERE v.id = $1 AND v.tenant_id = $2`, [id, req.tenantId]);
+       
+    if (vRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Voucher not found' });
+    const v = vRes.rows[0];
+
+    // 2. Tell the router to kick the user
+    let routerCleaned = true;
+    const rRes = await db.query('SELECT * FROM routers WHERE id = $1 AND tenant_id = $2', [v.router_id, req.tenantId]);
+    if (rRes.rows[0]) {
+      const result = await getRouter(rRes.rows[0]).removeVoucher(v.code);
+      routerCleaned = result.ok;
+    }
+
+    // 3. Mark as cancelled in the database
+    await db.query("UPDATE vouchers SET status = 'cancelled' WHERE id = $1", [v.id]);
+    
+    // 4. Close the active session
+    await db.query(
+      "UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'revoked' WHERE voucher_id = $1 AND ended_at IS NULL",
+      [v.id]
     );
-    if (rows.length === 0) return res.status(404).json({ success: false, error: 'Voucher not found' });
-    return res.status(200).json({ success: true, data: rows[0] });
+
+    return res.status(200).json({ success: true, message: 'Voucher revoked' });
   } catch (error) {
+    console.error(error);
     return res.status(500).json({ success: false, error: 'Failed to revoke voucher' });
   }
 };
