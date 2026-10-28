@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="OSWAGOTech WiFi: smart WiFi billing. Generate vouchers, control speeds and monitor live connections.">
+  <title>OSWAGOlink - Smart WiFi Billing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #566175;
+      --line: #e5e7eb;
+      --soft: #f7f8fa;
+      --brand: #1a56db;
+      --brand-dark: #1446b8;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      color: var(--ink);
+      background: #fff;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    a { text-decoration: none; color: inherit; }
+    .container { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+    :focus-visible { outline: 3px solid rgba(26, 86, 219, .4); outline-offset: 3px; }
+
+    /* Buttons */
+    .btn {
+      display: inline-block;
+      font-weight: 600;
+      font-size: 15px;
+      padding: 13px 26px;
+      border-radius: 8px;
+      border: 1.5px solid var(--brand);
+      transition: background .2s, color .2s;
+    }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-primary:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+    .btn-outline { background: transparent; color: var(--brand); }
+    .btn-outline:hover { background: var(--brand); color: #fff; }
+    .btn-sm { padding: 9px 18px; font-size: 14px; }
+
+    /* Navbar */
+    .navbar { border-bottom: 1px solid var(--line); background: #fff; }
+    .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 16px; }
+    .logo { font-weight: 700; font-size: 18px; letter-spacing: -.2px; }
+    .logo span { color: var(--brand); }
+
+    /* Hero */
+    .hero { text-align: center; padding: 96px 0 88px; background: var(--soft); border-bottom: 1px solid var(--line); }
+    .hero h1 {
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 700;
+      letter-spacing: -.03em;
+      line-height: 1.12;
+      max-width: 780px;
+      margin: 0 auto 20px;
+    }
+    .hero p {
+      font-size: clamp(16px, 2vw, 18px);
+      color: var(--muted);
+      max-width: 620px;
+      margin: 0 auto 32px;
+    }
+
+    /* Features */
+    .features { padding: 80px 0; }
+    .features h2 {
+      font-size: clamp(24px, 3vw, 32px);
+      font-weight: 700;
+      letter-spacing: -.02em;
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .card { border: 1px solid var(--line); border-radius: 12px; padding: 28px; background: #fff; }
+    .card h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+    .card p { color: var(--muted); font-size: 15.5px; }
+
+    /* Contact Section */
+    .contact { padding: 60px 0; background: var(--soft); border-top: 1px solid var(--line); }
+    .contact-box { text-align: center; }
+    .contact h2 { font-size: 24px; font-weight: 700; margin-bottom: 20px; }
+    .contact-info { display: flex; flex-direction: column; gap: 12px; font-size: 16px; color: var(--muted); }
+    .contact-info a { color: var(--brand); font-weight: 600; transition: color 0.2s; }
+    .contact-info a:hover { color: var(--brand-dark); text-decoration: underline; }
+
+    /* Footer */
+    .footer { margin-top: auto; border-top: 1px solid var(--line); padding: 28px 0; text-align: center; font-size: 14px; color: var(--muted); }
+    .footer p + p { margin-top: 2px; }
+
+    /* Tablet */
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; max-width: 520px; margin: 0 auto; }
+      .hero { padding: 72px 0 64px; }
+      .features { padding: 56px 0; }
+    }
+
+    /* Phone */
+    @media (max-width: 480px) {
+      .container { padding: 0 18px; }
+      .nav-inner { height: 60px; }
+      .logo { font-size: 16px; }
+      .hero { padding: 56px 0 52px; }
+      .hero .btn { display: block; width: 100%; }
+      .card { padding: 22px; }
+      .contact { padding: 40px 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="container nav-inner">
+      <a href="/" class="logo">OSWAGOTech <span>WiFi</span></a>
+      <a href="/tenant/login" class="btn btn-outline btn-sm">Client Login</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container">
+        <h1>Smart WiFi Billing for Your Business</h1>
+        <p>Effortlessly manage your WiFi network. Generate voucher codes, control internet speeds, and monitor active connections, all from one dashboard.</p>
+        <a href="/tenant/login" class="btn btn-primary">Client Login</a>
+      </div>
+    </section>
+
+    <section class="features">
+      <div class="container">
+        <h2>Everything you need</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Instant Vouchers</h3>
+            <p>Generate up to voucher codes at once. Provide seamless internet access with zero manual paperwork or complicated POS systems.</p>
+          </div>
+          <div class="card">
+            <h3>Speed Control</h3>
+            <p>Create packages with specific speeds and time limits. Give your customers exactly what they pay for with precision bandwidth management.</p>
+          </div>
+          <div class="card">
+            <h3>Live Monitoring</h3>
+            <p>See exactly who is online right now. Manage active sessions and disconnect unauthorized devices instantly from your dashboard.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACT SECTION -->
+    <section class="contact">
+      <div class="container contact-box">
+        <h2>Get in Touch</h2>
+        <div class="contact-info">
+          <p>Call us: <a href="tel:+255750825721">+255 750 825 721</a></p>
+          <p>Email us: <a href="mailto:faustinebiliant@gmail.com">faustinebiliant@gmail.com</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2026 OSWAGOlink. All rights reserved.</p>
+      <p>Dar es Salaam, Tanzania</p>
+    </div>
+  </footer>
+
+</body>
+</html>
