@@ -4,7 +4,6 @@
 const RouterOSAPI = require('node-routeros').RouterOSAPI;
 const { decrypt } = require('../../utils/encryption');
 
-// A print that returns [] instead of throwing when RouterOS answers "!empty"
 const safePrint = async (conn, path, query = []) => {
   try {
     return await conn.write(path, query);
@@ -38,58 +37,51 @@ class MikroTikRouter {
     return conn;
   }
 
-  async ensureSpeedProfile(conn, downKbps, upKbps) {
-    const down = Math.round(Number(downKbps));
-    const up = Math.round(Number(upKbps));
-    if (!Number.isInteger(down) || !Number.isInteger(up) ||
-        down < 1 || up < 1 || down > 102400 || up > 102400) {
-      throw new Error('Invalid speed');
-    }
-    const name = `spd-${down}d-${up}u`;
-    const found = await safePrint(conn, '/ip/hotspot/user/profile/print', [`?name=${name}`]);
-    if (found.length === 0) {
-      try {
-        await conn.write('/ip/hotspot/user/profile/add', [
-          `=name=${name}`,
-          `=rate-limit=${up}k/${down}k`,
-          '=shared-users=1',
-        ]);
-      } catch (e) {
-        if (!/already have/i.test(String(e.message))) throw e; 
-      }
-    }
-    return name;
-  }
-
   async createVoucher(code, durationMinutes, speedDownKbps, speedUpKbps) {
     let conn;
     try {
       conn = await this.getConnection();
       const limitUptime = `${Math.max(1, Math.round(durationMinutes))}m`;
-      const profile = await this.ensureSpeedProfile(conn, speedDownKbps, speedUpKbps);
+      const down = Math.round(Number(speedDownKbps));
+      const up = Math.round(Number(speedUpKbps));
+      const profileName = `spd-${down}d-${up}u`;
 
+      // 1. Ensure the speed profile exists
+      const profiles = await safePrint(conn, '/ip/hotspot/user/profile/print', [`?name=${profileName}`]);
+      if (profiles.length === 0) {
+        try {
+          await conn.write('/ip/hotspot/user/profile/add', [
+            `=name=${profileName}`,
+            `=rate-limit=${up}k/${down}k`,
+            '=shared-users=1'
+          ]);
+        } catch (err) {
+           if (!err.message.includes('already have')) throw err;
+        }
+      }
+
+      // 2. Check if the user already exists (Resume case)
       const existing = await safePrint(conn, '/ip/hotspot/user/print', [`?name=${code}`]);
       
       if (existing.length > 0) {
-        // Router kept the user: just update their profile
+        // Update existing user
         await conn.write('/ip/hotspot/user/set', [
           `=.id=${existing[0]['.id']}`,
-          `=profile=${profile}`,
+          `=profile=${profileName}`,
+          `=limit-uptime=${limitUptime}`
         ]);
       } else {
-        // Router lost the user (power cut): create them fresh
+        // Create fresh user
         try {
           await conn.write('/ip/hotspot/user/add', [
             `=name=${code}`,
             `=password=${code}`,
             `=limit-uptime=${limitUptime}`,
-            `=profile=${profile}`,
+            `=profile=${profileName}`
           ]);
         } catch (err) {
-          // THE FIX: Ignore the !empty bug after creating the user
-          if (!err.message.includes('!empty')) {
-            throw err;
-          }
+          // Ignore the router being weird
+          if (!err.message.includes('!empty')) throw err;
         }
       }
 
@@ -106,7 +98,7 @@ class MikroTikRouter {
     let conn;
     try {
       conn = await this.getConnection();
-
+      
       const active = await safePrint(conn, '/ip/hotspot/active/print', [`?user=${code}`]);
       for (const a of active) {
         await conn.write('/ip/hotspot/active/remove', [`=.id=${a['.id']}`]);
@@ -131,7 +123,6 @@ class MikroTikRouter {
     try {
       conn = await this.getConnection();
       const active = await safePrint(conn, '/ip/hotspot/active/print');
-
       return active.map(user => ({
         mac: user['mac-address'],
         ip: user.address,
@@ -140,7 +131,6 @@ class MikroTikRouter {
         expiresAt: null
       }));
     } catch (error) {
-      console.error('[MikroTik] Failed to fetch active users:', error.message);
       return [];
     } finally {
       if (conn) conn.close();
@@ -151,15 +141,12 @@ class MikroTikRouter {
     let conn;
     try {
       conn = await this.getConnection();
-      const active = await safePrint(conn, '/ip/hotspot/active/print', [
-        `?mac-address=${macAddress}`
-      ]);
+      const active = await safePrint(conn, '/ip/hotspot/active/print', [`?mac-address=${macAddress}`]);
       for (const a of active) {
         await conn.write('/ip/hotspot/active/remove', [`=.id=${a['.id']}`]);
       }
       return { ok: true };
     } catch (error) {
-      console.error(`[MikroTik] Failed to disconnect MAC ${macAddress}:`, error.message);
       return { ok: false, error: error.message };
     } finally {
       if (conn) conn.close();
