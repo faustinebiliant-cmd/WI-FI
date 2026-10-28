@@ -7,19 +7,21 @@ export default function VouchersPage() {
   const [packages, setPackages] = useState([]);
   const [routers, setRouters] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState('');
-  const [quantity, setQuantity] = useState(''); 
+  const [quantity, setQuantity] = useState('');
   const [generatedCodes, setGeneratedCodes] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [todayOnly, setTodayOnly] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // State for the revoke confirmation
   const [revokeTarget, setRevokeTarget] = useState(null);
   const [isRevoking, setIsRevoking] = useState(false);
+  const [revokeError, setRevokeError] = useState('');
 
   const fetchVouchers = useCallback(async (pageNumber = 1) => {
     setLoading(true);
@@ -30,35 +32,52 @@ export default function VouchersPage() {
       setVouchers(res.data.data);
       setTotalPages(res.data.pagination.pages);
       setPage(res.data.pagination.page);
+      setLoadError('');
     } catch (error) {
       console.error(error);
+      setLoadError('Failed to load vouchers. Please refresh the page.');
     } finally {
       setLoading(false);
     }
   }, [todayOnly]);
 
+  // Packages and routers: load once
   useEffect(() => {
+    let cancelled = false;
     Promise.all([
       apiClient.get('/tenant/packages'),
       apiClient.get('/tenant/routers')
-    ]).then(([pkgRes, routerRes]) => {
-      setPackages(pkgRes.data.data);
-      setRouters(routerRes.data.data);
-      if (pkgRes.data.data.length > 0) setSelectedPackage(pkgRes.data.data[0].id);
-    });
+    ])
+      .then(([pkgRes, routerRes]) => {
+        if (cancelled) return;
+        setPackages(pkgRes.data.data);
+        setRouters(routerRes.data.data);
+        if (pkgRes.data.data.length > 0) setSelectedPackage(pkgRes.data.data[0].id);
+      })
+      .catch((error) => {
+        console.error(error);
+        if (!cancelled) setLoadError('Failed to load packages. Please refresh the page.');
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Voucher list: reload when the filter changes
+  useEffect(() => {
     fetchVouchers(1);
   }, [fetchVouchers]);
 
   const handleGenerate = async (e) => {
     e.preventDefault();
+    if (isGenerating) return;
     setErrorMsg('');
-    
-    const numQuantity = parseInt(quantity);
+
+    const numQuantity = parseInt(quantity, 10);
     if (!numQuantity || numQuantity < 1 || numQuantity > 50) {
       setErrorMsg('Please enter a number between 1 and 50.');
       return;
     }
 
+    setIsGenerating(true);
     try {
       const res = await apiClient.post('/tenant/vouchers/generate', { package_id: selectedPackage, quantity: numQuantity });
       setGeneratedCodes(res.data.data);
@@ -66,19 +85,26 @@ export default function VouchersPage() {
       fetchVouchers(1);
     } catch (error) {
       setErrorMsg(error.response?.data?.error || 'Failed to generate vouchers');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
-  // NEW: The function that talks to the backend
+  const openRevoke = (voucher) => {
+    setRevokeError('');
+    setRevokeTarget(voucher);
+  };
+
   const confirmRevoke = async () => {
     if (!revokeTarget) return;
     setIsRevoking(true);
+    setRevokeError('');
     try {
       await apiClient.patch(`/tenant/vouchers/${revokeTarget.id}/revoke`);
       setRevokeTarget(null);
-      fetchVouchers(page); // Refresh the list
+      fetchVouchers(page);
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to revoke voucher');
+      setRevokeError(error.response?.data?.error || 'Failed to revoke voucher');
     } finally {
       setIsRevoking(false);
     }
@@ -87,12 +113,12 @@ export default function VouchersPage() {
   const getRemainingTime = (expiresAt) => {
     if (!expiresAt) return null;
     const safeDateString = expiresAt.replace(' ', 'T');
-    const now = new Date();
     const expires = new Date(safeDateString);
-    const diffMs = expires - now;
-    
+    if (isNaN(expires.getTime())) return null;
+    const diffMs = expires - new Date();
+
     if (diffMs <= 0) return 'Expired';
-    
+
     const diffMins = Math.floor(diffMs / 60000);
     const days = Math.floor(diffMins / 1440);
     const hours = Math.floor((diffMins % 1440) / 60);
@@ -133,6 +159,12 @@ export default function VouchersPage() {
         </div>
       </div>
 
+      {loadError && (
+        <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
+          {loadError}
+        </div>
+      )}
+
       <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {loading ? (
           <Loader message="Loading vouchers..." />
@@ -148,7 +180,6 @@ export default function VouchersPage() {
                 {hasMultipleRouters && <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Router</th>}
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Package</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Status</th>
-                {/* NEW ACTION COLUMN */}
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Action</th>
               </tr>
             </thead>
@@ -156,7 +187,7 @@ export default function VouchersPage() {
               {vouchers.map((v) => (
                 <tr key={v.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                   <td style={{ padding: '16px 20px', fontFamily: 'monospace', fontSize: '16px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{v.code}</td>
-                  
+
                   {hasMultipleRouters && (
                     <td style={{ padding: '16px 20px', fontWeight: 'bold', color: 'var(--primary)', whiteSpace: 'nowrap' }}>
                       {v.packages?.router_name || 'Any'}
@@ -179,17 +210,18 @@ export default function VouchersPage() {
                       )}
                     </div>
                   </td>
-                  {/* NEW BUTTON */}
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
-                    {v.status !== 'cancelled' ? (
-                      <button 
-                        onClick={() => setRevokeTarget(v)}
+                    {v.status === 'unused' || v.status === 'active' ? (
+                      <button
+                        onClick={() => openRevoke(v)}
                         style={{ padding: '6px 12px', backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                       >
                         Revoke
                       </button>
                     ) : (
-                      <span style={{ fontSize: '13px', color: '#9ca3af' }}>Revoked</span>
+                      <span style={{ fontSize: '13px', color: '#9ca3af' }}>
+                        {v.status === 'cancelled' ? 'Revoked' : 'Expired'}
+                      </span>
                     )}
                   </td>
                 </tr>
@@ -217,7 +249,7 @@ export default function VouchersPage() {
         <div className="modal-overlay">
           <div className="modal-content">
             <h2 style={{ marginTop: 0 }}>Generate Vouchers</h2>
-            
+
             {errorMsg && (
               <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
                 {errorMsg}
@@ -225,41 +257,52 @@ export default function VouchersPage() {
             )}
 
             {!generatedCodes ? (
-              <form onSubmit={handleGenerate}>
-                <div className="form-group">
-                  <label>Package</label>
-                  <select className="form-control" required value={selectedPackage} onChange={e => setSelectedPackage(e.target.value)}>
-                    {packages.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {hasMultipleRouters ? `${p.name} - TZS ${p.price_tzs} (${p.router_name || 'No Router'})` : `${p.name} - TZS ${p.price_tzs}`}
-                      </option>
-                    ))}
-                  </select>
+              packages.length === 0 ? (
+                <div>
+                  <p style={{ fontSize: '14px' }}>You need to create a package before you can generate vouchers.</p>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                    <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary">Close</button>
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label>Quantity (Max 50)</label>
-                  <input 
-                    className="form-control" 
-                    required 
-                    type="text" 
-                    inputMode="numeric" 
-                    pattern="[0-9]*" 
-                    placeholder="e.g. 50" 
-                    maxLength={2}
-                    value={quantity} 
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (/^\d*$/.test(val)) {
-                        setQuantity(val);
-                      }
-                    }} 
-                  />
-                </div>
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
-                  <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary">Cancel</button>
-                  <button type="submit" className="btn btn-primary" disabled={!quantity}>Generate</button>
-                </div>
-              </form>
+              ) : (
+                <form onSubmit={handleGenerate}>
+                  <div className="form-group">
+                    <label>Package</label>
+                    <select className="form-control" required value={selectedPackage} onChange={e => setSelectedPackage(e.target.value)}>
+                      {packages.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {hasMultipleRouters ? `${p.name} - TZS ${p.price_tzs} (${p.router_name || 'No Router'})` : `${p.name} - TZS ${p.price_tzs}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Quantity (Max 50)</label>
+                    <input
+                      className="form-control"
+                      required
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="e.g. 50"
+                      maxLength={2}
+                      value={quantity}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (/^\d*$/.test(val)) {
+                          setQuantity(val);
+                        }
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                    <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary" disabled={isGenerating}>Cancel</button>
+                    <button type="submit" className="btn btn-primary" disabled={!quantity || isGenerating}>
+                      {isGenerating ? 'Generating...' : 'Generate'}
+                    </button>
+                  </div>
+                </form>
+              )
             ) : (
               <div>
                 <p style={{ color: 'var(--success)', fontWeight: 'bold' }}>Successfully generated {generatedCodes.length} vouchers!</p>
@@ -277,24 +320,32 @@ export default function VouchersPage() {
         </div>
       )}
 
-      {/* NEW: Revoke Confirmation Modal */}
       {revokeTarget && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }}>
             <h2 style={{ marginTop: 0, color: 'var(--danger)' }}>Revoke Voucher?</h2>
             <p style={{ color: 'var(--dark)', fontSize: '14px', marginBottom: '20px' }}>
-              Are you sure you want to revoke voucher <strong>{revokeTarget.code}</strong>?<br/><br/>
-              This will immediately kick the guest off the WiFi and they will not be able to use this code again.
+              Are you sure you want to revoke voucher <strong>{revokeTarget.code}</strong>?<br /><br />
+              {revokeTarget.status === 'active'
+                ? 'This will immediately disconnect the guest from the WiFi and they will not be able to use this code again.'
+                : 'This code will no longer be usable.'}
             </p>
+
+            {revokeError && (
+              <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px', textAlign: 'left' }}>
+                {revokeError}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button 
-                onClick={() => setRevokeTarget(null)} 
+              <button
+                onClick={() => setRevokeTarget(null)}
                 disabled={isRevoking}
                 style={{ padding: '10px 20px', cursor: isRevoking ? 'not-allowed' : 'pointer', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={confirmRevoke}
                 disabled={isRevoking}
                 style={{ padding: '10px 20px', cursor: isRevoking ? 'not-allowed' : 'pointer', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}

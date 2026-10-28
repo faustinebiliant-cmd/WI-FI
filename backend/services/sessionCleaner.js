@@ -1,45 +1,51 @@
 const db = require('../config/db');
 const { getRouter } = require('./routers/routerFactory');
 
+let running = false;
+
 const cleanExpiredSessions = async () => {
+  if (running) return; // never run two cleanups at the same time
+  running = true;
   try {
     // ---------------------------------------------------------
-    // STEP 1: Sync with the Router (Find Ghost Sessions)
+    // STEP 1: Sync with the router (find ghost sessions)
     // ---------------------------------------------------------
-    // Get all routers that have active sessions in the database
     const { rows: routers } = await db.query(`
-      SELECT DISTINCT r.* 
+      SELECT DISTINCT r.*
       FROM sessions s
       JOIN routers r ON s.router_id = r.id
       WHERE s.ended_at IS NULL
+        AND s.started_at < NOW() - INTERVAL '2 minutes'
     `);
 
     for (const router of routers) {
-      // Ask the router who is actually online right now
-      let activeOnRouter = [];
+      let activeOnRouter;
       try {
         const adapter = getRouter(router);
+        const status = await adapter.checkStatus();
+        if (!status || !status.online) {
+          console.log(`[Cleaner] Router ${router.name} is unreachable. Skipping ghost check.`);
+          continue;
+        }
         activeOnRouter = await adapter.getActiveUsers();
       } catch (err) {
-        console.error(`[Cleaner] Could not reach router ${router.name}. Skipping ghost check for this router.`);
-        continue; // Move to the next router if this one is offline
+        console.error(`[Cleaner] Could not reach router ${router.name}. Skipping ghost check.`);
+        continue;
       }
 
-      // Create a list of MAC addresses that the router says are online
-      const routerMacs = activeOnRouter.map(u => u.mac.toUpperCase());
+      const routerMacs = new Set(
+        activeOnRouter.map(u => String(u.mac || '').toUpperCase())
+      );
 
-      // Get all database sessions for this router that think they are active
+      // Sessions younger than 2 minutes are still logging in: leave them alone
       const { rows: dbSessions } = await db.query(`
         SELECT id, mac_address FROM sessions
         WHERE router_id = $1 AND ended_at IS NULL
+          AND started_at < NOW() - INTERVAL '2 minutes'
       `, [router.id]);
 
-      // Compare the two lists
       for (const session of dbSessions) {
-        const dbMac = session.mac_address.toUpperCase();
-        
-        // If the database thinks they are online, but the router says they are gone
-        if (!routerMacs.includes(dbMac)) {
+        if (!routerMacs.has(session.mac_address.toUpperCase())) {
           await db.query(
             "UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'Left Network' WHERE id = $1",
             [session.id]
@@ -50,57 +56,60 @@ const cleanExpiredSessions = async () => {
     }
 
     // ---------------------------------------------------------
-    // STEP 2: Expire Vouchers (Kick users whose time is up)
+    // STEP 2: Expire vouchers whose time is up (with or without a session)
     // ---------------------------------------------------------
-    const { rows: expiredSessions } = await db.query(`
-      SELECT s.id as session_id, s.mac_address, s.voucher_id, s.router_id, r.* 
-      FROM sessions s
-      JOIN vouchers v ON s.voucher_id = v.id
-      JOIN routers r ON s.router_id = r.id
-      WHERE s.ended_at IS NULL 
-      AND v.expires_at < NOW()
+    const { rows: expired } = await db.query(`
+      SELECT v.id, v.package_id, p.router_id
+      FROM vouchers v
+      JOIN packages p ON p.id = v.package_id
+      WHERE v.status = 'active' AND v.expires_at < NOW()
+      ORDER BY v.expires_at ASC
+      LIMIT 100
     `);
 
-    if (expiredSessions.length > 0) {
-      console.log(`[Cleaner] Found ${expiredSessions.length} expired sessions. Kicking users...`);
+    if (expired.length > 0) {
+      console.log(`[Cleaner] Found ${expired.length} expired vouchers.`);
     }
 
-    for (const session of expiredSessions) {
-      let kickSuccess = false;
-      let disconnectReason = 'Time Expired';
+    const failedRouters = new Set(); // do not retry a dead router for every voucher
 
+    for (const v of expired) {
       try {
-        const adapter = getRouter(session);
-        const result = await adapter.disconnectUser(session.mac_address);
-        if (result && result.ok) {
-          kickSuccess = true;
+        if (failedRouters.has(v.router_id)) continue;
+
+        const routerRes = await db.query('SELECT * FROM routers WHERE id = $1', [v.router_id]);
+        const router = routerRes.rows[0];
+
+        if (router) {
+          // Get the code only here, and keep it out of the logs
+          const codeRes = await db.query('SELECT code FROM vouchers WHERE id = $1', [v.id]);
+          const result = await getRouter(router).removeVoucher(codeRes.rows[0].code);
+          if (!result || !result.ok) {
+            failedRouters.add(v.router_id);
+            console.error(`[Cleaner] Router ${router.name} could not remove expired voucher ${v.id}. Will retry.`);
+            continue; // stays 'active' in the database, so the next run retries
+          }
         }
-      } catch (err) {
-        console.error(`[Cleaner] Failed to kick MAC ${session.mac_address}:`, err.message);
-        disconnectReason = 'Expired (router unreachable)';
-      }
 
-      try {
+        await db.query("UPDATE vouchers SET status = 'expired' WHERE id = $1 AND status = 'active'", [v.id]);
         await db.query(
-          "UPDATE sessions SET ended_at = NOW(), disconnect_reason = $1 WHERE id = $2",
-          [disconnectReason, session.session_id]
+          "UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'Time Expired' WHERE voucher_id = $1 AND ended_at IS NULL",
+          [v.id]
         );
-        await db.query(
-          "UPDATE vouchers SET status = 'expired' WHERE id = $1",
-          [session.voucher_id]
-        );
-      } catch (dbErr) {
-        console.error(`[Cleaner] Database update failed for session ${session.session_id}:`, dbErr.message);
+      } catch (err) {
+        console.error(`[Cleaner] Failed to expire voucher ${v.id}:`, err.message);
       }
     }
-
   } catch (error) {
     console.error('[Cleaner] Database error:', error);
+  } finally {
+    running = false;
   }
 };
 
-// Run this function every 60 seconds (1 minute)
+// Run once at startup, then every 60 seconds
 const startSessionCleaner = () => {
+  cleanExpiredSessions();
   setInterval(cleanExpiredSessions, 60 * 1000);
   console.log('[Cleaner] Session sync and expiration checker started.');
 };
