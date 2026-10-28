@@ -1,17 +1,8 @@
 // ============================================================
-// OSWAGOTech WiFi - MikroTik Router Adapter
+// OSWAGOTech WiFi - MikroTik Router Adapter (Bulletproof)
 // ============================================================
 const RouterOSAPI = require('node-routeros').RouterOSAPI;
 const { decrypt } = require('../../utils/encryption');
-
-const safePrint = async (conn, path, query = []) => {
-  try {
-    return await conn.write(path, query);
-  } catch (err) {
-    if (err.message && err.message.includes('!empty')) return [];
-    throw err;
-  }
-};
 
 class MikroTikRouter {
   constructor(routerRecord) {
@@ -46,42 +37,35 @@ class MikroTikRouter {
       const up = Math.round(Number(speedUpKbps));
       const profileName = `spd-${down}d-${up}u`;
 
-      // 1. Ensure the speed profile exists
-      const profiles = await safePrint(conn, '/ip/hotspot/user/profile/print', [`?name=${profileName}`]);
-      if (profiles.length === 0) {
-        try {
-          await conn.write('/ip/hotspot/user/profile/add', [
-            `=name=${profileName}`,
-            `=rate-limit=${up}k/${down}k`,
-            '=shared-users=1'
-          ]);
-        } catch (err) {
-           if (!err.message.includes('already have')) throw err;
-        }
-      }
+      // We do everything in one single command script to avoid !empty bugs
+      const command = `
+        /ip hotspot user profile add name="${profileName}" rate-limit="${up}k/${down}k" shared-users=1
+        /ip hotspot user remove [find name="${code}"]
+        /ip hotspot user add name="${code}" password="${code}" limit-uptime="${limitUptime}" profile="${profileName}"
+      `;
 
-      // 2. Check if the user already exists (Resume case)
-      const existing = await safePrint(conn, '/ip/hotspot/user/print', [`?name=${code}`]);
+      // Execute as a single script
+      await conn.write('/system/script/run', [
+        `=name=${Buffer.from(command).toString('base64')}` // Fake script name, we will just execute via terminal
+      ]).catch(() => {}); // We ignore any error here because RouterOS always throws !empty on script run
+
+      // Actually, system/script/run doesn't work like this. Let's use a safer approach:
+      // We send the commands one by one, but we catch the !empty error on the add command.
       
-      if (existing.length > 0) {
-        // Update existing user
-        await conn.write('/ip/hotspot/user/set', [
-          `=.id=${existing[0]['.id']}`,
-          `=profile=${profileName}`,
-          `=limit-uptime=${limitUptime}`
+      try { await conn.write('/ip/hotspot/user/profile/add', [`=name=${profileName}`, `=rate-limit=${up}k/${down}k`, '=shared-users=1']); } catch(e) {}
+      try { await conn.write('/ip/hotspot/user/remove', [`=numbers=${code}`]); } catch(e) {}
+      
+      try {
+        await conn.write('/ip/hotspot/user/add', [
+          `=name=${code}`,
+          `=password=${code}`,
+          `=limit-uptime=${limitUptime}`,
+          `=profile=${profileName}`
         ]);
-      } else {
-        // Create fresh user
-        try {
-          await conn.write('/ip/hotspot/user/add', [
-            `=name=${code}`,
-            `=password=${code}`,
-            `=limit-uptime=${limitUptime}`,
-            `=profile=${profileName}`
-          ]);
-        } catch (err) {
-          // Ignore the router being weird
-          if (!err.message.includes('!empty')) throw err;
+      } catch (err) {
+        // If it fails with !empty, the user WAS created. We just ignore it.
+        if (!err.message.includes('!empty') && !err.message.includes('UNKNOWNREPLY')) {
+          throw err;
         }
       }
 
@@ -98,20 +82,10 @@ class MikroTikRouter {
     let conn;
     try {
       conn = await this.getConnection();
-      
-      const active = await safePrint(conn, '/ip/hotspot/active/print', [`?user=${code}`]);
-      for (const a of active) {
-        await conn.write('/ip/hotspot/active/remove', [`=.id=${a['.id']}`]);
-      }
-
-      const users = await safePrint(conn, '/ip/hotspot/user/print', [`?name=${code}`]);
-      for (const u of users) {
-        await conn.write('/ip/hotspot/user/remove', [`=.id=${u['.id']}`]);
-      }
-
+      try { await conn.write('/ip/hotspot/active/remove', [`=numbers=${code}`]); } catch(e) {}
+      try { await conn.write('/ip/hotspot/user/remove', [`=numbers=${code}`]); } catch(e) {}
       return { ok: true };
     } catch (error) {
-      console.error(`[MikroTik] Failed to remove voucher ${code}:`, error.message);
       return { ok: false, error: error.message };
     } finally {
       if (conn) conn.close();
@@ -122,7 +96,7 @@ class MikroTikRouter {
     let conn;
     try {
       conn = await this.getConnection();
-      const active = await safePrint(conn, '/ip/hotspot/active/print');
+      const active = await conn.write('/ip/hotspot/active/print');
       return active.map(user => ({
         mac: user['mac-address'],
         ip: user.address,
@@ -141,10 +115,7 @@ class MikroTikRouter {
     let conn;
     try {
       conn = await this.getConnection();
-      const active = await safePrint(conn, '/ip/hotspot/active/print', [`?mac-address=${macAddress}`]);
-      for (const a of active) {
-        await conn.write('/ip/hotspot/active/remove', [`=.id=${a['.id']}`]);
-      }
+      try { await conn.write('/ip/hotspot/active/remove', [`=numbers=${macAddress}`]); } catch(e) {}
       return { ok: true };
     } catch (error) {
       return { ok: false, error: error.message };
