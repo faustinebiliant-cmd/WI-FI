@@ -38,7 +38,6 @@ class MikroTikRouter {
     return conn;
   }
 
-  // Creates (or reuses) a profile that carries the speed
   async ensureSpeedProfile(conn, downKbps, upKbps) {
     const down = Math.round(Number(downKbps));
     const up = Math.round(Number(upKbps));
@@ -52,17 +51,16 @@ class MikroTikRouter {
       try {
         await conn.write('/ip/hotspot/user/profile/add', [
           `=name=${name}`,
-          `=rate-limit=${up}k/${down}k`, // upload/download, from the customer's side
+          `=rate-limit=${up}k/${down}k`,
           '=shared-users=1',
         ]);
       } catch (e) {
-        if (!/already have/i.test(String(e.message))) throw e; // two vouchers at once
+        if (!/already have/i.test(String(e.message))) throw e; 
       }
     }
     return name;
   }
 
-  // Safe to call twice: an existing router user is kept, not duplicated
   async createVoucher(code, durationMinutes, speedDownKbps, speedUpKbps) {
     let conn;
     try {
@@ -71,19 +69,28 @@ class MikroTikRouter {
       const profile = await this.ensureSpeedProfile(conn, speedDownKbps, speedUpKbps);
 
       const existing = await safePrint(conn, '/ip/hotspot/user/print', [`?name=${code}`]);
+      
       if (existing.length > 0) {
-        // Router kept the user (and its used time): only make sure the speed is right
+        // Router kept the user: just update their profile
         await conn.write('/ip/hotspot/user/set', [
           `=.id=${existing[0]['.id']}`,
           `=profile=${profile}`,
         ]);
       } else {
-        await conn.write('/ip/hotspot/user/add', [
-          `=name=${code}`,
-          `=password=${code}`,
-          `=limit-uptime=${limitUptime}`,
-          `=profile=${profile}`,
-        ]);
+        // Router lost the user (power cut): create them fresh
+        try {
+          await conn.write('/ip/hotspot/user/add', [
+            `=name=${code}`,
+            `=password=${code}`,
+            `=limit-uptime=${limitUptime}`,
+            `=profile=${profile}`,
+          ]);
+        } catch (err) {
+          // THE FIX: Ignore the !empty bug after creating the user
+          if (!err.message.includes('!empty')) {
+            throw err;
+          }
+        }
       }
 
       return { ok: true, expiresAt: new Date(Date.now() + durationMinutes * 60000) };
