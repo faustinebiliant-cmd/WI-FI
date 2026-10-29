@@ -36,6 +36,15 @@
 /ip service set winbox address=192.168.88.0/24
 /ip service disable telnet,ftp,www,ssh,api-ssl
 
+# --- Speed Profiles (Pre-loaded for common speeds) ---
+/ip hotspot user profile add name=spd-1024d-1024u rate-limit=1024k/1024k
+/ip hotspot user profile add name=spd-2048d-2048u rate-limit=2048k/2048k
+/ip hotspot user profile add name=spd-3072d-3072u rate-limit=3072k/3072k
+/ip hotspot user profile add name=spd-4096d-4096u rate-limit=4096k/4096k
+/ip hotspot user profile add name=spd-5120d-5120u rate-limit=5120k/5120k
+/ip hotspot user profile add name=spd-10240d-10240u rate-limit=10240k/10240k
+/ip hotspot user profile add name=spd-20480d-20480u rate-limit=20480k/20480k
+
 # --- THE FIX: Power-Cut Watchdog Scripts ---
 /system script add name=wg-boot policy=read,write,policy,test source={
     /interface wireguard peers disable [find name=peer1]

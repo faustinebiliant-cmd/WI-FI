@@ -111,6 +111,9 @@ app.use('/api/tenant', tenantRoutes);
 const portalRoutes = require('./routes/portal');
 app.use('/api/portal', portalRoutes);
 
+const provisionRoutes = require('./routes/provision');
+app.use('/api/provision', provisionRoutes);
+
 // ------------------------------------------------------------
 // 404
 // ------------------------------------------------------------

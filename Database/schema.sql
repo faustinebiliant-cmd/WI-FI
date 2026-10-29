@@ -57,6 +57,8 @@ CREATE TABLE public.routers (
     router_token varchar(255) UNIQUE NOT NULL,
     status varchar(50) DEFAULT 'offline',
     last_seen_at timestamptz,
+    provision_token varchar(100) UNIQUE, -- NEW: For Zero-Touch Provisioning
+    tunnel_ip varchar(50) UNIQUE,        -- NEW: The WireGuard IP assigned to this router
     created_at timestamptz DEFAULT now() NOT NULL
 );
 
@@ -64,7 +66,7 @@ CREATE TABLE public.routers (
 CREATE TABLE public.packages (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id uuid REFERENCES public.tenants(id) ON DELETE CASCADE NOT NULL,
-    router_id uuid REFERENCES public.routers(id) ON DELETE CASCADE, -- NEW: Links package to a specific router
+    router_id uuid REFERENCES public.routers(id) ON DELETE CASCADE, -- Links package to a specific router
     name varchar(255) NOT NULL,
     price_tzs numeric NOT NULL,
     duration_minutes integer NOT NULL,
@@ -204,3 +206,6 @@ CREATE INDEX idx_packages_tenant_created ON public.packages(tenant_id, created_a
 CREATE INDEX idx_vouchers_tenant_created ON public.vouchers(tenant_id, created_at DESC);
 CREATE INDEX idx_sessions_tenant_started ON public.sessions(tenant_id, started_at DESC);
 CREATE INDEX idx_audit_created ON public.platform_audit_logs(created_at DESC);
+
+-- New Index for Zero-Touch Provisioning
+CREATE INDEX idx_routers_provision_token ON public.routers(provision_token);
