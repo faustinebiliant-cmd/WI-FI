@@ -3,24 +3,19 @@
 /system identity set name=CLIENT_NAME
 /system clock set time-zone-autodetect=no time-zone-name=Africa/Dar_es_Salaam
 
-# --- Time & Cloud (Fixes the clock after power cuts) ---
 /ip cloud set update-time=yes
 /system ntp client set enabled=yes servers=time.google.com,pool.ntp.org,time.cloudflare.com
 
-# --- Basic Security & DNS ---
 /ip dns set allow-remote-requests=yes servers=8.8.8.8,8.8.4.4
 /disk settings set auto-media-sharing=no auto-smb-sharing=no
 
-# --- WireGuard Tunnel ---
 /interface wireguard add name=wg-vps listen-port=51820 mtu=1420
 /ip address add address=TUNNEL_IP/24 interface=wg-vps comment="VPS API tunnel"
 /interface wireguard peers add interface=wg-vps name=peer1 public-key="ge0I3cNGfsm5MuItotNBt5KDrSGeg3lhRThsDFc3byY=" endpoint-address=69.62.105.119 endpoint-port=51820 allowed-address=10.20.0.1/32 persistent-keepalive=25s comment="WI-FI VPS"
 
-# --- Firewall (Security & API Access) ---
 /ip firewall filter add chain=input action=accept protocol=tcp dst-port=8728 in-interface=wg-vps src-address=10.20.0.1 place-before=0 comment="Allow VPS API through WireGuard"
 /ip firewall filter add chain=forward action=drop src-address=192.168.88.0/24 out-interface=wg-vps place-before=0 comment="Guests cannot use VPS tunnel"
 
-# --- Hotspot Setup ---
 /ip hotspot profile set [find default=yes] login-by=http-pap
 /ip hotspot profile add name=hsprof1 hotspot-address=192.168.88.1 html-directory=flash/hotspot login-by=http-pap
 /ip hotspot add name=hotspot1 interface=bridge address-pool=default-dhcp profile=hsprof1 disabled=no
@@ -29,23 +24,34 @@
 /ip hotspot walled-garden ip add dst-address=69.62.105.119 action=accept
 /ip firewall nat add action=masquerade chain=srcnat comment="masquerade hotspot network" src-address=192.168.88.0/24 out-interface-list=WAN
 
-# --- API User ---
 /user group add name=apigroup policy=api,read,write,policy,test
 /user add name=wifiapi group=apigroup address=10.20.0.1 password="API_PASSWORD"
 /ip service set api address=10.20.0.1/32
 /ip service set winbox address=192.168.88.0/24
 /ip service disable telnet,ftp,www,ssh,api-ssl
 
-# --- Speed Profiles (Pre-loaded for common speeds) ---
+# --- Speed Profiles (1 to 20 Mbps) ---
 /ip hotspot user profile add name=spd-1024d-1024u rate-limit=1024k/1024k
 /ip hotspot user profile add name=spd-2048d-2048u rate-limit=2048k/2048k
 /ip hotspot user profile add name=spd-3072d-3072u rate-limit=3072k/3072k
 /ip hotspot user profile add name=spd-4096d-4096u rate-limit=4096k/4096k
 /ip hotspot user profile add name=spd-5120d-5120u rate-limit=5120k/5120k
+/ip hotspot user profile add name=spd-6144d-6144u rate-limit=6144k/6144k
+/ip hotspot user profile add name=spd-7168d-7168u rate-limit=7168k/7168k
+/ip hotspot user profile add name=spd-8192d-8192u rate-limit=8192k/8192k
+/ip hotspot user profile add name=spd-9216d-9216u rate-limit=9216k/9216k
 /ip hotspot user profile add name=spd-10240d-10240u rate-limit=10240k/10240k
+/ip hotspot user profile add name=spd-11264d-11264u rate-limit=11264k/11264k
+/ip hotspot user profile add name=spd-12288d-12288u rate-limit=12288k/12288k
+/ip hotspot user profile add name=spd-13312d-13312u rate-limit=13312k/13312k
+/ip hotspot user profile add name=spd-14336d-14336u rate-limit=14336k/14336k
+/ip hotspot user profile add name=spd-15360d-15360u rate-limit=15360k/15360k
+/ip hotspot user profile add name=spd-16384d-16384u rate-limit=16384k/16384k
+/ip hotspot user profile add name=spd-17408d-17408u rate-limit=17408k/17408k
+/ip hotspot user profile add name=spd-18432d-18432u rate-limit=18432k/18432k
+/ip hotspot user profile add name=spd-19456d-19456u rate-limit=19456k/19456k
 /ip hotspot user profile add name=spd-20480d-20480u rate-limit=20480k/20480k
 
-# --- THE FIX: Power-Cut Watchdog Scripts ---
 /system script add name=wg-boot policy=read,write,policy,test source={
     /interface wireguard peers disable [find name=peer1]
     :do {
