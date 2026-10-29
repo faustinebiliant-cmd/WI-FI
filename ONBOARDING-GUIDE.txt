@@ -1,0 +1,185 @@
+============================================================
+OSWAGOLink - New Client Onboarding Guide
+============================================================
+
+This guide explains how to add a new MikroTik router to your system
+in under 5 minutes using the automated VPS scripts.
+
+============================================================
+PART 1: ONE-TIME VPS SETUP (Do this ONCE only)
+============================================================
+
+Before you can onboard clients, you must verify that the VPS
+scripts exist. Run these commands on your VPS:
+
+    ls -l ~/onboarding/new-client.sh
+    ls -l ~/onboarding/add-peer.sh
+
+What does "ls -l" mean?
+- "ls" means "list files".
+- "-l" means "show details like size and permissions".
+- The path tells Linux where to look.
+
+If the commands show a file with "-rwxr-xr-x" (the x means executable),
+then the scripts are ready.
+If they say "No such file or directory", the scripts are missing and
+must be created before you can continue.
+
+You also need the client template file:
+    ls -l ~/onboarding/client-template.rsc
+
+This template contains the router configuration. It has placeholder
+variables (CLIENT_NAME, TUNNEL_IP, API_PASSWORD) that the script
+will fill in for each new client.
+
+
+============================================================
+PART 2: WHAT YOU NEED BEFORE STARTING
+============================================================
+
+For every new client, you need to prepare:
+
+1. A client name (no spaces, e.g., "hotel-kariakoo").
+2. The next free WireGuard tunnel IP address.
+   Your main router is 10.20.0.2, so the next client is 10.20.0.3,
+   then 10.20.0.4, and so on. NEVER reuse an IP.
+3. A router token. You get this from your Tenant Panel.
+4. A strong API password (letters and numbers only, min 12 chars).
+
+
+============================================================
+PART 3: ONBOARDING A NEW CLIENT
+============================================================
+
+STEP 1 - Add the router in the Tenant Panel
+------------------------------------------
+Log into https://oswagolink.co.tz/tenant and go to Routers.
+Click "Add Router".
+Fill in:
+- Router Name: hotel-kariakoo
+- Host / IP: 10.20.0.3
+- API Username: wifiapi
+- API Password: (your strong password)
+- API Port: 8728
+
+Click Save. Copy the router token shown in the dashboard.
+
+STEP 2 - Generate the client configuration on the VPS
+-----------------------------------------------------
+Open your VPS terminal and run:
+
+    ~/onboarding/new-client.sh CLIENT_NAME TUNNEL_IP ROUTER_TOKEN API_PASSWORD
+
+Example:
+    ~/onboarding/new-client.sh hotel-kariakoo 10.20.0.3 abc123def456 Kariakoo2026
+
+What does this script do?
+- It creates a unique .rsc file for this client
+- It fills in the tunnel IP, name, and API password
+- It creates a custom login page for this client's token
+- It prints the download command for you
+
+STEP 3 - Download the .rsc file to your laptop
+----------------------------------------------
+The script will print a command that looks like:
+
+    scp biliant@69.62.105.119:/home/biliant/onboarding/clients/CLIENT_NAME.rsc .
+
+Run that exact command on your Windows Command Prompt.
+The .rsc file will download to your current folder.
+
+STEP 4 - Import the configuration into the new router
+-----------------------------------------------------
+1. Connect to the new MikroTik via WinBox using its MAC address.
+2. Open Files and drag the CLIENT_NAME.rsc file into the router.
+3. Open New Terminal and run:
+
+    /import file-name=CLIENT_NAME.rsc
+
+This installs the full configuration: WireGuard, Hotspot, Firewall,
+API user, NTP settings, and the power-cut watchdog scripts.
+
+STEP 5 - Get the router's Public Key
+------------------------------------
+In WinBox, go to WireGuard and click the Peers tab.
+Find the "wg-vps" interface and copy the Public Key value.
+You will need this for the next step.
+
+STEP 6 - Register the router on the VPS
+---------------------------------------
+Go back to your VPS terminal and run:
+
+    ~/onboarding/add-peer.sh CLIENT_NAME TUNNEL_IP PUBLIC_KEY
+
+Example:
+    ~/onboarding/add-peer.sh hotel-kariakoo 10.20.0.3 abcXYZ123key...
+
+What does this script do?
+- It adds the new router to your WireGuard config
+- It enables the tunnel from the VPS side
+- It checks the handshake, ping, and API port automatically
+- It saves the peer to wg0.conf so it survives reboots
+
+STEP 7 - Set up the login redirect page
+---------------------------------------
+This step tells the router which URL to send guests to.
+
+In WinBox, open New Terminal on the new router and run:
+
+    /ip hotspot reset-html
+
+(Type 0, then y when asked.)
+
+Then run the fetch command that your script printed:
+
+    /tool fetch url="https://oswagolink.co.tz/hotspot-login/ROUTER_TOKEN.html" dst-path="flash/hotspot/login.html" check-certificate=no
+
+STEP 8 - Verify the router is online
+------------------------------------
+1. Wait 2-3 minutes for the boot script to sync the clock.
+2. Open your Tenant Panel and check the Routers page.
+3. The router should show as ONLINE (green).
+
+If it shows offline, check the VPS log with:
+    pm2 logs wifi-backend
+
+
+============================================================
+PART 4: TROUBLESHOOTING
+============================================================
+
+Issue: "Cannot find file new-client.sh"
+Fix: Run ls ~/onboarding/ to see what files exist.
+
+Issue: Router shows offline after import
+Fix: Run on the router: /log print where message~"wg-"
+This will show if the boot script ran successfully.
+
+Issue: Guests cannot reach the portal
+Fix: Check that the walled garden is configured:
+    /ip hotspot walled-garden print
+It should list oswagolink.co.tz.
+
+Issue: Watchdog restarts the tunnel every 2 minutes
+Fix: Test with /ping 10.20.0.1 count=3 on the router.
+If it times out, your VPS blocks pings. Do not use the watchdog
+script until you can allow ICMP through the firewall.
+
+
+============================================================
+PART 5: QUICK REFERENCE
+============================================================
+
+Generate client config:   ~/onboarding/new-client.sh NAME IP TOKEN PASS
+Download file:            scp user@vps:/path/file.rsc .
+Import on router:         /import file-name=NAME.rsc
+Add peer to VPS:          ~/onboarding/add-peer.sh NAME IP PUBKEY
+Fetch login page:         /tool fetch url="..." dst-path="flash/hotspot/login.html"
+Check router status:      /log print where message~"wg-"
+Check VPS tunnel:         sudo wg show
+Check VPS API:            nc -vz -w 5 10.20.0.X 8728
+
+
+============================================================
+END OF GUIDE
+============================================================
