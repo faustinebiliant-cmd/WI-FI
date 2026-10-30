@@ -1,15 +1,23 @@
 const db = require('../config/db');
+const env = require('../config/env');
 const { getRouter } = require('../services/routers/routerFactory');
+const MikroTikRouter = require('../services/routers/MikroTikRouter');
 const { isValidMACAddress, isValidIPAddress, isValidVoucherCode } = require('../utils/validators');
+
+const TOKEN_RE = /^[A-Za-z0-9_-]{8,128}$/;
+const NOT_REACHABLE = 'The WiFi system is not reachable right now. Please try again in a moment.';
 
 // GET /api/portal/info/:router_token
 const getPortalInfo = async (req, res) => {
   try {
     const { router_token } = req.params;
+    if (!TOKEN_RE.test(String(router_token))) {
+      return res.status(404).json({ success: false, error: 'Router not found' });
+    }
 
     const routerRes = await db.query(`
-      SELECT r.*, t.business_name, t.logo_url 
-      FROM routers r JOIN tenants t ON r.tenant_id = t.id 
+      SELECT r.id, r.tenant_id, t.business_name, t.logo_url
+      FROM routers r JOIN tenants t ON r.tenant_id = t.id
       WHERE r.router_token = $1
     `, [router_token]);
 
@@ -41,10 +49,13 @@ const getPortalInfo = async (req, res) => {
 // POST /api/portal/redeem
 const redeemVoucher = async (req, res) => {
   try {
-    const { router_token, code, mac_address, ip_address } = req.body;
+    const { router_token, code, mac_address, ip_address } = req.body || {};
 
-    if (!router_token || !code || !mac_address) {
+    if (typeof router_token !== 'string' || typeof code !== 'string' || typeof mac_address !== 'string') {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+    if (!TOKEN_RE.test(router_token)) {
+      return res.status(404).json({ success: false, error: 'Router not found' });
     }
     if (!isValidMACAddress(mac_address)) {
       return res.status(400).json({ success: false, error: 'Invalid device MAC address' });
@@ -53,17 +64,31 @@ const redeemVoucher = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid device IP address' });
     }
 
-    const cleanCode = String(code).toUpperCase().trim();
+    const cleanCode = code.toUpperCase().trim();
     if (!isValidVoucherCode(cleanCode)) {
       return res.status(400).json({ success: false, error: 'Invalid voucher format' });
     }
 
-    const routerRes = await db.query('SELECT * FROM routers WHERE router_token = $1', [router_token]);
+    const routerRes = await db.query(
+      `SELECT id, tenant_id, ip_address, api_port, api_username, api_password_encrypted
+       FROM routers WHERE router_token = $1`,
+      [router_token]
+    );
     const router = routerRes.rows[0];
     if (!router) return res.status(404).json({ success: false, error: 'Router not found' });
 
-    if (router.status === 'offline') {
-      return res.status(400).json({ success: false, error: 'Router is currently offline. Please contact the management.' });
+    // Router not set up yet
+    if (!router.ip_address || router.ip_address === '0.0.0.0') {
+      return res.status(503).json({ success: false, error: 'This WiFi is not ready yet. Please contact the management.' });
+    }
+
+    // Create the router connection BEFORE touching the voucher
+    let adapter;
+    try {
+      adapter = env.ROUTER_MODE === 'real' ? new MikroTikRouter(router) : getRouter(router);
+    } catch (err) {
+      console.error('Router adapter error:', err.message);
+      return res.status(503).json({ success: false, error: NOT_REACHABLE });
     }
 
     let voucher;
@@ -90,17 +115,14 @@ const redeemVoucher = async (req, res) => {
       );
       const existing = existingRes.rows[0];
 
+      // Unknown code, or a code of another router: same answer
       if (!existing) {
-        const anyRes = await db.query('SELECT 1 FROM vouchers WHERE tenant_id = $1 AND code = $2', [router.tenant_id, cleanCode]);
-        if (anyRes.rows.length > 0) {
-          return res.status(400).json({ success: false, error: 'This voucher is not valid for this router.' });
-        }
         return res.status(404).json({ success: false, error: 'Invalid voucher code' });
       }
       if (existing.status === 'cancelled') {
         return res.status(400).json({ success: false, error: 'This voucher has been cancelled.' });
       }
-      if (existing.status !== 'active' || new Date(existing.expires_at) <= new Date()) {
+      if (existing.status !== 'active' || !existing.expires_at || new Date(existing.expires_at) <= new Date()) {
         return res.status(400).json({ success: false, error: 'This voucher has expired.' });
       }
       voucher = existing;
@@ -116,14 +138,14 @@ const redeemVoucher = async (req, res) => {
     // Minutes left on the voucher's own clock (the full duration on first use)
     const remainingMinutes = Math.max(1, Math.ceil((new Date(voucher.expires_at) - Date.now()) / 60000));
 
-    const adapter = getRouter(router);
     const routerResult = await adapter.createVoucher(cleanCode, remainingMinutes, pkg.speed_down_kbps, pkg.speed_up_kbps);
 
-    if (!routerResult.ok) {
+    if (!routerResult || !routerResult.ok) {
+      // A fresh voucher goes back to unused, so the customer does not lose it
       if (!resumed) {
         await db.query("UPDATE vouchers SET status = 'unused', used_at = NULL, expires_at = NULL WHERE id = $1", [voucher.id]);
       }
-      return res.status(500).json({ success: false, error: 'Router failed to authorize connection' });
+      return res.status(503).json({ success: false, error: NOT_REACHABLE });
     }
 
     // Close any old open session of this voucher, then record the new one

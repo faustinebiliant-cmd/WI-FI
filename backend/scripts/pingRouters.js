@@ -1,46 +1,87 @@
 // ============================================================
-// OSWAGOTech WiFi - Background Router Pinger (Raw PostgreSQL)
+// OSWAGOTech WiFi - Background Router Pinger
+// Runs once: checks every router, updates its status, then exits.
 // ============================================================
 const db = require('../config/db');
-const { getRouter } = require('../services/routers/routerFactory');
+const env = require('../config/env');
+const MikroTikRouter = require('../services/routers/MikroTikRouter');
 
-const pingAllRouters = async () => {
-  console.log('[Pinger] Checking router statuses...');
-  
+const CONCURRENCY = 5;            // routers checked at the same time
+const CHECK_TIMEOUT_MS = 10000;   // give up on one router after 10 seconds
+const OFFLINE_AFTER_MINUTES = 8;  // show "offline" only after this long without an answer
+
+const withTimeout = (promise, ms) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+  ]);
+
+const checkOne = async (r) => {
   try {
-    // 1. Get all routers using Raw SQL
-    const { rows: routers } = await db.query('SELECT * FROM routers');
+    // Not set up yet: nothing to check
+    if (!r.ip_address || r.ip_address === '0.0.0.0') return 'skipped';
 
-    for (const r of routers) {
-      try {
-        const adapter = getRouter(r);
-        
-        // If we are in dev mode, MockRouter doesn't have checkStatus.
-        // So we only ping if we are in "real" mode.
-        if (typeof adapter.checkStatus === 'function') {
-          const status = await adapter.checkStatus();
-          
-          if (status.online) {
-            await db.query(
-              'UPDATE routers SET status = $1, last_seen_at = NOW() WHERE id = $2',
-              ['online', r.id]
-            );
-          } else {
-            await db.query(
-              'UPDATE routers SET status = $1 WHERE id = $2',
-              ['offline', r.id]
-            );
-          }
-        }
-      } catch (err) {
-        console.error(`[Pinger] Failed to ping router ${r.name}:`, err.message);
-      }
+    const adapter = new MikroTikRouter(r);
+    const status = await withTimeout(adapter.checkStatus(), CHECK_TIMEOUT_MS);
+
+    if (status && status.online) {
+      await db.query(
+        "UPDATE routers SET status = 'online', last_seen_at = NOW() WHERE id = $1",
+        [r.id]
+      );
+      return 'online';
     }
-    console.log('[Pinger] Finished checking routers.');
   } catch (err) {
-    console.error('[Pinger] Fatal error:', err.message);
+    console.error(`[Pinger] Router ${r.id} check failed:`, err.message);
   }
+
+  // No answer: mark offline only if it has been silent for a while
+  await db.query(
+    `UPDATE routers SET status = 'offline'
+     WHERE id = $1
+       AND (last_seen_at IS NULL OR last_seen_at < NOW() - make_interval(mins => $2::int))`,
+    [r.id, OFFLINE_AFTER_MINUTES]
+  );
+  return 'no-answer';
 };
 
-// Run immediately when the script is executed
-pingAllRouters();
+const run = async () => {
+  if (env.ROUTER_MODE !== 'real') {
+    console.log('[Pinger] Skipped (router mode is not real).');
+    return;
+  }
+
+  console.log('[Pinger] Checking router statuses...');
+  const { rows: routers } = await db.query(
+    'SELECT id, ip_address, api_port, api_username, api_password_encrypted FROM routers'
+  );
+
+  const counts = { online: 0, 'no-answer': 0, skipped: 0 };
+  let next = 0;
+
+  const worker = async () => {
+    while (next < routers.length) {
+      const r = routers[next++];
+      const result = await checkOne(r);
+      counts[result] = (counts[result] || 0) + 1;
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, routers.length) }, worker)
+  );
+
+  console.log(
+    `[Pinger] Finished checking routers. online=${counts.online} no-answer=${counts['no-answer']} skipped=${counts.skipped}`
+  );
+};
+
+run()
+  .catch((err) => {
+    console.error('[Pinger] Fatal error:', err.message);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    try { await db.pool.end(); } catch (e) { /* ignore */ }
+    process.exit(process.exitCode || 0);
+  });
