@@ -24,12 +24,14 @@ const tenantLoginLimiter = rateLimit({
   message: limitMessage('Too many login attempts. Please try again in 10 minutes.')
 });
 
+// FIXED: Only counts failed attempts, and raised limit for shared hotel IPs
 const redeemLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  max: devMax(10),
+  max: devMax(30), // Raised from 10 to 30 (hotel guests share 1 IP)
+  skipSuccessfulRequests: true, // Only count bad codes, not successful ones
   standardHeaders: true,
   legacyHeaders: false,
-  message: limitMessage('Too many attempts. Please wait 10 minutes and try again.')
+  message: limitMessage('Too many invalid attempts. Please wait 10 minutes and try again.')
 });
 
 const tenantGlobalLimiter = rateLimit({

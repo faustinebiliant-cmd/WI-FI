@@ -203,7 +203,6 @@ const registerRouterKey = async (req, res) => {
     const { token } = req.params;
     if (!TOKEN_RE.test(token)) return res.status(404).send('Invalid token');
 
-    // In a web address, "+" arrives as a space, so put it back
     const pubkey = String(req.query.pubkey || '').replace(/ /g, '+');
     if (!PUBKEY_RE.test(pubkey)) return res.status(400).send('Invalid key');
 
@@ -213,7 +212,6 @@ const registerRouterKey = async (req, res) => {
     if (router.provisioned_at) return res.status(410).send('Token already used');
     if (!TUNNEL_IP_RE.test(String(router.tunnel_ip || ''))) return res.status(400).send('No tunnel address yet');
 
-    // No shell is used, so nothing typed in the web address can run as a command
     execFile(
       'flock',
       ['-w', '10', '/var/lock/wg-enroll.lock', 'sudo', '/usr/local/sbin/wifi-wireguard-add-peer', pubkey, router.tunnel_ip + '/32'],
@@ -222,8 +220,10 @@ const registerRouterKey = async (req, res) => {
           console.error('Enrollment error:', stderr || error.message);
           return res.status(500).send('Failed to add peer');
         }
-        db.query('UPDATE routers SET provisioned_at = NOW() WHERE id = $1', [router.id])
-          .catch((e) => console.error('provisioned_at update failed:', e.message));
+        
+        db.query('UPDATE routers SET status = $1, public_key = $2 WHERE id = $3', ['online', pubkey, router.id])
+          .catch((e) => console.error('Database update failed:', e.message));
+          
         res.send('OK');
       }
     );

@@ -77,17 +77,28 @@ const createRouter = async (req, res) => {
 const deleteRouter = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!UUID_RE.test(String(id))) {
+    
+    // 1. Find the router and get its public key
+    const checkRes = await db.query('SELECT id, public_key FROM routers WHERE id = $1 AND tenant_id = $2', [id, req.tenantId]);
+    if (checkRes.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Router not found or unauthorized' });
     }
 
-    const { rows } = await db.query(
-      'DELETE FROM routers WHERE id = $1 AND tenant_id = $2 RETURNING id',
-      [id, req.tenantId]
-    );
-    if (rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Router not found or unauthorized' });
+    const router = checkRes.rows[0];
+
+    // 2. Remove the WireGuard Peer from the VPS if it has a public key
+    if (router.public_key) {
+      const { execFile } = require('child_process');
+      execFile('sudo', ['/usr/local/sbin/wifi-wireguard-remove-peer', router.public_key], (err) => {
+        if (err) {
+          console.error('Failed to remove WireGuard peer:', err.message);
+          // We log the error, but we still delete from the database so the dashboard doesn't get stuck
+        }
+      });
     }
+
+    // 3. Delete the router from the database
+    await db.query('DELETE FROM routers WHERE id = $1 AND tenant_id = $2', [id, req.tenantId]);
 
     return res.status(200).json({ success: true, message: 'Router and all associated data deleted successfully' });
   } catch (error) {

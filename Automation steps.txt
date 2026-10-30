@@ -1,0 +1,82 @@
+============================================================
+OSWAGOLink - Complete Router Onboarding & Portal Setup Guide
+============================================================
+
+PHASE 1: CREATE THE ROUTER IN THE DASHBOARD
+------------------------------------------------------------
+1. Log in to the Tenant Panel.
+2. Click "+ Add Router".
+3. Enter the Router Name (e.g., "Main Lobby") and click "Generate".
+4. The system will display the "Zero-Touch Setup Command". 
+5. Click "Copy Command" and keep it ready.
+
+
+PHASE 2: PREPARE THE MIKROTIK (PHYSICAL SETUP)
+------------------------------------------------------------
+1. Connect a brand-new MikroTik to your PC via Ethernet.
+2. Open WinBox and connect via MAC address.
+3. Set a strong admin password (type this in the terminal):
+   /user set admin password="YOUR_STRONG_PASSWORD"
+
+4. Check the device mode:
+   /system device-mode print
+   
+   * If it says "scheduler: no", run this command:
+     /system device-mode update scheduler=yes
+   * IMPORTANT: After running this, unplug the router's power and 
+     plug it back in within 5 minutes to confirm.
+
+
+PHASE 3: RUN THE ZERO-TOUCH COMMAND
+------------------------------------------------------------
+1. Open the New Terminal in WinBox.
+2. Paste the Zero-Touch Setup Command you copied in Phase 1.
+3. The router will download its configuration, set up the VPN, 
+   create speed profiles, and connect to your VPS.
+4. Wait about 2 minutes. The dashboard should show the router as 
+   "ONLINE".
+
+
+PHASE 4: INSTALL THE GUEST LOGIN PAGE (MANUAL STEP)
+------------------------------------------------------------
+*Because MikroTik requires a human confirmation to reset the HTML, 
+this step cannot be automated.*
+
+1. In the WinBox terminal, run:
+   /ip hotspot reset-html
+
+2. It will ask you a question. Type "0" and press Enter.
+3. Then type "y" and press Enter. Wait for it to finish.
+
+4. Delete the default MikroTik page:
+   /file remove flash/hotspot/login.html
+
+5. Fetch your custom portal page. Paste this exact command:
+   /tool fetch url="https://oswagolink.co.tz/api/provision/login/YOUR_TOKEN" dst-path=flash/hotspot/login.html
+
+6. Verify it worked. The file size should be about 700 bytes:
+   /file print where name="flash/hotspot/login.html"
+
+
+PHASE 5: THE GUEST EXPERIENCE
+------------------------------------------------------------
+1. A guest connects to the hotel's WiFi.
+2. The MikroTik intercepts their traffic and serves the custom 
+   login.html page.
+3. The custom page instantly redirects the guest's browser to 
+   https://oswagolink.co.tz/portal/.
+4. The guest enters a voucher code on your React portal.
+5. Your backend tells the MikroTik to authorize the guest.
+6. The guest gets internet access.
+
+
+SUMMARY OF MANUAL STEPS:
+------------------------------------------------------------
+- Setting the Admin Password.
+- Checking Device Mode (update scheduler=yes if needed).
+- Running /ip hotspot reset-html (typing 0 and y).
+- Fetching the custom login.html file.
+
+*Everything else (VPN, firewall, speed profiles, watchdog scripts, 
+and database registration) is fully automated by the Zero-Touch 
+script.*
