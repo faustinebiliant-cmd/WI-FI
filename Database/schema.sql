@@ -57,9 +57,10 @@ CREATE TABLE public.routers (
     router_token varchar(255) UNIQUE NOT NULL,
     status varchar(50) DEFAULT 'offline',
     last_seen_at timestamptz,
-    provision_token varchar(100) UNIQUE, -- NEW: For Zero-Touch Provisioning
-    tunnel_ip varchar(50) UNIQUE,        -- NEW: The WireGuard IP assigned to this router
-    provisioned_at timestamptz,
+    provision_token varchar(100) UNIQUE, -- For Zero-Touch Provisioning
+    tunnel_ip varchar(50) UNIQUE,        -- The WireGuard IP assigned to this router
+    public_key varchar(100),             -- NEW: Stores the router's WireGuard Public Key
+    provisioned_at timestamptz,          -- Marks when the router was successfully set up
     created_at timestamptz DEFAULT now() NOT NULL
 );
 
