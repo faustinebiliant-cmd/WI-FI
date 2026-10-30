@@ -7,10 +7,10 @@ export default function PackagesPage() {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  
+
   const [formData, setFormData] = useState({
     name: '',
     price_tzs: '',
@@ -39,7 +39,7 @@ export default function PackagesPage() {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMsg('');
-    
+
     let duration_minutes = parseInt(formData.duration_value, 10);
     if (formData.duration_unit === 'hours') duration_minutes *= 60;
     if (formData.duration_unit === 'days') duration_minutes *= 1440;
@@ -98,13 +98,13 @@ export default function PackagesPage() {
         </button>
       </div>
 
-      <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%', maxWidth: '100%' }}>
         {loading ? (
           <Loader message="Loading packages..." />
         ) : packages.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center' }}>No packages yet.</div>
         ) : (
-          <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
               <tr>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Name</th>
@@ -137,7 +137,7 @@ export default function PackagesPage() {
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '100%', maxWidth: '500px' }}>
             <h2 style={{ marginTop: 0 }}>Create Package</h2>
-            
+
             {errorMsg && (
               <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
                 {errorMsg}
@@ -145,12 +145,12 @@ export default function PackagesPage() {
             )}
 
             <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <input required type="text" placeholder="Package Name (e.g. Daily 5Mbps)" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} disabled={isSubmitting} />
-              <input required type="number" min="0" placeholder="Price (TZS)" value={formData.price_tzs} onChange={e => setFormData({...formData, price_tzs: e.target.value})} style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} disabled={isSubmitting} />
-              
+              <input required type="text" placeholder="Package Name (e.g. Daily 5Mbps)" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} disabled={isSubmitting} />
+              <input required type="number" min="0" placeholder="Price (TZS)" value={formData.price_tzs} onChange={e => setFormData({ ...formData, price_tzs: e.target.value })} style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} disabled={isSubmitting} />
+
               <div style={{ display: 'flex', gap: '10px' }}>
-                <input required type="number" min="1" placeholder="Duration" value={formData.duration_value} onChange={e => setFormData({...formData, duration_value: e.target.value})} style={{ padding: '10px', flex: 1, border: '1px solid #ccc', borderRadius: '4px' }} disabled={isSubmitting} />
-                <select value={formData.duration_unit} onChange={e => setFormData({...formData, duration_unit: e.target.value})} style={{ padding: '10px', flex: 1, border: '1px solid #ccc', borderRadius: '4px' }} disabled={isSubmitting}>
+                <input required type="number" min="1" placeholder="Duration" value={formData.duration_value} onChange={e => setFormData({ ...formData, duration_value: e.target.value })} style={{ padding: '10px', flex: 1, border: '1px solid #ccc', borderRadius: '4px' }} disabled={isSubmitting} />
+                <select value={formData.duration_unit} onChange={e => setFormData({ ...formData, duration_unit: e.target.value })} style={{ padding: '10px', flex: 1, border: '1px solid #ccc', borderRadius: '4px' }} disabled={isSubmitting}>
                   <option value="hours">Hours</option>
                   <option value="days">Days</option>
                   <option value="weeks">Weeks</option>
@@ -160,10 +160,10 @@ export default function PackagesPage() {
               {/* RESTRICTED SPEED INPUT (1 - 20) */}
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>Speed (Mbps)</label>
-                <select 
-                  value={formData.speed_mbps} 
-                  onChange={e => setFormData({...formData, speed_mbps: e.target.value})} 
-                  style={{ padding: '10px', width: '100%', border: '1px solid #ccc', borderRadius: '4px' }} 
+                <select
+                  value={formData.speed_mbps}
+                  onChange={e => setFormData({ ...formData, speed_mbps: e.target.value })}
+                  style={{ padding: '10px', width: '100%', border: '1px solid #ccc', borderRadius: '4px' }}
                   disabled={isSubmitting}
                 >
                   {[...Array(20)].map((_, i) => (
