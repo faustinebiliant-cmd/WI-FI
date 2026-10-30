@@ -38,7 +38,7 @@ export default function SessionsPage() {
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="page-wrapper">
       <div style={{ marginBottom: '30px' }}>
         <h1 style={{ margin: 0 }}>Active Sessions</h1>
         <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Guests currently connected to your WiFi.</p>

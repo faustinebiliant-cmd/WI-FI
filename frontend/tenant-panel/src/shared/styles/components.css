@@ -12,7 +12,7 @@
 .btn-secondary { background: white; color: var(--dark); border: 1px solid var(--border); }
 .btn-secondary:hover:not(:disabled) { background: var(--light); }
 
-/* --- TABLE FIXES --- */
+/* --- TABLES --- */
 .table-container { 
   background: var(--white); 
   border-radius: var(--radius-md); 
@@ -25,7 +25,7 @@
 
 table { 
   width: 100%; 
-  min-width: 600px; /* Forces scroll on mobile */
+  min-width: 600px; 
   border-collapse: collapse; 
   text-align: left; 
 }
@@ -49,106 +49,27 @@ tbody tr:hover td { background: #f8fafc; }
 .modal-content { background: white; border-radius: var(--radius-lg); padding: 32px; width: 100%; max-width: 500px; box-shadow: var(--shadow-lg); max-height: 90vh; overflow-y: auto; }
 
 /* --- Loader --- */
-.loader-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  width: 100%;
-}
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 3.5px solid var(--border);
-  border-top-color: var(--primary);
-  border-right-color: var(--primary-light);
-  border-radius: 50%;
-  animation: spin 0.65s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
-}
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-.loader-text {
-  margin-top: 14px;
-  color: var(--gray);
-  font-size: 13.5px;
-  font-weight: 500;
-}
+.loader-container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; width: 100%; }
+.spinner { width: 36px; height: 36px; border: 3.5px solid var(--border); border-top-color: var(--primary); border-right-color: var(--primary-light); border-radius: 50%; animation: spin 0.65s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-text { margin-top: 14px; color: var(--gray); font-size: 13.5px; font-weight: 500; }
 
 /* ============================================================ */
 /* MOBILE RESPONSIVENESS & HAMBURGER MENU                       */
 /* ============================================================ */
 
-.sidebar { 
-  width: var(--sidebar-w); 
-  background: var(--dark); 
-  color: white; 
-  position: fixed; 
-  inset: 0 auto 0 0; 
-  display: flex; 
-  flex-direction: column; 
-  box-shadow: 4px 0 24px rgba(0,0,0,0.1); 
-  z-index: 100;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
+.sidebar { width: var(--sidebar-w); background: var(--dark); color: white; position: fixed; inset: 0 auto 0 0; display: flex; flex-direction: column; box-shadow: 4px 0 24px rgba(0,0,0,0.1); z-index: 100; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 
-.main-content { 
-  flex: 1; 
-  margin-left: var(--sidebar-w); 
-  display: flex; 
-  flex-direction: column; 
-  min-width: 0; 
-}
+.main-content { flex: 1; margin-left: var(--sidebar-w); display: flex; flex-direction: column; min-width: 0; overflow-x: hidden; }
 
-.page-content { 
-  padding: 32px; 
-  flex: 1; 
-}
+.page-content { padding: 32px; flex: 1; }
 
-.mobile-topbar { 
-  display: none; 
-  height: var(--header-h); 
-  background: white; 
-  border-bottom: 1px solid var(--border); 
-  align-items: center; 
-  justify-content: space-between; 
-  padding: 0 20px; 
-  position: fixed; 
-  top: 0; 
-  left: 0; 
-  right: 0; 
-  z-index: 50; 
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-}
+.mobile-topbar { display: none; height: var(--header-h); background: white; border-bottom: 1px solid var(--border); align-items: center; justify-content: space-between; padding: 0 20px; position: fixed; top: 0; left: 0; right: 0; z-index: 50; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
 
-.hamburger-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--dark);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px;
-  border-radius: 8px;
-}
-
-.hamburger-btn:active {
-  background: var(--light);
-}
-
-.mobile-close-btn { 
-  display: none; 
-  background: none; 
-  border: none; 
-  cursor: pointer; 
-  padding: 8px;
-}
-
-.mobile-overlay { 
-  display: none; 
-}
+.hamburger-btn { background: none; border: none; cursor: pointer; color: var(--dark); display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 8px; }
+.hamburger-btn:active { background: var(--light); }
+.mobile-close-btn { display: none; background: none; border: none; cursor: pointer; padding: 8px; }
+.mobile-overlay { display: none; }
 
 
 /* ============================================================ */
@@ -156,70 +77,73 @@ tbody tr:hover td { background: #f8fafc; }
 /* ============================================================ */
 @media (max-width: 768px) {
   
-  .sidebar { 
-    transform: translateX(-100%); 
-  }
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
   
-  .sidebar.open { 
-    transform: translateX(0); 
-  }
+  .main-content { margin-left: 0; padding-top: var(--header-h); width: 100%; overflow-x: hidden; }
   
-  .main-content { 
-    margin-left: 0; 
-    padding-top: var(--header-h);
-  }
+  .mobile-topbar { display: flex; }
+  .mobile-close-btn { display: block; }
+  .mobile-overlay { display: block; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(3px); z-index: 90; }
   
-  .mobile-topbar { 
-    display: flex; 
-  }
+  /* Remove padding from the page wrapper */
+  .page-content { padding: 0; width: 100%; }
   
-  .mobile-close-btn { 
-    display: block; 
-  }
+  /* Add padding to text and buttons, but NOT the table */
+  .page-content > *:not(.table-container) { padding: 16px; }
   
-  .mobile-overlay { 
-    display: block; 
-    position: fixed; 
-    inset: 0; 
-    background: rgba(15, 23, 42, 0.6); 
-    backdrop-filter: blur(3px);
-    z-index: 90; 
-  }
-  
-  .page-content { 
-    padding: 16px; 
-  }
-
-  /* --- THE FIX FOR THE TABLES --- */
+  /* Make the table stretch edge-to-edge */
   .table-container {
-    display: block;
+    margin: 0;
     width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    background: white;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border);
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
   }
 
+  /* THE FIX FOR THE COLUMN SPACING */
   table {
-    width: 100%;
-    min-width: 600px;
+    width: max-content;
+    min-width: 100%;
     table-layout: auto;
     white-space: nowrap;
   }
 
-  .page-header { 
-    flex-direction: column; 
-    align-items: flex-start; 
-    gap: 12px;
+  /* Reduce padding to bring columns closer to the edge */
+  th, td {
+    padding: 12px 10px; /* Reduced from 16px to 10px */
   }
   
-  .page-header > div {
-    width: 100%;
+  /* Keep a nice gap on the very left and right edges */
+  th:first-child, td:first-child {
+    padding-left: 16px; 
+  }
+  
+  th:last-child, td:last-child {
+    padding-right: 16px; 
   }
 
-  .page-header .btn { 
-    width: 100%; 
-    justify-content: center;
+  /* Custom scrollbar */
+  .table-container::-webkit-scrollbar { height: 6px; }
+  .table-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+  .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+  .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .page-header > div { width: 100%; }
+  .page-header .btn { width: 100%; justify-content: center; }
+}
+
+.page-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+@media (max-width: 768px) {
+  .page-wrapper {
+    padding: 0; /* Remove padding so table touches edges */
+  }
+  .page-wrapper > *:not(.table-container) {
+    padding: 16px; /* Add padding back to text and buttons */
   }
 }

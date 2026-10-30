@@ -132,7 +132,7 @@ export default function VouchersPage() {
   const hasMultipleRouters = routers.length > 1;
 
   return (
-    <div>
+    <div className="page-wrapper">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
         <div>
           <h1 style={{ margin: 0 }}>Vouchers</h1>

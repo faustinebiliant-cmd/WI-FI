@@ -87,7 +87,7 @@ export default function PackagesPage() {
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="page-wrapper">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '30px' }}>
         <div>
           <h1 style={{ margin: 0 }}>WiFi Packages</h1>
