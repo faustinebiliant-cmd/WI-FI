@@ -98,13 +98,13 @@ export default function PackagesPage() {
         </button>
       </div>
 
-      <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%', maxWidth: '100%' }}>
+      <div className="table-container">
         {loading ? (
           <Loader message="Loading packages..." />
         ) : packages.length === 0 ? (
           <div style={{ padding: '40px', textAlign: 'center' }}>No packages yet.</div>
         ) : (
-          <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <table>
             <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
               <tr>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Name</th>
