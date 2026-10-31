@@ -1,5 +1,15 @@
 -- ============================================================
--- OSWAGOTech WiFi - Complete Database Schema
+-- OSWAGOTech WiFi - Complete Database Schema (source of truth)
+--
+-- A NEW database: run this file only; it already contains every change.
+-- An EXISTING database: run only the files in Database/migrations/ that
+-- it has not had yet (each one is safe to run twice).
+--
+-- Changes included so far:
+--   2026-10-31-must-change-password.sql    tenant_users.must_change_password
+--   2026-10-31-provision-token-expiry.sql  routers.provision_token_expires_at
+--
+-- When the database changes: update this file AND add a migration file.
 -- ============================================================
 
 -- 1. platform_admins (You, the SaaS owner)
@@ -61,7 +71,7 @@ CREATE TABLE public.routers (
     provision_token varchar(100) UNIQUE, -- For Zero-Touch Provisioning
     provision_token_expires_at timestamptz, -- The setup link stops working after this time
     tunnel_ip varchar(50) UNIQUE,        -- The WireGuard IP assigned to this router
-    public_key varchar(100),             -- NEW: Stores the router's WireGuard Public Key
+    public_key varchar(100),             -- The router's WireGuard public key (needed to remove its peer)
     provisioned_at timestamptz,          -- Marks when the router was successfully set up
     created_at timestamptz DEFAULT now() NOT NULL
 );
