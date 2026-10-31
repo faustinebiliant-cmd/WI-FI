@@ -1,6 +1,12 @@
 const db = require('../config/db');
 const { isValidUUID } = require('../utils/validators');
 
+// Every router is set up with speed profiles for 1 to 20 Mbps (see provisionController),
+// so a package speed must be one of those: a whole number of Mbps from 1 to 20.
+const MIN_SPEED_KBPS = 1 * 1024;
+const MAX_SPEED_KBPS = 20 * 1024;
+const isAllowedSpeed = (kbps) => Number.isInteger(kbps) && kbps % 1024 === 0 && kbps >= MIN_SPEED_KBPS && kbps <= MAX_SPEED_KBPS;
+
 const listPackages = async (req, res) => {
   try {
     // Include the router name for the frontend
@@ -32,6 +38,10 @@ const createPackage = async (req, res) => {
       return res.status(400).json({ success: false, error: 'You have reached the maximum limit of 20 packages.' });
     }
 
+    if (!isValidUUID(router_id)) {
+      return res.status(400).json({ success: false, error: 'Invalid router selected.' });
+    }
+
     // Check if the router belongs to this tenant
     const routerCheck = await db.query('SELECT id FROM routers WHERE id = $1 AND tenant_id = $2', [router_id, req.tenantId]);
     if (routerCheck.rows.length === 0) {
@@ -49,8 +59,9 @@ const createPackage = async (req, res) => {
     }
     if (price < 0) return res.status(400).json({ success: false, error: 'Price cannot be negative.' });
     if (duration <= 0 || duration > 525600) return res.status(400).json({ success: false, error: 'Duration must be between 1 minute and 365 days.' });
-    if (down <= 0 || down > 102400) return res.status(400).json({ success: false, error: 'Speed must be between 1 kbps and 100 Mbps.' });
-    if (up <= 0 || up > 102400) return res.status(400).json({ success: false, error: 'Speed must be between 1 kbps and 100 Mbps.' });
+    if (!isAllowedSpeed(down) || !isAllowedSpeed(up)) {
+      return res.status(400).json({ success: false, error: 'Speed must be a whole number from 1 to 20 Mbps.' });
+    }
     
     const { rows } = await db.query(
       `INSERT INTO packages (tenant_id, router_id, name, price_tzs, duration_minutes, speed_down_kbps, speed_up_kbps) 

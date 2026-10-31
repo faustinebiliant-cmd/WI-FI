@@ -3,8 +3,13 @@ import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
 import ConfirmDialog from '../shared/components/ConfirmDialog';
 
+// Speeds the router setup prepares (1 to 20 Mbps, whole numbers only)
+const MIN_SPEED_MBPS = 1;
+const MAX_SPEED_MBPS = 20;
+
 export default function PackagesPage() {
   const [packages, setPackages] = useState([]);
+  const [routers, setRouters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
@@ -16,14 +21,27 @@ export default function PackagesPage() {
     price_tzs: '',
     duration_value: 1,
     duration_unit: 'hours',
-    speed_mbps: 5
+    speed_mbps: 5,
+    router_id: ''
   });
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
-  useEffect(() => { fetchPackages(); }, []);
+  useEffect(() => { fetchPackages(); fetchRouters(); }, []);
+
+  const fetchRouters = async () => {
+    try {
+      const res = await apiClient.get('/tenant/routers');
+      const list = res.data.data || [];
+      setRouters(list);
+      // With one router (the usual case) it is chosen already
+      if (list.length > 0) setFormData(prev => ({ ...prev, router_id: prev.router_id || list[0].id }));
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const fetchPackages = async () => {
     try {
@@ -38,16 +56,25 @@ export default function PackagesPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setErrorMsg('');
+
+    const speed_mbps = Number(formData.speed_mbps);
+    if (!Number.isInteger(speed_mbps) || speed_mbps < MIN_SPEED_MBPS || speed_mbps > MAX_SPEED_MBPS) {
+      setErrorMsg(`Speed must be a whole number from ${MIN_SPEED_MBPS} to ${MAX_SPEED_MBPS} Mbps.`);
+      return;
+    }
+    if (!formData.router_id) {
+      setErrorMsg('Choose the router this package is sold on.');
+      return;
+    }
+    setIsSubmitting(true);
 
     let duration_minutes = parseInt(formData.duration_value, 10);
     if (formData.duration_unit === 'hours') duration_minutes *= 60;
     if (formData.duration_unit === 'days') duration_minutes *= 1440;
     if (formData.duration_unit === 'weeks') duration_minutes *= 10080;
 
-    // Speed is restricted to 1-20 in the UI, so we just multiply
-    const speed_kbps = parseInt(formData.speed_mbps, 10) * 1024;
+    const speed_kbps = speed_mbps * 1024;
 
     try {
       await apiClient.post('/tenant/packages', {
@@ -55,10 +82,11 @@ export default function PackagesPage() {
         price_tzs: parseFloat(formData.price_tzs),
         duration_minutes: duration_minutes,
         speed_down_kbps: speed_kbps,
-        speed_up_kbps: speed_kbps
+        speed_up_kbps: speed_kbps,
+        router_id: formData.router_id
       });
       setShowModal(false);
-      setFormData({ name: '', price_tzs: '', duration_value: 1, duration_unit: 'hours', speed_mbps: 5 });
+      setFormData({ name: '', price_tzs: '', duration_value: 1, duration_unit: 'hours', speed_mbps: 5, router_id: routers[0]?.id || '' });
       fetchPackages();
     } catch (error) {
       setErrorMsg(error.response?.data?.error || 'Failed to create package');
@@ -110,6 +138,7 @@ export default function PackagesPage() {
             <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
               <tr>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Name</th>
+                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Router</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Price</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Duration</th>
                 <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Speed</th>
@@ -120,6 +149,7 @@ export default function PackagesPage() {
               {packages.map((pkg) => (
                 <tr key={pkg.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                   <td style={{ padding: '16px 20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{pkg.name}</td>
+                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{pkg.router_name || '-'}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>TZS {pkg.price_tzs.toLocaleString()}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{formatDuration(pkg.duration_minutes)}</td>
                   <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{pkg.speed_down_kbps / 1024} Mbps</td>
@@ -159,19 +189,36 @@ export default function PackagesPage() {
                 </select>
               </div>
 
-              {/* RESTRICTED SPEED INPUT (1 - 20) */}
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>Speed (Mbps)</label>
-                <select
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>Speed (Mbps, {MIN_SPEED_MBPS} to {MAX_SPEED_MBPS})</label>
+                <input
+                  required
+                  type="number"
+                  min={MIN_SPEED_MBPS}
+                  max={MAX_SPEED_MBPS}
+                  step="1"
+                  inputMode="numeric"
+                  placeholder={`${MIN_SPEED_MBPS} - ${MAX_SPEED_MBPS}`}
                   value={formData.speed_mbps}
-                  onChange={e => setFormData({ ...formData, speed_mbps: e.target.value })}
+                  onChange={e => setFormData({ ...formData, speed_mbps: e.target.value.replace(/[^0-9]/g, '') })}
+                  style={{ padding: '10px', width: '100%', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }}
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>Router</label>
+                <select
+                  required
+                  value={formData.router_id}
+                  onChange={e => setFormData({ ...formData, router_id: e.target.value })}
                   style={{ padding: '10px', width: '100%', border: '1px solid #ccc', borderRadius: '4px' }}
                   disabled={isSubmitting}
                 >
-                  {[...Array(20)].map((_, i) => (
-                    <option key={i + 1} value={i + 1}>{i + 1} Mbps</option>
-                  ))}
+                  {routers.length === 0 && <option value="">Add a router first (Routers page)</option>}
+                  {routers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
+                <p style={{ fontSize: '12px', color: '#6b7280', margin: '4px 0 0 0' }}>Customers see this package only on this router's WiFi.</p>
               </div>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>

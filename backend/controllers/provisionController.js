@@ -109,7 +109,7 @@ const getBootstrapScript = async (req, res) => {
     let speedProfiles = '';
     for (let i = 1; i <= 20; i++) {
       const kbps = i * 1024;
-      speedProfiles += '/ip hotspot user profile add name=spd-' + kbps + 'd-' + kbps + 'u rate-limit=' + kbps + 'k/' + kbps + 'k shared-users=1\n';
+      speedProfiles += '/ip hotspot user profile add name=spd-' + kbps + 'd-' + kbps + 'u rate-limit=' + kbps + 'k/' + kbps + 'k shared-users=1 mac-cookie-timeout=30d\n';
     }
 
     // NOTE: inside this template, a RouterOS backslash must be written as two (\\)

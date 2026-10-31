@@ -141,7 +141,10 @@ class MikroTikRouter {
           conn.write('/ip/hotspot/user/profile/add', [
             `=name=${name}`,
             `=rate-limit=${up}k/${down}k`, // upload/download, from the customer's side
-            '=shared-users=1'
+            '=shared-users=1',
+            // How long the router remembers the device (default 3 days). An expired
+            // voucher is still kicked at once: removeVoucher deletes its cookie.
+            '=mac-cookie-timeout=30d'
           ])
         );
       } catch (err) {
