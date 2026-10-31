@@ -5,15 +5,31 @@
 // (ip_address, api_port, api_username, api_password_encrypted).
 // ============================================================
 const RouterOSAPI = require('node-routeros').RouterOSAPI;
+const { Channel } = require('node-routeros/dist/Channel');
 const { decrypt } = require('../../utils/encryption');
 
 // ------------------------------------------------------------
-// PROTECTION AGAINST "!empty"
-// RouterOS 7.18+ answers a search that finds nothing with "!empty".
-// The node-routeros library throws that as an error.
-// We catch it locally here and return an empty list instead.
-// Real errors (timeouts, auth failures) still fail normally.
+// PROTECTION AGAINST "!empty" (crashed the whole server)
+// RouterOS 7.18+ answers a search that finds nothing with "!empty",
+// followed by the usual "!done". node-routeros 1.6.8 does not know
+// "!empty": it throws from inside its socket handler, where no
+// try/catch can reach, and the Node process dies.
+// Fix: skip the "!empty" packet and let the "!done" that follows
+// finish the command normally, with an empty list.
+// (Closing the command at "!empty" instead would make the library
+// throw again on the "!done", for an unknown tag.)
 // ------------------------------------------------------------
+if (!Channel.prototype.__emptyReplyPatched) {
+  const originalProcessPacket = Channel.prototype.processPacket;
+  Channel.prototype.processPacket = function processPacketSkippingEmpty(packet) {
+    if (Array.isArray(packet) && packet[0] === '!empty') return;
+    return originalProcessPacket.call(this, packet);
+  };
+  Channel.prototype.__emptyReplyPatched = true;
+}
+
+// Kept as a second line of defence, in case a library version
+// turns "!empty" into a normal rejected promise instead.
 const isEmptyReply = (err) => {
   const message = String(err?.message || err || '');
   return (
@@ -38,6 +54,7 @@ const safePrint = async (conn, path, query = []) => {
 // Input checks (a bad value must never reach the router)
 // ------------------------------------------------------------
 const MAX_SPEED_KBPS = 1000000;
+const STEP_TIMEOUT_MS = 15000;
 
 const cleanCode = (code) => {
   const value = String(code || '');
@@ -81,13 +98,19 @@ class MikroTikRouter {
     return conn;
   }
 
-  // Runs one step on its own short, clean connection
+  // Runs one step on its own short, clean connection.
+  // A step that gets no answer fails after STEP_TIMEOUT_MS instead of waiting forever.
   async _step(work) {
     let conn;
+    let timer;
     try {
       conn = await this.getConnection();
-      return await work(conn);
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Router did not answer in time')), STEP_TIMEOUT_MS);
+      });
+      return await Promise.race([work(conn), timeout]);
     } finally {
+      clearTimeout(timer);
       if (conn) {
         try {
           const closing = conn.close();
