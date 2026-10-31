@@ -17,9 +17,10 @@ pool.on('connect', () => {
   if (env.IS_DEV) console.log('PostgreSQL connected');
 });
 
+// The pool drops the broken connection and opens a new one by itself,
+// so a short database hiccup must not stop the whole server
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle PostgreSQL client', err);
-  process.exit(-1);
+  console.error('Unexpected error on idle PostgreSQL client:', err.message);
 });
 
 // Export query to act as a direct bridge to Postgres

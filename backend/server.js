@@ -94,10 +94,11 @@ app.get('/api/health', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (err) {
+    // Details go to the log only; this page is public
+    console.error('Health check failed:', err.message);
     res.status(500).json({
       status: 'error',
-      database: 'disconnected',
-      error: err.message || 'Database table not found'
+      database: 'disconnected'
     });
   }
 });
@@ -236,3 +237,9 @@ const gracefulShutdown = (signal) => {
 // Listen for PM2 or ctrl+c signals
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Last safety net: a failed request that nobody caught is logged,
+// it must never take the whole server down for every hotel
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled error (server kept running):', reason && reason.message ? reason.message : reason);
+});

@@ -23,7 +23,8 @@ const getDashboardStats = async (req, res) => {
     // 5. Vouchers USED TODAY (EAT day boundaries, converted to UTC)
     const today = getTodayRangeEAT();
     const vouchersUsedToday = await db.query(
-      "SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1 AND status = 'active' AND used_at >= $2 AND used_at <= $3",
+      // A voucher used today may already have expired: it still counts
+      "SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1 AND status IN ('active', 'expired') AND used_at >= $2 AND used_at <= $3",
       [tenantId, today.start.toISOString(), today.end.toISOString()]
     );
 

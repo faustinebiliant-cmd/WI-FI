@@ -9,6 +9,7 @@ export default function SessionsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [disconnectError, setDisconnectError] = useState('');
 
   useEffect(() => { fetchSessions(); }, []);
 
@@ -26,12 +27,13 @@ export default function SessionsPage() {
   const confirmDisconnect = async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
+    setDisconnectError('');
     try {
       await apiClient.post(`/tenant/sessions/${deleteTarget.id}/disconnect`);
       setDeleteTarget(null);
       fetchSessions();
     } catch (error) {
-      console.error('Failed to disconnect guest', error);
+      setDisconnectError(error.response?.data?.error || 'Failed to disconnect guest.');
     } finally {
       setIsDeleting(false);
     }
@@ -82,13 +84,13 @@ export default function SessionsPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         title="Disconnect Guest"
-        message={`Are you sure you want to kick ${deleteTarget?.mac_address} off the WiFi?`}
-        confirmLabel="Disconnect"
+        message={disconnectError || `Are you sure you want to kick ${deleteTarget?.mac_address} off the WiFi?`}
+        confirmLabel={disconnectError ? 'Try Again' : 'Disconnect'}
         cancelLabel="Cancel"
         variant="danger"
         loading={isDeleting}
         onConfirm={confirmDisconnect}
-        onCancel={() => setDeleteTarget(null)}
+        onCancel={() => { setDeleteTarget(null); setDisconnectError(''); }}
       />
     </div>
   );

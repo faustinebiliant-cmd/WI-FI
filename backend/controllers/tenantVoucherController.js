@@ -154,7 +154,12 @@ const revokeVoucher = async (req, res) => {
         [v.router_id, req.tenantId]
       );
       if (rRes.rows[0]) {
-        const result = await getRouter(rRes.rows[0]).removeVoucher(v.code);
+        let result;
+        try {
+          result = await getRouter(rRes.rows[0]).removeVoucher(v.code);
+        } catch (err) {
+          result = { ok: false };
+        }
         if (!result || !result.ok) {
           // Undo, so the tenant can try again when the router is reachable
           await db.query(

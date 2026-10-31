@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
+import ChangePasswordForm from '../components/ChangePasswordForm';
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState({ business_name: '', lipa_namba: '', payout_provider: '' });
@@ -74,6 +75,11 @@ export default function ProfilePage() {
             {saving ? 'Saving...' : 'Save Payment Details'}
           </button>
         </form>
+      </div>
+
+      <div className="card" style={{ marginTop: '20px' }}>
+        <h3 style={{ marginTop: 0 }}>Change Password</h3>
+        <ChangePasswordForm />
       </div>
     </div>
   );

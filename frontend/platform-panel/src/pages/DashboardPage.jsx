@@ -25,7 +25,7 @@ export default function DashboardPage() {
     setSubmitError(''); setSubmitSuccess('');
     try {
       const res = await apiClient.post('/platform/tenants', formData);
-      setSubmitSuccess(`Created! Password: ${res.data.data.temp_password}`);
+      setSubmitSuccess(`Created! Temporary password (shown only once, give it to the owner): ${res.data.data.temp_password}`);
       fetchTenants();
       setFormData({ business_name: '', owner_name: '', owner_email: '', owner_phone: '', monthly_fee: 50000 });
     } catch (error) {

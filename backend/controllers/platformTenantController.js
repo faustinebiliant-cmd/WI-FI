@@ -4,6 +4,11 @@ const { hashPassword } = require('../services/password');
 const { signTenantToken } = require('../services/jwt');
 const { isValidEmail, isValidPhone, isSafeText } = require('../utils/validators');
 
+// Easy to read out over the phone: no 0/O, 1/l/I
+const TEMP_PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+const makeTempPassword = () =>
+  Array.from({ length: 10 }, () => TEMP_PASSWORD_CHARS[crypto.randomInt(TEMP_PASSWORD_CHARS.length)]).join('');
+
 const createTenant = async (req, res) => {
   try {
     const { business_name, owner_name, owner_email, owner_phone, monthly_fee } = req.body;
@@ -24,7 +29,8 @@ const createTenant = async (req, res) => {
     const existing = await db.query('SELECT id FROM tenant_users WHERE email = $1', [cleanEmail]);
     if (existing.rows.length > 0) return res.status(400).json({ success: false, error: 'Email is already registered to another tenant' });
 
-    const tempPassword = 'Welcome123!';
+    // A different password for every tenant; the owner must replace it at first login
+    const tempPassword = makeTempPassword();
     const passwordHash = await hashPassword(tempPassword);
 
     const { rows } = await db.query(
@@ -33,6 +39,7 @@ const createTenant = async (req, res) => {
     );
 
     const result = rows[0].result;
+    await db.query('UPDATE tenant_users SET must_change_password = true WHERE id = $1', [result.user_id]);
     return res.status(201).json({
       success: true,
       message: 'Tenant created successfully',
@@ -45,8 +52,13 @@ const createTenant = async (req, res) => {
 };
 
 const listTenants = async (req, res) => {
-  const { rows } = await db.query('SELECT * FROM tenants ORDER BY created_at DESC');
-  return res.status(200).json({ success: true, data: rows });
+  try {
+    const { rows } = await db.query('SELECT * FROM tenants ORDER BY created_at DESC');
+    return res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    console.error('List tenants error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to list tenants' });
+  }
 };
 
 const getTenant = async (req, res) => {

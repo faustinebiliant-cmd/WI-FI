@@ -1,15 +1,21 @@
 const db = require('../config/db');
+const { isValidUUID } = require('../utils/validators');
 
 const listPackages = async (req, res) => {
-  // Include the router name for the frontend
-  const { rows } = await db.query(`
-    SELECT p.*, r.name as router_name 
-    FROM packages p 
-    LEFT JOIN routers r ON p.router_id = r.id 
-    WHERE p.tenant_id = $1 
-    ORDER BY p.created_at DESC
-  `, [req.tenantId]);
-  return res.status(200).json({ success: true, data: rows });
+  try {
+    // Include the router name for the frontend
+    const { rows } = await db.query(`
+      SELECT p.*, r.name as router_name
+      FROM packages p
+      LEFT JOIN routers r ON p.router_id = r.id
+      WHERE p.tenant_id = $1
+      ORDER BY p.created_at DESC
+    `, [req.tenantId]);
+    return res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    console.error('List packages error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to list packages' });
+  }
 };
 
 const createPackage = async (req, res) => {
@@ -38,6 +44,9 @@ const createPackage = async (req, res) => {
     const down = Number(speed_down_kbps);
     const up = Number(speed_up_kbps);
 
+    if (![price, duration, down, up].every(Number.isFinite)) {
+      return res.status(400).json({ success: false, error: 'Price, duration and speeds must be numbers.' });
+    }
     if (price < 0) return res.status(400).json({ success: false, error: 'Price cannot be negative.' });
     if (duration <= 0 || duration > 525600) return res.status(400).json({ success: false, error: 'Duration must be between 1 minute and 365 days.' });
     if (down <= 0 || down > 102400) return res.status(400).json({ success: false, error: 'Speed must be between 1 kbps and 100 Mbps.' });
@@ -57,9 +66,30 @@ const createPackage = async (req, res) => {
 };
 
 const deletePackage = async (req, res) => {
-  const { id } = req.params;
-  await db.query('DELETE FROM packages WHERE id = $1 AND tenant_id = $2', [id, req.tenantId]);
-  return res.status(200).json({ success: true, message: 'Package deleted' });
+  try {
+    const { id } = req.params;
+    if (!isValidUUID(id)) return res.status(400).json({ success: false, error: 'Invalid package ID' });
+
+    // Deleting a package also deletes its vouchers. Refuse while guests may still
+    // hold a sold code (unused) or are using one (active), so nobody loses paid time.
+    const inUse = await db.query(
+      "SELECT COUNT(*) FROM vouchers WHERE package_id = $1 AND tenant_id = $2 AND status IN ('unused', 'active')",
+      [id, req.tenantId]
+    );
+    const inUseCount = parseInt(inUse.rows[0].count, 10);
+    if (inUseCount > 0) {
+      return res.status(409).json({
+        success: false,
+        error: `This package still has ${inUseCount} unused or active voucher(s). Revoke them, or wait until they are used and expired, then delete the package.`
+      });
+    }
+
+    await db.query('DELETE FROM packages WHERE id = $1 AND tenant_id = $2', [id, req.tenantId]);
+    return res.status(200).json({ success: true, message: 'Package deleted' });
+  } catch (error) {
+    console.error('Delete package error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to delete package' });
+  }
 };
 
 module.exports = { listPackages, createPackage, deletePackage };

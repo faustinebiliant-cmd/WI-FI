@@ -3,7 +3,7 @@ const router = express.Router();
 const authTenant = require('../middleware/authTenant');
 const { tenantLoginLimiter, tenantGlobalLimiter } = require('../middleware/rateLimiter');
 
-const { login, endImpersonationSelf } = require('../controllers/authTenantController');
+const { login, changePassword, endImpersonationSelf } = require('../controllers/authTenantController');
 const { listPackages, createPackage, deletePackage } = require('../controllers/tenantPackageController');
 const { listRouters, createRouter, deleteRouter } = require('../controllers/tenantRouterController');
 const { generateVouchers, listVouchers, revokeVoucher } = require('../controllers/tenantVoucherController');
@@ -20,6 +20,7 @@ router.get('/dashboard', getDashboardStats);
 router.get('/profile', getProfile);
 router.put('/profile', updateProfile);
 router.post('/auth/end-impersonation', endImpersonationSelf);
+router.post('/auth/change-password', changePassword);
 
 router.get('/packages', listPackages);
 router.post('/packages', createPackage);

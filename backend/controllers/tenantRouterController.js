@@ -2,12 +2,32 @@
 // OSWAGOTech WiFi - Tenant Router Controller
 // ============================================================
 const crypto = require('crypto');
+const { execFile } = require('child_process');
 const db = require('../config/db');
 const { isSafeText } = require('../utils/validators');
 const { encrypt } = require('../utils/encryption');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PUBKEY_RE = /^[A-Za-z0-9+/]{43}=$/;
 const MAX_ROUTERS_PER_TENANT = 10;
+
+// Removes the router's WireGuard peer on the VPS through the root-owned helper.
+// Same lock as enrollment, so two changes to wg0.conf never run at the same time.
+// No shell is used. Resolves true only if the helper reported success.
+const removeWireGuardPeer = (publicKey) => new Promise((resolve) => {
+  execFile(
+    'flock',
+    ['-w', '10', '/var/lock/wg-enroll.lock', 'sudo', '-n', '/usr/local/sbin/wifi-wireguard-remove-peer', publicKey],
+    { timeout: 30000 },
+    (err, stdout, stderr) => {
+      if (err) {
+        console.error('Failed to remove WireGuard peer:', (stderr && stderr.trim()) || err.message);
+        return resolve(false);
+      }
+      resolve(true);
+    }
+  );
+});
 
 // Only what the page needs. Tokens and passwords are never sent to the browser.
 const listRouters = async (req, res) => {
@@ -77,27 +97,41 @@ const createRouter = async (req, res) => {
 const deleteRouter = async (req, res) => {
   try {
     const { id } = req.params;
-    
+    if (!UUID_RE.test(String(id))) {
+      return res.status(404).json({ success: false, error: 'Router not found or unauthorized' });
+    }
+
     // 1. Find the router and get its public key
-    const checkRes = await db.query('SELECT id, public_key FROM routers WHERE id = $1 AND tenant_id = $2', [id, req.tenantId]);
+    const checkRes = await db.query(
+      'SELECT id, public_key, provisioned_at FROM routers WHERE id = $1 AND tenant_id = $2',
+      [id, req.tenantId]
+    );
     if (checkRes.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Router not found or unauthorized' });
     }
 
     const router = checkRes.rows[0];
 
-    // 2. Remove the WireGuard Peer from the VPS if it has a public key
+    // 2. Remove its WireGuard peer from the VPS FIRST. Its tunnel address is
+    //    reused by the next new router, so if the old peer stayed, two routers
+    //    would share one address. If removal fails, nothing is deleted.
     if (router.public_key) {
-      const { execFile } = require('child_process');
-      execFile('sudo', ['/usr/local/sbin/wifi-wireguard-remove-peer', router.public_key], (err) => {
-        if (err) {
-          console.error('Failed to remove WireGuard peer:', err.message);
-          // We log the error, but we still delete from the database so the dashboard doesn't get stuck
-        }
+      const removed = PUBKEY_RE.test(router.public_key) && await removeWireGuardPeer(router.public_key);
+      if (!removed) {
+        return res.status(503).json({
+          success: false,
+          error: 'The router\'s VPN tunnel could not be removed from the server, so the router was NOT deleted. Please try again in a minute. If it keeps failing, contact OSWAGOTech support.'
+        });
+      }
+    } else if (router.provisioned_at) {
+      // Set up by an older version that did not save the key: the peer cannot be found automatically
+      return res.status(409).json({
+        success: false,
+        error: 'This router was set up with an older version. OSWAGOTech support must remove its VPN tunnel before it can be deleted. Please contact support.'
       });
     }
 
-    // 3. Delete the router from the database
+    // 3. Delete the router from the database (its packages, vouchers and sessions go with it)
     await db.query('DELETE FROM routers WHERE id = $1 AND tenant_id = $2', [id, req.tenantId]);
 
     return res.status(200).json({ success: true, message: 'Router and all associated data deleted successfully' });

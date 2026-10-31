@@ -26,18 +26,28 @@ export const AuthProvider = ({ children }) => {
     try {
       const res = await apiClient.post('/tenant/auth/login', { email, password });
       if (res.data.success) {
+        const loggedInUser = { ...res.data.user, must_change_password: res.data.must_change_password === true };
         localStorage.setItem('tenantToken', res.data.token);
-        localStorage.setItem('tenantUser', JSON.stringify(res.data.user));
+        localStorage.setItem('tenantUser', JSON.stringify(loggedInUser));
         // Clear any leftover impersonation flags from a normal login
         localStorage.removeItem('is_impersonating');
-        
-        setUser(res.data.user);
+
+        setUser(loggedInUser);
         setTenantStatus(res.data.tenant_status);
         return { success: true };
       }
     } catch (error) {
       return { success: false, error: error.response?.data?.error || 'Login failed' };
     }
+  };
+
+  // Called after the temporary password was replaced
+  const markPasswordChanged = () => {
+    setUser((current) => {
+      const updated = { ...current, must_change_password: false };
+      localStorage.setItem('tenantUser', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const logout = () => {
@@ -49,7 +59,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, tenantStatus, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, tenantStatus, login, logout, markPasswordChanged, loading }}>
       {children}
     </AuthContext.Provider>
   );

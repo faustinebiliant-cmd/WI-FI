@@ -4,13 +4,16 @@ import './shared/styles/variables.css';
 import './shared/styles/base.css';
 import './shared/styles/components.css';
 
+// Switch to true only when the real mobile payment (AzamPay) is connected
+const PAYMENTS_ENABLED = false;
+
 export default function App() {
   const [hotelInfo, setHotelInfo] = useState(null);
   const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [successData, setSuccessData] = useState(null);
   
-  const [activeTab, setActiveTab] = useState('buy');
+  const [activeTab, setActiveTab] = useState(PAYMENTS_ENABLED ? 'buy' : 'voucher');
   const [voucherCode, setVoucherCode] = useState('');
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -32,7 +35,7 @@ export default function App() {
     }
     apiClient.get(`/portal/info/${routerToken}`)
       .then(res => setHotelInfo(res.data.data))
-      .catch(() => setErrorMessage('Invalid or inactive router.'));
+      .catch((err) => setErrorMessage(err.response?.data?.error || 'Invalid or inactive router.'));
   }, [routerToken]);
 
   useEffect(() => {
@@ -196,12 +199,14 @@ export default function App() {
         
         {errorMessage && <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '20px', fontSize: '13px' }}>{errorMessage}</div>}
 
+        {PAYMENTS_ENABLED && (
         <div style={{ display: 'flex', borderBottom: '2px solid #e5e7eb', marginBottom: '20px' }}>
           <button onClick={() => { setActiveTab('buy'); setErrorMessage(''); setSelectedPackage(null); }} style={{ flex: 1, padding: '10px', background: 'none', border: 'none', borderBottom: activeTab === 'buy' ? '2px solid var(--primary)' : 'none', fontWeight: activeTab === 'buy' ? 'bold' : 'normal', color: activeTab === 'buy' ? 'var(--primary)' : 'var(--gray)', cursor: 'pointer', marginBottom: '-2px' }}>Buy WiFi</button>
           <button onClick={() => { setActiveTab('voucher'); setErrorMessage(''); setSelectedPackage(null); }} style={{ flex: 1, padding: '10px', background: 'none', border: 'none', borderBottom: activeTab === 'voucher' ? '2px solid var(--primary)' : 'none', fontWeight: activeTab === 'voucher' ? 'bold' : 'normal', color: activeTab === 'voucher' ? 'var(--primary)' : 'var(--gray)', cursor: 'pointer', marginBottom: '-2px' }}>Have a Voucher?</button>
         </div>
+        )}
 
-        {activeTab === 'buy' && (
+        {PAYMENTS_ENABLED && activeTab === 'buy' && (
           <div>
             {!selectedPackage ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

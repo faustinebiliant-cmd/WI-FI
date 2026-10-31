@@ -40,6 +40,7 @@ CREATE TABLE public.tenant_users (
     full_name varchar(255) NOT NULL,
     role varchar(50) DEFAULT 'owner',
     is_active boolean DEFAULT true NOT NULL,
+    must_change_password boolean DEFAULT false NOT NULL, -- true while the owner still has a temporary password
     last_login_at timestamptz,
     created_at timestamptz DEFAULT now() NOT NULL
 );

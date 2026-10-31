@@ -18,7 +18,11 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // A suspended account, or an old login that still needs a new password:
+    // back to the login page, which shows the reason or asks for the new password
+    const code = error.response?.data?.code;
+    const mustLogInAgain = code === 'TENANT_SUSPENDED' || code === 'PASSWORD_CHANGE_REQUIRED';
+    if (error.response?.status === 401 || mustLogInAgain) {
       localStorage.removeItem('tenantToken');
       localStorage.removeItem('tenantUser');
       window.location.href = import.meta.env.VITE_TENANT_BASE + '/login';

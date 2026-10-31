@@ -1,6 +1,8 @@
-const { verifyAdminToken, verifyTenantToken } = require('../services/jwt');
+const { verifyAdminToken } = require('../services/jwt');
 const db = require('../config/db');
 
+// Only a real platform admin token is accepted here. An impersonation token
+// is a tenant token and works in the tenant panel only.
 const authPlatform = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -11,39 +13,12 @@ const authPlatform = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
     let decoded;
 
-    // 1. Try verifying as a Platform Admin
     try {
       decoded = verifyAdminToken(token);
     } catch (err) {
-      // 2. If that fails, try verifying as an Impersonation Tenant Token
-      try {
-        const decodedTenant = verifyTenantToken(token);
-        if (!decodedTenant.impersonation_token_id) {
-          throw new Error('Not an impersonation token');
-        }
-        decoded = decodedTenant;
-      } catch (e) {
-        return res.status(401).json({ success: false, error: 'Invalid or expired token' });
-      }
+      return res.status(401).json({ success: false, error: 'Invalid or expired token' });
     }
 
-    // 3. If it's an impersonation token, check the session table
-    if (decoded.impersonation_token_id) {
-      const { rows } = await db.query(
-        'SELECT * FROM impersonation_sessions WHERE token_id = $1 AND ended_at IS NULL',
-        [decoded.impersonation_token_id]
-      );
-      const session = rows[0];
-
-      if (!session || new Date(session.expires_at) < new Date()) {
-        return res.status(401).json({ success: false, error: 'Impersonation session expired or ended' });
-      }
-      
-      req.admin = { id: session.admin_id, email: session.admin_email };
-      return next();
-    }
-
-    // 4. Normal platform admin flow
     const { rows } = await db.query(
       'SELECT id, email, full_name, is_active FROM platform_admins WHERE id = $1',
       [decoded.id]

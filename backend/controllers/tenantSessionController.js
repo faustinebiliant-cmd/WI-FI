@@ -42,8 +42,16 @@ const disconnectSession = async (req, res) => {
     const session = rows[0];
     if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
 
-    const adapter = getRouter(session);
-    await adapter.disconnectUser(session.mac_address);
+    // Only mark the session ended if the router really kicked the guest off
+    let result;
+    try {
+      result = await getRouter(session).disconnectUser(session.mac_address);
+    } catch (err) {
+      result = { ok: false };
+    }
+    if (!result || !result.ok) {
+      return res.status(503).json({ success: false, error: 'The router could not be reached, so the guest was NOT disconnected. Please try again when the router is online.' });
+    }
 
     await db.query(
       `UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'Disconnected by Tenant Admin' WHERE id = $1`,

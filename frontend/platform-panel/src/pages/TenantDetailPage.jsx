@@ -35,17 +35,13 @@ export default function TenantDetailPage() {
     try {
       const res = await apiClient.post(`/platform/tenants/${id}/impersonate`, { reason });
       
-      // Save the token for both apps
-      localStorage.setItem('adminToken', res.data.token);
+      // The impersonation token is for the tenant panel only.
+      // The admin's own login (adminToken) is left untouched.
       localStorage.setItem('tenantToken', res.data.token);
-      
-      // Save the user data
-      const userPayload = {
+      localStorage.setItem('tenantUser', JSON.stringify({
         full_name: res.data.tenant_user.full_name,
         email: res.data.tenant_user.email
-      };
-      localStorage.setItem('admin', JSON.stringify({ ...userPayload, is_impersonation: true }));
-      localStorage.setItem('tenantUser', JSON.stringify(userPayload));
+      }));
       
       // THIS IS THE FLAG THE TENANT PANEL WILL READ
       localStorage.setItem('is_impersonating', 'true');

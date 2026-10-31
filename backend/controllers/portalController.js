@@ -3,6 +3,7 @@ const env = require('../config/env');
 const { getRouter } = require('../services/routers/routerFactory');
 const MikroTikRouter = require('../services/routers/MikroTikRouter');
 const { isValidMACAddress, isValidIPAddress, isValidVoucherCode } = require('../utils/validators');
+const { TENANT_BLOCKED_SQL, PORTAL_BLOCKED_ERROR } = require('../middleware/subscriptionGuard');
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{8,128}$/;
 const NOT_REACHABLE = 'The WiFi system is not reachable right now. Please try again in a moment.';
@@ -16,7 +17,7 @@ const getPortalInfo = async (req, res) => {
     }
 
     const routerRes = await db.query(`
-      SELECT r.id, r.tenant_id, t.business_name, t.logo_url
+      SELECT r.id, r.tenant_id, t.business_name, t.logo_url, ${TENANT_BLOCKED_SQL} AS tenant_blocked
       FROM routers r JOIN tenants t ON r.tenant_id = t.id
       WHERE r.router_token = $1
     `, [router_token]);
@@ -26,6 +27,7 @@ const getPortalInfo = async (req, res) => {
     }
 
     const router = routerRes.rows[0];
+    if (router.tenant_blocked) return res.status(403).json(PORTAL_BLOCKED_ERROR);
 
     const packagesRes = await db.query(
       'SELECT id, name, price_tzs, duration_minutes, speed_down_kbps FROM packages WHERE tenant_id = $1 AND router_id = $2 AND is_active = true',
@@ -70,12 +72,15 @@ const redeemVoucher = async (req, res) => {
     }
 
     const routerRes = await db.query(
-      `SELECT id, tenant_id, ip_address, api_port, api_username, api_password_encrypted
-       FROM routers WHERE router_token = $1`,
+      `SELECT r.id, r.tenant_id, r.ip_address, r.api_port, r.api_username, r.api_password_encrypted,
+              ${TENANT_BLOCKED_SQL} AS tenant_blocked
+       FROM routers r JOIN tenants t ON t.id = r.tenant_id
+       WHERE r.router_token = $1`,
       [router_token]
     );
     const router = routerRes.rows[0];
     if (!router) return res.status(404).json({ success: false, error: 'Router not found' });
+    if (router.tenant_blocked) return res.status(403).json(PORTAL_BLOCKED_ERROR);
 
     // Router not set up yet
     if (!router.ip_address || router.ip_address === '0.0.0.0') {

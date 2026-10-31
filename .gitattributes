@@ -1,0 +1,4 @@
+# Scripts that run on the Linux VPS must keep Linux line endings (LF),
+# even when the project is edited on Windows.
+vps/* text eol=lf
+*.sh text eol=lf

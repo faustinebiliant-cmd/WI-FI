@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# ============================================================
+# OSWAGOTech WiFi - remove a router's WireGuard peer on the VPS
+# Install: sudo install -o root -g root -m 755 vps/wifi-wireguard-remove-peer /usr/local/sbin/wifi-wireguard-remove-peer
+# Called by the backend (tenantRouterController) through sudo, without a shell.
+# The backend deletes the router ONLY if this script exits with 0.
+# ============================================================
+
+set -euo pipefail
+
+WG_INTERFACE="wg0"
+WG_CONFIG="/etc/wireguard/wg0.conf"
+# Shared with wifi-wireguard-add-peer, so the two never edit wg0.conf at the same time
+LOCK_FILE="/run/lock/wifi-wireguard-peers.lock"
+
+fail() {
+    echo "$2" >&2
+    exit "$1"
+}
+
+if [ "$#" -ne 1 ]; then
+    fail 2 "Usage: wifi-wireguard-remove-peer PUBLIC_KEY"
+fi
+
+PUBKEY="$1"
+
+if [[ ! "$PUBKEY" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
+    fail 3 "Invalid WireGuard public key"
+fi
+
+if [ ! -f "$WG_CONFIG" ]; then
+    fail 4 "WireGuard configuration is missing"
+fi
+
+if ! wg show "$WG_INTERFACE" >/dev/null 2>&1; then
+    fail 5 "WireGuard interface is not active"
+fi
+
+mkdir -p /run/lock
+exec 9>"$LOCK_FILE"
+
+if ! flock -w 10 9; then
+    fail 6 "Another WireGuard peer change is still running"
+fi
+
+# True if the peer is written in wg0.conf (exact key match, spaces ignored)
+config_has_peer() {
+    awk -v target="$PUBKEY" '
+        /^PublicKey[[:space:]]*=/ {
+            line = $0
+            sub(/^[^=]*=[[:space:]]*/, "", line)
+            sub(/[[:space:]]+$/, "", line)
+            if (line == target) found = 1
+        }
+        END { exit !found }
+    ' "$WG_CONFIG"
+}
+
+running_has_peer() {
+    wg show "$WG_INTERFACE" peers | grep -Fxq "$PUBKEY"
+}
+
+# Already gone everywhere: the goal is reached, so this counts as success
+if ! running_has_peer && ! config_has_peer; then
+    echo "Peer already absent, nothing to do"
+    exit 0
+fi
+
+TMP_CONFIG="$(mktemp /etc/wireguard/wg0.conf.XXXXXX)"
+TMP_STRIPPED="$(mktemp /etc/wireguard/wg0.stripped.XXXXXX)"
+BACKUP_CONFIG="/etc/wireguard/wg0.conf.before-remove.$(date +%Y%m%d%H%M%S)"
+
+cleanup() {
+    rm -f "$TMP_CONFIG" "$TMP_STRIPPED"
+}
+
+trap cleanup EXIT
+
+cp "$WG_CONFIG" "$BACKUP_CONFIG"
+chmod 600 "$BACKUP_CONFIG"
+
+awk -v target="$PUBKEY" '
+function flush_block() {
+    if (section == "peer" && peer_key == target) {
+        block = ""
+    }
+
+    printf "%s", block
+    block = ""
+    peer_key = ""
+}
+
+{
+    if ($0 ~ /^\[Peer\][[:space:]]*$/) {
+        flush_block()
+        section = "peer"
+        block = $0 ORS
+        next
+    }
+
+    if ($0 ~ /^\[Interface\][[:space:]]*$/) {
+        flush_block()
+        section = "interface"
+        block = $0 ORS
+        next
+    }
+
+    block = block $0 ORS
+
+    if (section == "peer" && $0 ~ /^PublicKey[[:space:]]*=/) {
+        line = $0
+        sub(/^[^=]*=[[:space:]]*/, "", line)
+        sub(/[[:space:]]+$/, "", line)
+        peer_key = line
+    }
+}
+
+END {
+    flush_block()
+}
+' "$WG_CONFIG" > "$TMP_CONFIG"
+
+chmod 600 "$TMP_CONFIG"
+
+wg-quick strip "$TMP_CONFIG" > "$TMP_STRIPPED"
+
+install -o root -g root -m 600 "$TMP_CONFIG" "$WG_CONFIG"
+
+wg syncconf "$WG_INTERFACE" "$TMP_STRIPPED"
+
+if running_has_peer || config_has_peer; then
+    cp "$BACKUP_CONFIG" "$WG_CONFIG"
+    fail 8 "Error: peer still exists after removal"
+fi
+
+echo "Success: WireGuard peer removed"
+echo "Backup created: $BACKUP_CONFIG"

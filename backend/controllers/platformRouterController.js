@@ -2,8 +2,10 @@ const db = require('../config/db');
 
 const listAllRouters = async (req, res) => {
   try {
+    // Only what the page shows. Tokens and passwords never go to the browser.
     const { rows } = await db.query(`
-      SELECT r.*, t.business_name as tenant_name
+      SELECT r.id, r.name, r.location_label, r.status, r.last_seen_at, r.created_at,
+             t.business_name as tenant_name
       FROM routers r
       JOIN tenants t ON r.tenant_id = t.id
       ORDER BY r.created_at DESC

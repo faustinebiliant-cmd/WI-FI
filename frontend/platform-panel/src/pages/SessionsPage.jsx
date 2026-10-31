@@ -37,7 +37,7 @@ export default function SessionsPage() {
       setDeleteTarget(null);
       fetchSessions();
     } catch (error) {
-      alert('Failed to disconnect guest');
+      alert(error.response?.data?.error || 'Failed to disconnect guest');
     } finally {
       setIsDeleting(false);
     }

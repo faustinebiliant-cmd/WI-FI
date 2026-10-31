@@ -3,6 +3,7 @@
 // ============================================================
 const { verifyTenantToken } = require('../services/jwt');
 const db = require('../config/db');
+const { TENANT_BLOCKED_SQL, TENANT_BLOCKED_ERROR } = require('./subscriptionGuard');
 
 const authTenant = async (req, res, next) => {
   try {
@@ -38,10 +39,13 @@ const authTenant = async (req, res, next) => {
     }
 
     // Normal Tenant User Flow
-    const { rows } = await db.query(
-      'SELECT id, tenant_id, email, full_name, role, is_active FROM tenant_users WHERE id = $1',
-      [decoded.id]
-    );
+    const { rows } = await db.query(`
+      SELECT u.id, u.tenant_id, u.email, u.full_name, u.role, u.is_active, u.must_change_password,
+             ${TENANT_BLOCKED_SQL} AS tenant_blocked
+      FROM tenant_users u
+      JOIN tenants t ON t.id = u.tenant_id
+      WHERE u.id = $1
+    `, [decoded.id]);
     const user = rows[0];
 
     if (!user) {
@@ -50,6 +54,19 @@ const authTenant = async (req, res, next) => {
 
     if (!user.is_active) {
       return res.status(403).json({ success: false, error: 'Account is deactivated' });
+    }
+
+    if (user.tenant_blocked) {
+      return res.status(403).json(TENANT_BLOCKED_ERROR);
+    }
+
+    // A temporary password allows nothing except choosing a new one
+    if (user.must_change_password && req.path !== '/auth/change-password') {
+      return res.status(403).json({
+        success: false,
+        code: 'PASSWORD_CHANGE_REQUIRED',
+        error: 'Please choose a new password first.'
+      });
     }
 
     req.tenantUser = user;

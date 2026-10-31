@@ -21,6 +21,7 @@ export default function PackagesPage() {
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => { fetchPackages(); }, []);
 
@@ -69,12 +70,13 @@ export default function PackagesPage() {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
+    setDeleteError('');
     try {
       await apiClient.delete(`/tenant/packages/${deleteTarget.id}`);
       setDeleteTarget(null);
       fetchPackages();
     } catch (error) {
-      console.error(error);
+      setDeleteError(error.response?.data?.error || 'Failed to delete package.');
     } finally {
       setIsDeleting(false);
     }
@@ -186,13 +188,13 @@ export default function PackagesPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         title="Delete Package"
-        message={`Are you sure you want to delete "${deleteTarget?.name}"? This will permanently delete all vouchers tied to this package.`}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
+        message={deleteError || `Are you sure you want to delete "${deleteTarget?.name}"? This is only possible when it has no unused or active vouchers. Its old (used, expired or revoked) vouchers are deleted with it.`}
+        confirmLabel={deleteError ? 'Try Again' : 'Delete'}
+        cancelLabel={deleteError ? 'Close' : 'Cancel'}
         variant="danger"
         loading={isDeleting}
         onConfirm={confirmDelete}
-        onCancel={() => setDeleteTarget(null)}
+        onCancel={() => { setDeleteTarget(null); setDeleteError(''); }}
       />
     </div>
   );

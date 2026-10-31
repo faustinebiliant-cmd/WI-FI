@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# ============================================================
+# OSWAGOTech WiFi - add a router's WireGuard peer on the VPS
+# Install: sudo install -o root -g root -m 755 vps/wifi-wireguard-add-peer /usr/local/sbin/wifi-wireguard-add-peer
+# Called by the backend (provisionController) through sudo, without a shell.
+# ============================================================
+
+set -euo pipefail
+
+WG_INTERFACE="wg0"
+WG_CONFIG="/etc/wireguard/wg0.conf"
+# Shared with wifi-wireguard-remove-peer, so the two never edit wg0.conf at the same time
+LOCK_FILE="/run/lock/wifi-wireguard-peers.lock"
+
+fail() {
+    echo "$2" >&2
+    exit "$1"
+}
+
+if [ "$#" -ne 2 ]; then
+    fail 2 "Usage: wifi-wireguard-add-peer PUBLIC_KEY 10.20.X.Y/32"
+fi
+
+PUBKEY="$1"
+IP="$2"
+
+# Accept only a standard WireGuard public-key format.
+if [[ ! "$PUBKEY" =~ ^[A-Za-z0-9+/]{43}=$ ]]; then
+    fail 3 "Invalid WireGuard public key format"
+fi
+
+# Allow only server-assigned router addresses in 10.20.0.0/16:
+# from 10.20.0.3 to 10.20.255.254, never ending in .0 or .255.
+# 10.20.0.1 is the VPS and 10.20.0.2 the owner's own router.
+if [[ ! "$IP" =~ ^10\.20\.([0-9]{1,3})\.([0-9]{1,3})/32$ ]]; then
+    fail 4 "Invalid router tunnel IP"
+fi
+THIRD="${BASH_REMATCH[1]}"
+FOURTH="${BASH_REMATCH[2]}"
+# No leading zeros (bash would read them as octal numbers)
+if [[ "$THIRD" =~ ^0[0-9] || "$FOURTH" =~ ^0[0-9] ]]; then
+    fail 4 "Invalid router tunnel IP"
+fi
+if (( THIRD > 255 || FOURTH == 0 || FOURTH >= 255 )); then
+    fail 4 "Invalid router tunnel IP"
+fi
+if (( THIRD == 0 && FOURTH < 3 )); then
+    fail 4 "Invalid router tunnel IP"
+fi
+
+if [ ! -f "$WG_CONFIG" ]; then
+    fail 5 "WireGuard configuration is missing"
+fi
+
+if ! wg show "$WG_INTERFACE" >/dev/null 2>&1; then
+    fail 6 "WireGuard interface is not active"
+fi
+
+mkdir -p /run/lock
+exec 9>"$LOCK_FILE"
+
+if ! flock -w 10 9; then
+    fail 7 "Another WireGuard peer change is still running"
+fi
+
+if wg show "$WG_INTERFACE" peers | grep -Fxq "$PUBKEY"; then
+    fail 8 "This public key is already registered"
+fi
+
+# The address of a deleted router is reused: refuse if its old peer is still there
+if wg show "$WG_INTERFACE" allowed-ips | awk -v ip="$IP" '$2 == ip { found=1 } END { exit !found }'; then
+    fail 9 "This tunnel IP is already registered"
+fi
+
+TMP_CONFIG="$(mktemp /etc/wireguard/wg0.conf.XXXXXX)"
+TMP_STRIPPED="$(mktemp /etc/wireguard/wg0.stripped.XXXXXX)"
+
+cleanup() {
+    rm -f "$TMP_CONFIG" "$TMP_STRIPPED"
+}
+
+trap cleanup EXIT
+
+cp "$WG_CONFIG" "$TMP_CONFIG"
+
+cat >> "$TMP_CONFIG" <<EOF
+
+[Peer]
+PublicKey = $PUBKEY
+AllowedIPs = $IP
+EOF
+
+chmod 600 "$TMP_CONFIG"
+
+wg-quick strip "$TMP_CONFIG" > "$TMP_STRIPPED"
+
+wg syncconf "$WG_INTERFACE" "$TMP_STRIPPED"
+
+install -o root -g root -m 600 "$TMP_CONFIG" "$WG_CONFIG"
+
+echo "WireGuard peer added successfully"
+echo "Allowed IP: $IP"
