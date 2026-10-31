@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* No web font in the portal: before paying, a customer's phone can only reach our
+   server, so a Google Fonts request is blocked and the page stayed blank while the
+   browser waited for it. The phone's own font is used instead (see base.css). */
 
 :root {
   --primary: #1a56db;
