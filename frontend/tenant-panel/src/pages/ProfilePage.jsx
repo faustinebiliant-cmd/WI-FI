@@ -40,7 +40,7 @@ export default function ProfilePage() {
       <div className="page-header">
         <div>
           <h1 style={{ margin: 0 }}>Business Settings</h1>
-          <p>Manage your payout details for guest payments.</p>
+          <p>Manage your payout details for customer payments.</p>
         </div>
       </div>
 
@@ -68,7 +68,7 @@ export default function ProfilePage() {
           <div className="form-group">
             <label>Lipa Namba (Payment Number)</label>
             <input className="form-control" type="text" placeholder="e.g. 123456" value={profile.lipa_namba || ''} onChange={e => setProfile({...profile, lipa_namba: e.target.value})} required />
-            <p style={{ fontSize: '12px', color: 'var(--gray)', marginTop: '5px' }}>This is where the money will be sent when guests buy WiFi.</p>
+            <p style={{ fontSize: '12px', color: 'var(--gray)', marginTop: '5px' }}>This is where the money will be sent when customers buy WiFi.</p>
           </div>
 
           <button type="submit" className="btn btn-primary" disabled={saving} style={{ width: '100%', marginTop: '10px' }}>

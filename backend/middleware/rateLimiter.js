@@ -27,17 +27,36 @@ const tenantLoginLimiter = rateLimit({
   message: limitMessage('Too many login attempts. Please try again in 10 minutes.')
 });
 
-// Voucher codes: only bad codes count (hotel guests share one address).
-// A "router not reachable" answer (503) is not the guest's fault, so it does not count.
+// Voucher codes: only bad codes count (all customers of one business often share one address).
+// A "router not reachable" answer (503) is not the customer's fault, so it does not count.
 // (The requestWasSuccessful option needs express-rate-limit version 7 or newer.)
-const redeemLimiter = rateLimit({
+const redeemFailureOptions = {
   windowMs: 10 * 60 * 1000,
-  max: devMax(30),
   skipSuccessfulRequests: true,
   requestWasSuccessful: (req, res) => res.statusCode < 400 || res.statusCode === 503,
   standardHeaders: true,
   legacyHeaders: false,
   message: limitMessage('Too many invalid attempts. Please wait 10 minutes and try again.')
+};
+
+// Mobile networks often put many different businesses behind ONE public address.
+// Counting per address AND router means wrong codes typed at one business do not
+// lock out the customers of another business on the same mobile network.
+const ROUTER_TOKEN_RE = /^[A-Za-z0-9_-]{8,128}$/;
+const redeemPerRouterLimiter = rateLimit({
+  ...redeemFailureOptions,
+  max: devMax(30),
+  keyGenerator: (req) => {
+    const token = req.body && req.body.router_token;
+    return `${req.ip}|${typeof token === 'string' && ROUTER_TOKEN_RE.test(token) ? token : 'invalid'}`;
+  }
+});
+
+// Backstop per address over all routers, so nobody can guess codes without limit
+// by switching between routers
+const redeemPerAddressLimiter = rateLimit({
+  ...redeemFailureOptions,
+  max: devMax(300)
 });
 
 const tenantGlobalLimiter = rateLimit({
@@ -51,6 +70,7 @@ const tenantGlobalLimiter = rateLimit({
 module.exports = {
   platformLoginLimiter,
   tenantLoginLimiter,
-  redeemLimiter,
+  redeemPerAddressLimiter,
+  redeemPerRouterLimiter,
   tenantGlobalLimiter
 };

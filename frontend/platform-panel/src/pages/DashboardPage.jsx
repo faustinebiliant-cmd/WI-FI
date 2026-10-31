@@ -38,7 +38,7 @@ export default function DashboardPage() {
       <div className="page-header">
         <div>
           <h1>Tenants</h1>
-          <p>Manage your hotel and guest house customers.</p>
+          <p>Manage the businesses that use your WiFi billing system.</p>
         </div>
         <button onClick={() => setShowModal(true)} className="btn btn-primary">
           + Add Tenant

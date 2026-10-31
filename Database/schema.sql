@@ -13,7 +13,7 @@ CREATE TABLE public.platform_admins (
     created_at timestamptz DEFAULT now() NOT NULL
 );
 
--- 2. tenants (The Hotel / Guest House)
+-- 2. tenants (The Business that sells WiFi)
 CREATE TABLE public.tenants (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     business_name varchar(255) NOT NULL,
@@ -31,7 +31,7 @@ CREATE TABLE public.tenants (
     created_at timestamptz DEFAULT now() NOT NULL
 );
 
--- 3. tenant_users (The Hotel Owner's Login)
+-- 3. tenant_users (The Business Owner's Login)
 CREATE TABLE public.tenant_users (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id uuid REFERENCES public.tenants(id) ON DELETE CASCADE NOT NULL,
@@ -59,6 +59,7 @@ CREATE TABLE public.routers (
     status varchar(50) DEFAULT 'offline',
     last_seen_at timestamptz,
     provision_token varchar(100) UNIQUE, -- For Zero-Touch Provisioning
+    provision_token_expires_at timestamptz, -- The setup link stops working after this time
     tunnel_ip varchar(50) UNIQUE,        -- The WireGuard IP assigned to this router
     public_key varchar(100),             -- NEW: Stores the router's WireGuard Public Key
     provisioned_at timestamptz,          -- Marks when the router was successfully set up
@@ -107,7 +108,7 @@ CREATE TABLE public.vouchers (
     UNIQUE (tenant_id, code)
 );
 
--- 8. sessions (Live and Past Guest Connections)
+-- 8. sessions (Live and Past Customer Connections)
 CREATE TABLE public.sessions (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id uuid REFERENCES public.tenants(id) ON DELETE CASCADE NOT NULL,

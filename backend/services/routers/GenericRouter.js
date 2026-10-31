@@ -6,7 +6,7 @@
 // ============================================================
 class GenericRouter {
   async createVoucher(code, durationMinutes, speedLimitKbps) {
-    console.log(`[GenericRouter] Guest authorized for ${durationMinutes} mins.`);
+    console.log(`[GenericRouter] Customer authorized for ${durationMinutes} mins.`);
     return { 
       ok: true, 
       expiresAt: new Date(Date.now() + durationMinutes * 60000) 
@@ -20,7 +20,7 @@ class GenericRouter {
   }
 
   async disconnectUser(macAddress) {
-    console.log(`[GenericRouter] Kicked MAC ${macAddress}. Guest must re-authenticate.`);
+    console.log(`[GenericRouter] Kicked MAC ${macAddress}. Customer must log in again.`);
     return { ok: true };
   }
 }

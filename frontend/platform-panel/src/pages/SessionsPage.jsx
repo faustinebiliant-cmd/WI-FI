@@ -37,7 +37,7 @@ export default function SessionsPage() {
       setDeleteTarget(null);
       fetchSessions();
     } catch (error) {
-      alert(error.response?.data?.error || 'Failed to disconnect guest');
+      alert(error.response?.data?.error || 'Failed to disconnect customer');
     } finally {
       setIsDeleting(false);
     }
@@ -49,7 +49,7 @@ export default function SessionsPage() {
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ marginBottom: '30px' }}>
         <h1 style={{ margin: 0 }}>Active Sessions</h1>
-        <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Guests currently connected{isPlatform ? ' across all routers' : ' to your WiFi'}.</p>
+        <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Customers currently connected{isPlatform ? ' across all routers' : ' to your WiFi'}.</p>
       </div>
 
       <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
@@ -94,7 +94,7 @@ export default function SessionsPage() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        title="Disconnect Guest"
+        title="Disconnect Customer"
         message={`Are you sure you want to kick ${deleteTarget?.mac_address} off the WiFi?`}
         confirmLabel="Disconnect"
         cancelLabel="Cancel"

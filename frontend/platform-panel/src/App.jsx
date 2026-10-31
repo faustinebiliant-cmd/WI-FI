@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import DashboardLayout from './shared/components/DashboardLayout';
-import { FiUsers, FiWifi, FiActivity, FiFileText } from 'react-icons/fi';
+import { FiUsers, FiWifi, FiActivity, FiFileText, FiBookOpen } from 'react-icons/fi';
 
 // Import Pages
 import LoginPage from './pages/LoginPage';
@@ -11,6 +11,7 @@ import TenantDetailPage from './pages/TenantDetailPage';
 import RoutersPage from './pages/RoutersPage';
 import SessionsPage from './pages/SessionsPage';
 import AuditLogPage from './pages/AuditLogPage';
+import SetupGuidePage from './pages/SetupGuidePage';
 
 const PlatformShell = () => {
   const { admin, logout } = useAuth();
@@ -20,6 +21,7 @@ const PlatformShell = () => {
     { path: '/routers', label: 'All Routers', icon: FiWifi },
     { path: '/sessions', label: 'Active Sessions', icon: FiActivity },
     { path: '/audit', label: 'Audit Logs', icon: FiFileText },
+    { path: '/guide', label: 'Setup Guide', icon: FiBookOpen },
   ];
 
   return (
@@ -58,6 +60,7 @@ export default function App() {
             <Route path="/routers" element={<RoutersPage />} />
             <Route path="/sessions" element={<SessionsPage />} />
             <Route path="/audit" element={<AuditLogPage />} />
+            <Route path="/guide" element={<SetupGuidePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

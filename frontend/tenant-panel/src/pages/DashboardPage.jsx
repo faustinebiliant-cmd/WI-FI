@@ -42,7 +42,7 @@ export default function DashboardPage() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
-        <StatCard title="Active Guests Online" value={stats.activeGuests} icon={FiUsers} color="var(--primary)" bg="var(--primary-soft)" />
+        <StatCard title="Active Customers Online" value={stats.activeCustomers} icon={FiUsers} color="var(--primary)" bg="var(--primary-soft)" />
         <StatCard title="Vouchers Used Today" value={stats.vouchersUsedToday} icon={FiClock} color="var(--info)" bg="#eff6ff" />
         <StatCard title="Vouchers Used (total)" value={stats.totalVouchers - stats.unusedVouchers} icon={FiCheckCircle} color="var(--success)" bg="var(--success-soft)" />
         <StatCard title="Unused Vouchers" value={stats.unusedVouchers} icon={FiTag} color="var(--warning)" bg="var(--warning-soft)" />

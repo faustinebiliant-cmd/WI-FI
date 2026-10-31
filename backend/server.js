@@ -174,7 +174,8 @@ const runPinger = () => {
   execFile(
     process.execPath,
     [path.join(__dirname, 'scripts', 'pingRouters.js')],
-    { timeout: 120000, cwd: __dirname },
+    // 4.5 minutes: enough for hundreds of routers, and still finished before the next 5-minute run
+    { timeout: 270000, cwd: __dirname },
     (err, stdout, stderr) => {
       pingerRunning = false;
       if (err) console.error('Pinger error:', err.message);
@@ -239,7 +240,7 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Last safety net: a failed request that nobody caught is logged,
-// it must never take the whole server down for every hotel
+// it must never take the whole server down for every business
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled error (server kept running):', reason && reason.message ? reason.message : reason);
 });

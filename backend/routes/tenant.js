@@ -5,7 +5,7 @@ const { tenantLoginLimiter, tenantGlobalLimiter } = require('../middleware/rateL
 
 const { login, changePassword, endImpersonationSelf } = require('../controllers/authTenantController');
 const { listPackages, createPackage, deletePackage } = require('../controllers/tenantPackageController');
-const { listRouters, createRouter, deleteRouter } = require('../controllers/tenantRouterController');
+const { listRouters, createRouter, newSetupToken, deleteRouter } = require('../controllers/tenantRouterController');
 const { generateVouchers, listVouchers, revokeVoucher } = require('../controllers/tenantVoucherController');
 const { getActiveSessions, disconnectSession } = require('../controllers/tenantSessionController');
 const { getDashboardStats } = require('../controllers/tenantDashboardController');
@@ -28,7 +28,8 @@ router.delete('/packages/:id', deletePackage);
 
 router.get('/routers', listRouters);
 router.post('/routers', createRouter);
-router.delete('/routers/:id', deleteRouter); // NEW ROUTE
+router.post('/routers/:id/setup-token', newSetupToken);
+router.delete('/routers/:id', deleteRouter);
 
 router.post('/vouchers/generate', generateVouchers);
 router.get('/vouchers', listVouchers);

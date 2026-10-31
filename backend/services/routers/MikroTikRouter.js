@@ -132,7 +132,7 @@ class MikroTikRouter {
     const name = `spd-${down}d-${up}u`;
 
     const profiles = await this._step((conn) =>
-      safePrint(conn, '/ip/hotspot/user/profile/print', ['=.proplist=name'])
+      safePrint(conn, '/ip/hotspot/user/profile/print', ['=.proplist=name', `?name=${name}`])
     );
 
     if (!profiles.some((p) => p.name === name)) {
@@ -164,8 +164,10 @@ class MikroTikRouter {
 
       const profile = await this.ensureSpeedProfile(speedDownKbps, speedUpKbps);
 
+      // Ask the router for this one code only, not its whole user list
+      // (the code was checked by cleanCode, so it is safe inside the query)
       const users = await this._step((conn) =>
-        safePrint(conn, '/ip/hotspot/user/print', ['=.proplist=.id,name'])
+        safePrint(conn, '/ip/hotspot/user/print', ['=.proplist=.id,name', `?name=${voucher}`])
       );
       const existing = users.find((u) => u.name === voucher);
 
@@ -196,30 +198,42 @@ class MikroTikRouter {
   }
 
   /**
-   * Kicks the guest off and deletes the voucher user from the router.
+   * Kicks the customer off and deletes the voucher user from the router.
    * Safe to call when the user does not exist any more.
+   * Order matters: the router remembers devices (mac-cookie) and would log a kicked
+   * device straight back in. So: forget the device, delete the user, THEN kick.
    */
   async removeVoucher(code) {
     try {
       const voucher = cleanCode(code);
 
-      // 1. Disconnect running sessions of this voucher
+      // 1. Forget every device the router remembers for this voucher
+      const cookies = await this._step((conn) =>
+        safePrint(conn, '/ip/hotspot/cookie/print', ['=.proplist=.id', `?user=${voucher}`])
+      );
+      for (const cookie of cookies) {
+        await this._step((conn) =>
+          conn.write('/ip/hotspot/cookie/remove', [`=.id=${cookie['.id']}`])
+        );
+      }
+
+      // 2. Delete the hotspot user, so nothing can log in with this code any more
+      const users = await this._step((conn) =>
+        safePrint(conn, '/ip/hotspot/user/print', ['=.proplist=.id,name', `?name=${voucher}`])
+      );
+      for (const user of users.filter((u) => u.name === voucher)) {
+        await this._step((conn) =>
+          conn.write('/ip/hotspot/user/remove', [`=.id=${user['.id']}`])
+        );
+      }
+
+      // 3. Disconnect running sessions of this voucher
       const active = await this._step((conn) =>
         safePrint(conn, '/ip/hotspot/active/print', ['=.proplist=.id', `?user=${voucher}`])
       );
       for (const session of active) {
         await this._step((conn) =>
           conn.write('/ip/hotspot/active/remove', [`=.id=${session['.id']}`])
-        );
-      }
-
-      // 2. Delete the hotspot user
-      const users = await this._step((conn) =>
-        safePrint(conn, '/ip/hotspot/user/print', ['=.proplist=.id,name'])
-      );
-      for (const user of users.filter((u) => u.name === voucher)) {
-        await this._step((conn) =>
-          conn.write('/ip/hotspot/user/remove', [`=.id=${user['.id']}`])
         );
       }
 
@@ -231,7 +245,9 @@ class MikroTikRouter {
   }
 
   /**
-   * Guests that are online right now (empty list if none, or if the router cannot be reached).
+   * Customers that are online right now.
+   * Empty list = the router answered and nobody is online.
+   * null = the router could not be asked (so we do NOT know who is online).
    */
   async getActiveUsers() {
     try {
@@ -247,7 +263,7 @@ class MikroTikRouter {
       }));
     } catch (error) {
       console.error('[MikroTik] Failed to fetch active users:', error.message);
-      return [];
+      return null;
     }
   }
 

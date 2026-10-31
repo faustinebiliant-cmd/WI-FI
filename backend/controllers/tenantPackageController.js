@@ -70,7 +70,7 @@ const deletePackage = async (req, res) => {
     const { id } = req.params;
     if (!isValidUUID(id)) return res.status(400).json({ success: false, error: 'Invalid package ID' });
 
-    // Deleting a package also deletes its vouchers. Refuse while guests may still
+    // Deleting a package also deletes its vouchers. Refuse while customers may still
     // hold a sold code (unused) or are using one (active), so nobody loses paid time.
     const inUse = await db.query(
       "SELECT COUNT(*) FROM vouchers WHERE package_id = $1 AND tenant_id = $2 AND status IN ('unused', 'active')",

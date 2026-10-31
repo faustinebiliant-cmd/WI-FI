@@ -8,7 +8,7 @@ import './shared/styles/components.css';
 const PAYMENTS_ENABLED = false;
 
 export default function App() {
-  const [hotelInfo, setHotelInfo] = useState(null);
+  const [businessInfo, setBusinessInfo] = useState(null);
   const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [successData, setSuccessData] = useState(null);
@@ -21,7 +21,9 @@ export default function App() {
 
   const queryParams = new URLSearchParams(window.location.search);
   const routerToken = queryParams.get('router');
-  const macAddress = queryParams.get('mac') || '00:00:00:00:00:00';
+  // The router adds the device ID (mac) when it sends the customer here.
+  // Without it a voucher cannot be tied to the device, so the form stays locked.
+  const macAddress = queryParams.get('mac') || null;
   const ipAddress = queryParams.get('ip') || null;
   
   // NEW: Capture the MikroTik login URLs
@@ -34,7 +36,7 @@ export default function App() {
       return;
     }
     apiClient.get(`/portal/info/${routerToken}`)
-      .then(res => setHotelInfo(res.data.data))
+      .then(res => setBusinessInfo(res.data.data))
       .catch((err) => setErrorMessage(err.response?.data?.error || 'Invalid or inactive router.'));
   }, [routerToken]);
 
@@ -63,6 +65,23 @@ export default function App() {
     if (mins >= 1440 && mins % 1440 === 0) return `${mins / 1440} Day${mins / 1440 > 1 ? 's' : ''}`;
     if (mins >= 60 && mins % 60 === 0) return `${mins / 60} Hour${mins / 60 > 1 ? 's' : ''}`;
     return `${mins} Mins`;
+  };
+
+  // "1d 4h", "4h 12m" or "12m", from the minutes left that the server sent
+  const formatLeft = (mins) => {
+    const d = Math.floor(mins / 1440);
+    const h = Math.floor((mins % 1440) / 60);
+    const m = mins % 60;
+    if (d > 0) return `${d}d ${h}h`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  };
+
+  // End of the voucher in Tanzania time, e.g. "31 Oct, 18:30"
+  const formatEnd = (expiresAt) => {
+    const end = new Date(expiresAt);
+    if (isNaN(end.getTime())) return null;
+    return end.toLocaleString('en-GB', { timeZone: 'Africa/Dar_es_Salaam', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
   const handleRedeem = async (e) => {
@@ -175,7 +194,13 @@ export default function App() {
         <div className="card" style={{ maxWidth: '400px', textAlign: 'center', padding: '40px' }}>
           <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'var(--success)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', margin: '0 auto 20px' }}>✓</div>
           <h1 style={{ fontSize: '24px', marginBottom: '10px' }}>Connected!</h1>
-          <p style={{ color: 'var(--gray)', marginBottom: '20px' }}>You have internet access for <strong>{formatDuration(successData.duration_minutes)}</strong> at <strong>{successData.speed_down_mbps} Mbps</strong>.</p>
+          {successData.expires_at && Number.isFinite(successData.remaining_minutes) && formatEnd(successData.expires_at) ? (
+            <p style={{ color: 'var(--gray)', marginBottom: '20px' }}>
+              {successData.resumed ? 'Welcome back! ' : ''}You have internet until <strong>{formatEnd(successData.expires_at)}</strong> ({formatLeft(successData.remaining_minutes)} left) at <strong>{successData.speed_down_mbps} Mbps</strong>.
+            </p>
+          ) : (
+            <p style={{ color: 'var(--gray)', marginBottom: '20px' }}>You have internet access for <strong>{formatDuration(successData.duration_minutes)}</strong> at <strong>{successData.speed_down_mbps} Mbps</strong>.</p>
+          )}
           
           {loginUrl && (
             <p style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 'bold' }}>Unlocking internet...</p>
@@ -193,9 +218,9 @@ export default function App() {
       <div className="card" style={{ maxWidth: '450px', textAlign: 'center', padding: '40px', width: '100%' }}>
         
         <div style={{ width: '64px', height: '64px', borderRadius: '16px', backgroundColor: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: 'bold', margin: '0 auto 20px' }}>
-          {hotelInfo?.business_name ? hotelInfo.business_name.charAt(0) : 'W'}
+          {businessInfo?.business_name ? businessInfo.business_name.charAt(0) : 'W'}
         </div>
-        <h1 style={{ fontSize: '22px', marginBottom: '8px' }}>{hotelInfo?.business_name || 'Welcome'}</h1>
+        <h1 style={{ fontSize: '22px', marginBottom: '8px' }}>{businessInfo?.business_name || 'Welcome'}</h1>
         
         {errorMessage && <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '20px', fontSize: '13px' }}>{errorMessage}</div>}
 
@@ -210,7 +235,7 @@ export default function App() {
           <div>
             {!selectedPackage ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {hotelInfo?.packages?.length > 0 ? hotelInfo.packages.map(pkg => (
+                {businessInfo?.packages?.length > 0 ? businessInfo.packages.map(pkg => (
                   <div key={pkg.id} onClick={() => handleBuy(pkg)} style={{ padding: '15px', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white' }}>
                     <div style={{ textAlign: 'left' }}>
                       <div style={{ fontWeight: 'bold' }}>{pkg.name}</div>
@@ -253,6 +278,11 @@ export default function App() {
 
         {activeTab === 'voucher' && (
           <form onSubmit={handleRedeem}>
+            {!macAddress && (
+              <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
+                Your device could not be identified. Please connect to this WiFi network, then open any website so the login page appears again.
+              </div>
+            )}
             <p style={{ color: 'var(--gray)', marginBottom: '20px', fontSize: '14px' }}>Enter your voucher code to connect.</p>
             <input 
               className="form-control"
@@ -269,7 +299,7 @@ export default function App() {
               type="submit" 
               className="btn btn-primary" 
               style={{ width: '100%', backgroundColor: lockoutTimeLeft > 0 ? '#93c5fd' : 'var(--primary)', cursor: lockoutTimeLeft > 0 ? 'not-allowed' : 'pointer' }} 
-              disabled={status === 'loading' || voucherCode.length < 6 || lockoutTimeLeft > 0}
+              disabled={!macAddress || status === 'loading' || voucherCode.length < 6 || lockoutTimeLeft > 0}
             >
               {status === 'loading' ? 'Connecting...' : lockoutTimeLeft > 0 ? `Locked (${Math.floor(lockoutTimeLeft / 60)}:${String(lockoutTimeLeft % 60).padStart(2, '0')})` : 'Connect'}
             </button>

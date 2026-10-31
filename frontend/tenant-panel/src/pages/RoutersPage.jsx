@@ -9,6 +9,10 @@ const CopyIcon = () => (
   </svg>
 );
 
+// Official SHA-256 fingerprint of Let's Encrypt's root certificate "ISRG Root X1"
+// (valid until 2035). It signs the certificate of oswagolink.co.tz.
+const ISRG_ROOT_X1_FINGERPRINT = '96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6';
+
 // One command with its own copy button
 function CommandBox({ title, note, text, tone = 'blue' }) {
   const [copied, setCopied] = useState(false);
@@ -65,6 +69,7 @@ export default function RoutersPage() {
   const [deleteInput, setDeleteInput] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [actionError, setActionError] = useState('');
 
   const [formData, setFormData] = useState({ name: '', location_label: '' });
 
@@ -118,6 +123,23 @@ export default function RoutersPage() {
     setDeleteError('');
   };
 
+  // "Show setup commands again": the server makes a NEW setup link (valid 12 hours)
+  const showSetupAgain = async (router) => {
+    setActionError('');
+    try {
+      const res = await apiClient.post(`/tenant/routers/${router.id}/setup-token`);
+      const token = res.data && res.data.data && res.data.data.provision_token;
+      if (!token) {
+        setActionError('The server did not return a setup token. Please contact support.');
+        return;
+      }
+      setSetupToken(token);
+      setShowSetupModal(true);
+    } catch (error) {
+      setActionError(error.response?.data?.error || 'Failed to create new setup commands.');
+    }
+  };
+
   const handleDelete = async () => {
     if (deleteInput !== 'DELETE') return;
     setIsDeleting(true);
@@ -133,10 +155,22 @@ export default function RoutersPage() {
     }
   };
 
+  // Teaches a factory router to trust our server's certificate (Let's Encrypt root, ISRG Root X1).
+  // The certificate is downloaded without a check (the router cannot check anything yet), so it is
+  // accepted only if its SHA-256 fingerprint is exactly the official one. Safe to run twice.
+  const trustCommand =
+    `:if ([:len [/certificate find where fingerprint="${ISRG_ROOT_X1_FINGERPRINT}"]] = 0) do={ /tool fetch url="https://letsencrypt.org/certs/isrgrootx1.pem" dst-path=isrgrootx1.pem check-certificate=no; :delay 2s; /certificate import file-name=isrgrootx1.pem passphrase=""; /file remove isrgrootx1.pem }; /certificate remove [find where common-name="ISRG Root X1" and fingerprint!="${ISRG_ROOT_X1_FINGERPRINT}"]; :if ([:len [/certificate find where fingerprint="${ISRG_ROOT_X1_FINGERPRINT}" and trusted=yes]] = 0) do={ :error "CERTIFICATE CHECK FAILED - nothing else was changed. Check the internet connection and run this step again." } else={ :put "OK - the router now trusts oswagolink.co.tz" }`;
+  // check-certificate: the router refuses to run a script from anyone pretending to be our server
   const setupCommand =
-    `/tool fetch url="https://oswagolink.co.tz/api/provision/bootstrap/${setupToken}" dst-path=bootstrap.rsc; :delay 2s; /import file-name=bootstrap.rsc; /file remove bootstrap.rsc`;
+    `/tool fetch url="https://oswagolink.co.tz/api/provision/bootstrap/${setupToken}" dst-path=bootstrap.rsc check-certificate=yes-without-crl; :delay 2s; /import file-name=bootstrap.rsc; /file remove bootstrap.rsc`;
+  // The hEX has no clock battery: after a power cut, or when new, its date can be far off, and a
+  // certificate check with a wrong date fails. So the clock is set from the internet FIRST.
+  const clockCommand =
+    `/system ntp client set enabled=yes servers=time.google.com,pool.ntp.org,time.cloudflare.com; :local n 0; :while (([/system ntp client get status] != "synchronized") && ($n < 30)) do={ :delay 2s; :set n ($n + 1) }; :if ([/system ntp client get status] != "synchronized") do={ :error "CLOCK NOT SET - the router could not get the time from the internet. Check that the internet cable is in ether1, then paste step 2 again." } else={ :put "OK - the router clock is correct" }`;
+  // One paste: clock, then trust, then setup. Any :error stops the line before the next part runs.
+  const trustAndSetupCommand = `${clockCommand}; ${trustCommand}; ${setupCommand}`;
   const loginFetchCommand =
-    `/file remove flash/hotspot/login.html\n/tool fetch url="https://oswagolink.co.tz/api/provision/login/${setupToken}" dst-path=flash/hotspot/login.html`;
+    `/file remove flash/hotspot/login.html\n/tool fetch url="https://oswagolink.co.tz/api/provision/login/${setupToken}" dst-path=flash/hotspot/login.html check-certificate=yes-without-crl`;
 
   return (
     <div className="page-wrapper">
@@ -150,9 +184,9 @@ export default function RoutersPage() {
         </button>
       </div>
 
-      {loadError && (
+      {(loadError || actionError) && (
         <div style={{ color: '#dc2626', backgroundColor: '#fef2f2', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
-          {loadError}
+          {loadError || actionError}
         </div>
       )}
 
@@ -186,7 +220,12 @@ export default function RoutersPage() {
                     <td style={{ padding: '16px 20px', color: waiting ? '#9ca3af' : 'inherit' }}>
                       {waiting ? 'Waiting for setup' : router.ip_address}
                     </td>
-                    <td style={{ padding: '16px 20px' }}>
+                    <td style={{ padding: '16px 20px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {!router.provisioned && (
+                        <button onClick={() => showSetupAgain(router)} style={{ padding: '6px 12px', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                          Setup Commands
+                        </button>
+                      )}
                       <button onClick={() => { setDeleteError(''); setDeleteTarget(router); }} style={{ padding: '6px 12px', backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
                         Delete
                       </button>
@@ -229,10 +268,13 @@ export default function RoutersPage() {
           <div className="modal-content" style={{ maxWidth: '700px', padding: '20px', maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ marginTop: 0, fontSize: '20px' }}>Connect Your MikroTik</h2>
             <p style={{ color: '#64748b', marginBottom: '8px', fontSize: '14px' }}>
-              Use a brand-new (or factory-reset) router with its default configuration, and make sure it has internet on port ether1.
+              Use a brand-new (or factory-reset) router with its default configuration.
+            </p>
+            <p style={{ color: '#1e3a8a', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px', borderRadius: '6px', marginBottom: '8px', fontSize: '13px' }}>
+              <strong>How to connect:</strong> put the internet cable (from your modem) in <strong>port 1 (ether1)</strong>. Connect your computer to <strong>port 2, 3, 4 or 5</strong> and open Winbox <strong>by MAC address</strong> (pick the router in the Neighbors list), not by IP address. The router must have internet before step 2.
             </p>
             <p style={{ color: '#b45309', backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' }}>
-              The setup commands below contain a secret. They are shown only now, so finish the setup before you close this window, and never share them.
+              The setup commands below contain a secret: never share them. They work for 12 hours. If they expire, or you close this window too early, press "Setup Commands" on the Routers page to get new ones (only while the router is not set up yet).
             </p>
 
             <CommandBox
@@ -243,27 +285,27 @@ export default function RoutersPage() {
             />
 
             <CommandBox
+              title="Step 2: Set up the router (one paste)"
+              note={'The router first sets its clock from the internet (up to 1 minute), checks our server\'s certificate, then builds the hotspot and registers itself on this account. Wait until it shows SETUP COMPLETE. If it stops with CLOCK NOT SET or CERTIFICATE CHECK FAILED, check that the internet cable is in ether1 and paste it again.'}
+              text={trustAndSetupCommand}
+            />
+
+            <CommandBox
               tone="amber"
-              title="Step 2: Check that scheduled tasks are allowed"
-              note={'Run this: /system device-mode print. If it shows "scheduler: no", run the command below and then unplug the router\'s power and plug it back in within 5 minutes. If it already shows "scheduler: yes", skip the command.'}
+              title={'Only if step 2 stopped with "SCHEDULER IS OFF"'}
+              note="Run this, then unplug the router's power and plug it back in within 5 minutes. Then paste step 2 again. Nothing was changed by the stopped attempt."
               text="/system device-mode update scheduler=yes"
             />
 
             <CommandBox
-              title="Step 3: Paste the setup command"
-              note="The router builds the hotspot and registers itself on this account. Wait until it finishes."
-              text={setupCommand}
-            />
-
-            <CommandBox
-              title="Step 4a: Build the guest login pages"
-              note="Run this, then type 0 when it asks for numbers, and y to confirm. Wait until it finishes before step 4b."
+              title="Step 3 (part 1 of 2): Build the customer login pages"
+              note="Run this, then type 0 when it asks for numbers, and y to confirm. Wait until it finishes before part 2."
               text="/ip hotspot reset-html"
             />
 
             <CommandBox
-              title="Step 4b: Install your guest login page"
-              note="Paste both lines together. Afterwards the router shows your portal to guests."
+              title="Step 3 (part 2 of 2): Install your customer login page"
+              note="Paste both lines together. Afterwards the router shows your portal to your customers."
               text={loginFetchCommand}
             />
 

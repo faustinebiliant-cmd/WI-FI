@@ -6,8 +6,10 @@ const db = require('../config/db');
 const env = require('../config/env');
 const MikroTikRouter = require('../services/routers/MikroTikRouter');
 
-const CONCURRENCY = 5;            // routers checked at the same time
-const CHECK_TIMEOUT_MS = 10000;   // give up on one router after 10 seconds
+// Sized so that even 500 silent routers fit in one run:
+// 500 / 25 at a time x 8 seconds = 160 seconds, below the 4.5 minute limit set in server.js
+const CONCURRENCY = 25;           // routers checked at the same time
+const CHECK_TIMEOUT_MS = 8000;    // give up on one router after 8 seconds
 const OFFLINE_AFTER_MINUTES = 8;  // show "offline" only after this long without an answer
 
 const withTimeout = (promise, ms) =>
@@ -53,7 +55,8 @@ const run = async () => {
 
   console.log('[Pinger] Checking router statuses...');
   const { rows: routers } = await db.query(
-    'SELECT id, ip_address, api_port, api_username, api_password_encrypted FROM routers'
+    // Random order: if a run is ever cut short, a different set of routers misses out each time
+    'SELECT id, ip_address, api_port, api_username, api_password_encrypted FROM routers ORDER BY random()'
   );
 
   const counts = { online: 0, 'no-answer': 0, skipped: 0 };

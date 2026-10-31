@@ -1,7 +1,7 @@
 // ============================================================
 // OSWAGOTech WiFi - Subscription Guard
 // A suspended tenant, or one whose trial has ended, is blocked
-// from the tenant panel and from the guest portal.
+// from the tenant panel and from the customer portal.
 // ============================================================
 
 // SQL condition, true when the tenant must be blocked.
@@ -21,10 +21,10 @@ const TENANT_BLOCKED_ERROR = {
   error: 'This account is suspended or its trial has ended. Please contact OSWAGOTech.'
 };
 
-// What guests see on the portal of a blocked tenant
+// What customers see on the portal of a blocked tenant
 const PORTAL_BLOCKED_ERROR = {
   success: false,
-  error: 'This WiFi service is not available right now. Please contact the reception.'
+  error: 'This WiFi service is not available right now. Please ask the staff for help.'
 };
 
 module.exports = { TENANT_BLOCKED_SQL, TENANT_BLOCKED_ERROR, PORTAL_BLOCKED_ERROR };

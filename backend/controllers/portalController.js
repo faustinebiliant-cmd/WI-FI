@@ -59,8 +59,11 @@ const redeemVoucher = async (req, res) => {
     if (!TOKEN_RE.test(router_token)) {
       return res.status(404).json({ success: false, error: 'Router not found' });
     }
-    if (!isValidMACAddress(mac_address)) {
-      return res.status(400).json({ success: false, error: 'Invalid device MAC address' });
+    // One written form (AA:BB:CC:DD:EE:FF) so the router can find the device again later.
+    // All zeros means the router did not tell us which device this is: refuse it.
+    const deviceMac = mac_address.trim().toUpperCase().replace(/-/g, ':');
+    if (!isValidMACAddress(deviceMac) || deviceMac === '00:00:00:00:00:00') {
+      return res.status(400).json({ success: false, error: 'Your device could not be identified. Please connect to this WiFi network and open the login page again.' });
     }
     if (ip_address && !isValidIPAddress(ip_address)) {
       return res.status(400).json({ success: false, error: 'Invalid device IP address' });
@@ -161,7 +164,7 @@ const redeemVoucher = async (req, res) => {
     await db.query(
       `INSERT INTO sessions (tenant_id, router_id, voucher_id, mac_address, ip_address, started_at) 
        VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [router.tenant_id, router.id, voucher.id, mac_address, ip_address || null]
+      [router.tenant_id, router.id, voucher.id, deviceMac, ip_address || null]
     );
 
     return res.status(200).json({
@@ -170,6 +173,9 @@ const redeemVoucher = async (req, res) => {
       data: {
         resumed,
         duration_minutes: pkg.duration_minutes,
+        // Minutes left on the server's clock: a returning customer sees the time left,
+        // not the full package time, and a phone with a wrong clock cannot change it
+        remaining_minutes: remainingMinutes,
         speed_down_mbps: pkg.speed_down_kbps / 1024,
         expires_at: voucher.expires_at
       }

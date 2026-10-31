@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const db = require('../config/db');
 
 // Switched off until the real gateway (AzamPay) is connected. The mock below
-// answered "payment successful" without giving the guest any WiFi.
+// answered "payment successful" without giving the customer any WiFi.
 const PAYMENTS_ENABLED = false;
 
 const TOKEN_RE = /^[A-Za-z0-9_-]{8,128}$/;
@@ -57,7 +57,7 @@ const initiatePayment = async (req, res) => {
   if (!PAYMENTS_ENABLED) {
     return res.status(503).json({
       success: false,
-      error: 'Mobile payment is not available yet. Please buy a voucher at the reception.'
+      error: 'Mobile payment is not available yet. Please ask the staff for a voucher.'
     });
   }
   try {

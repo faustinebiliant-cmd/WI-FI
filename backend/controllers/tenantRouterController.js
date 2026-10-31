@@ -10,6 +10,8 @@ const { encrypt } = require('../utils/encryption');
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PUBKEY_RE = /^[A-Za-z0-9+/]{43}=$/;
 const MAX_ROUTERS_PER_TENANT = 10;
+// A setup link (provision token) works this long, then a new one must be made
+const SETUP_LINK_HOURS = 12;
 
 // Removes the router's WireGuard peer on the VPS through the root-owned helper.
 // Same lock as enrollment, so two changes to wg0.conf never run at the same time.
@@ -33,7 +35,8 @@ const removeWireGuardPeer = (publicKey) => new Promise((resolve) => {
 const listRouters = async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, name, location_label, ip_address, status, last_seen_at, created_at
+      `SELECT id, name, location_label, ip_address, status, last_seen_at, created_at,
+              (provisioned_at IS NOT NULL) AS provisioned
        FROM routers
        WHERE tenant_id = $1
        ORDER BY created_at DESC`,
@@ -69,7 +72,7 @@ const createRouter = async (req, res) => {
     }
 
     const provisionToken = crypto.randomBytes(24).toString('hex'); // 48 characters, secret
-    const routerToken = crypto.randomBytes(16).toString('hex');    // used in the guest portal link
+    const routerToken = crypto.randomBytes(16).toString('hex');    // used in the customer portal link
     const apiPassword = crypto.randomBytes(16).toString('hex');    // one password per router
 
     const encryptedPassword = encrypt(apiPassword);
@@ -80,17 +83,47 @@ const createRouter = async (req, res) => {
     const { rows } = await db.query(
       `INSERT INTO routers
          (tenant_id, name, location_label, ip_address, api_port, api_username,
-          api_password_encrypted, router_token, status, provision_token)
-       VALUES ($1, $2, $3, '0.0.0.0', 8728, 'wifiapi', $4, $5, 'offline', $6)
+          api_password_encrypted, router_token, status, provision_token, provision_token_expires_at)
+       VALUES ($1, $2, $3, '0.0.0.0', 8728, 'wifiapi', $4, $5, 'offline', $6,
+               NOW() + make_interval(hours => $7::int))
        RETURNING id, name, location_label, ip_address, status, provision_token`,
-      [req.tenantId, name, location || null, encryptedPassword, routerToken, provisionToken]
+      [req.tenantId, name, location || null, encryptedPassword, routerToken, provisionToken, SETUP_LINK_HOURS]
     );
 
-    // This is the ONLY time the setup token is sent to the browser
+    // The setup token goes to the browser only here and in newSetupToken
     return res.status(201).json({ success: true, data: rows[0] });
   } catch (error) {
     console.error('Create router error:', error);
     return res.status(500).json({ success: false, error: 'Failed to create router' });
+  }
+};
+
+// POST /api/tenant/routers/:id/setup-token
+// "Show setup commands again": a NEW setup link, only for a router that is not
+// set up yet. The old link stops working at once.
+const newSetupToken = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(String(id))) {
+      return res.status(404).json({ success: false, error: 'Router not found' });
+    }
+
+    const provisionToken = crypto.randomBytes(24).toString('hex');
+    const { rows } = await db.query(
+      `UPDATE routers
+       SET provision_token = $1, provision_token_expires_at = NOW() + make_interval(hours => $2::int)
+       WHERE id = $3 AND tenant_id = $4 AND provisioned_at IS NULL
+       RETURNING id, provision_token`,
+      [provisionToken, SETUP_LINK_HOURS, id, req.tenantId]
+    );
+    if (rows.length === 0) {
+      return res.status(409).json({ success: false, error: 'This router is already set up, or it was not found.' });
+    }
+
+    return res.status(200).json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error('New setup token error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to create new setup commands' });
   }
 };
 
@@ -141,4 +174,4 @@ const deleteRouter = async (req, res) => {
   }
 };
 
-module.exports = { listRouters, createRouter, deleteRouter };
+module.exports = { listRouters, createRouter, newSetupToken, deleteRouter };

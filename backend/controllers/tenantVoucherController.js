@@ -102,7 +102,9 @@ const listVouchers = async (req, res) => {
 
     const formattedData = rows.map(r => ({
       ...r,
-      expires_at: r.expires_at ? formatDateTimeEAT(r.expires_at) : null,
+      // expires_at stays the exact moment (with time zone), so a countdown is right on any device.
+      // expires_at_eat is the same moment written as Tanzania time, for display.
+      expires_at_eat: r.expires_at ? formatDateTimeEAT(r.expires_at) : null,
       packages: {
         name: r.package_name,
         router_name: r.router_name
@@ -143,7 +145,7 @@ const revokeVoucher = async (req, res) => {
       return res.status(200).json({ success: true, message: 'Voucher already revoked' });
     }
 
-    // Cancel first, so the guest cannot redeem it again while we talk to the router
+    // Cancel first, so the customer cannot redeem it again while we talk to the router
     const previousStatus = v.status;
     await db.query("UPDATE vouchers SET status = 'cancelled' WHERE id = $1", [v.id]);
 
@@ -168,7 +170,7 @@ const revokeVoucher = async (req, res) => {
           );
           return res.status(503).json({
             success: false,
-            error: 'The router could not be reached, so the guest could not be disconnected. The voucher was NOT revoked. Please try again when the router is online.'
+            error: 'The router could not be reached, so the customer could not be disconnected. The voucher was NOT revoked. Please try again when the router is online.'
           });
         }
       }

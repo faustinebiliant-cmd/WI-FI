@@ -112,8 +112,8 @@ export default function VouchersPage() {
 
   const getRemainingTime = (expiresAt) => {
     if (!expiresAt) return null;
-    const safeDateString = expiresAt.replace(' ', 'T');
-    const expires = new Date(safeDateString);
+    // The server sends the exact moment with its time zone, so this is right in any time zone
+    const expires = new Date(expiresAt);
     if (isNaN(expires.getTime())) return null;
     const diffMs = expires - new Date();
 
@@ -136,7 +136,7 @@ export default function VouchersPage() {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
         <div>
           <h1 style={{ margin: 0 }}>Vouchers</h1>
-          <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Generate codes to sell to your guests.</p>
+          <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Generate codes to sell to your customers.</p>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '300px' }}>
@@ -327,7 +327,7 @@ export default function VouchersPage() {
             <p style={{ color: 'var(--dark)', fontSize: '14px', marginBottom: '20px' }}>
               Are you sure you want to revoke voucher <strong>{revokeTarget.code}</strong>?<br /><br />
               {revokeTarget.status === 'active'
-                ? 'This will immediately disconnect the guest from the WiFi and they will not be able to use this code again.'
+                ? 'This will immediately disconnect the customer from the WiFi and they will not be able to use this code again.'
                 : 'This code will no longer be usable.'}
             </p>
 

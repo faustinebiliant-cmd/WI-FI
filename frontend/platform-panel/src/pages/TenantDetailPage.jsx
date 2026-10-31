@@ -92,7 +92,7 @@ export default function TenantDetailPage() {
         <div className="card">
           <h3 style={{ marginTop: 0, borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>System Stats</h3>
           <p style={{ marginBottom: '10px' }}><strong>Routers Registered:</strong> {tenant.router_count}</p>
-          <p style={{ marginBottom: '10px' }}><strong>Active Guests Right Now:</strong> {tenant.active_guests || tenant.active_sessions}</p>
+          <p style={{ marginBottom: '10px' }}><strong>Active Customers Right Now:</strong> {tenant.active_sessions}</p>
         </div>
       </div>
 

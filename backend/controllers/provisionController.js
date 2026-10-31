@@ -79,10 +79,15 @@ const getBootstrapScript = async (req, res) => {
     const { token } = req.params;
     if (!TOKEN_RE.test(token)) return res.status(404).type('text/plain').send('# Invalid Token');
 
-    const routerRes = await db.query('SELECT * FROM routers WHERE provision_token = $1', [token]);
+    const routerRes = await db.query(
+      'SELECT *, (provision_token_expires_at > NOW()) AS token_valid FROM routers WHERE provision_token = $1',
+      [token]
+    );
     const router = routerRes.rows[0];
     if (!router) return res.status(404).type('text/plain').send('# Invalid Token');
     if (router.provisioned_at) return res.status(410).type('text/plain').send('# This token was already used');
+    // A leaked setup link must not work forever
+    if (!router.token_valid) return res.status(410).type('text/plain').send('# This setup link has expired. Show new setup commands in the Tenant Panel.');
 
     const assignedIp = await assignTunnelIp(router.id);
 
@@ -126,10 +131,10 @@ const getBootstrapScript = async (req, res) => {
 /interface wireguard peers add interface=wg-vps name=peer1 public-key="ge0I3cNGfsm5MuItotNBt5KDrSGeg3lhRThsDFc3byY=" endpoint-address=69.62.105.119 endpoint-port=51820 allowed-address=10.20.0.1/32 persistent-keepalive=25s comment="WI-FI VPS"
 
 /ip firewall filter add chain=input action=accept protocol=tcp dst-port=8728 in-interface=wg-vps src-address=10.20.0.1 place-before=0 comment="Allow VPS API through WireGuard"
-/ip firewall filter add chain=forward action=drop src-address=192.168.88.0/24 out-interface=wg-vps place-before=0 comment="Guests cannot use VPS tunnel"
+/ip firewall filter add chain=forward action=drop src-address=192.168.88.0/24 out-interface=wg-vps place-before=0 comment="Customers cannot use VPS tunnel"
 
 /ip hotspot profile set [find default=yes] login-by=http-pap
-/ip hotspot profile add name=hsprof1 hotspot-address=192.168.88.1 html-directory=flash/hotspot login-by=http-pap
+/ip hotspot profile add name=hsprof1 hotspot-address=192.168.88.1 html-directory=flash/hotspot login-by=http-pap,mac-cookie http-cookie-lifetime=30d
 /ip hotspot add name=hotspot1 interface=bridge address-pool=default-dhcp profile=hsprof1 disabled=no
 /ip hotspot ip-binding add address=192.168.88.2 type=bypassed comment="Access point"
 /ip hotspot walled-garden add dst-host=oswagolink.co.tz
@@ -210,7 +215,7 @@ ${speedProfiles}
   }
 };
 
-// The redirect page the router shows to guests (replaces login.html on the router)
+// The redirect page the router shows to customers (replaces login.html on the router)
 const getLoginPage = async (req, res) => {
   try {
     const { token } = req.params;
@@ -262,10 +267,16 @@ const registerRouterKey = async (req, res) => {
     const pubkey = String((req.body && req.body.pubkey) || '');
     if (!PUBKEY_RE.test(pubkey)) return res.status(400).send('Invalid key');
 
-    const routerRes = await db.query('SELECT * FROM routers WHERE provision_token = $1', [token]);
+    // One extra hour, so a setup started just before the link expired can still finish
+    const routerRes = await db.query(
+      `SELECT *, (provision_token_expires_at + INTERVAL '1 hour' > NOW()) AS token_valid
+       FROM routers WHERE provision_token = $1`,
+      [token]
+    );
     const router = routerRes.rows[0];
     if (!router) return res.status(404).send('Invalid token');
     if (router.provisioned_at) return res.status(410).send('Token already used');
+    if (!router.token_valid) return res.status(410).send('Setup link expired');
     if (!isClientTunnelIp(router.tunnel_ip)) return res.status(400).send('No tunnel address yet');
 
     // No shell is used, so nothing sent by the router can run as a command
