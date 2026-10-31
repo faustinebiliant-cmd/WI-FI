@@ -116,6 +116,7 @@ const endImpersonationSelf = async (req, res) => {
 
     return res.status(200).json({ success: true, message: 'Impersonation ended' });
   } catch (error) {
+    console.error('End impersonation error:', error);
     return res.status(500).json({ success: false, error: 'Failed to end impersonation' });
   }
 };

@@ -160,6 +160,7 @@ const revokeVoucher = async (req, res) => {
         try {
           result = await getRouter(rRes.rows[0]).removeVoucher(v.code);
         } catch (err) {
+          console.error('Revoke voucher: router could not be used:', err.message);
           result = { ok: false };
         }
         if (!result || !result.ok) {

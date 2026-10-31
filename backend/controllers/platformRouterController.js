@@ -18,6 +18,7 @@ const listAllRouters = async (req, res) => {
 
     return res.status(200).json({ success: true, data: formattedData });
   } catch (error) {
+    console.error('List all routers error:', error);
     return res.status(500).json({ success: false, error: 'Failed to list routers' });
   }
 };

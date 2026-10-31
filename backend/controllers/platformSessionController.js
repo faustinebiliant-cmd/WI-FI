@@ -22,6 +22,7 @@ const listAllSessions = async (req, res) => {
 
     return res.status(200).json({ success: true, data: enriched });
   } catch (error) {
+    console.error('List all sessions error:', error);
     return res.status(500).json({ success: false, error: 'Failed to list sessions' });
   }
 };
@@ -39,6 +40,7 @@ const forceDisconnect = async (req, res) => {
     try {
       result = await getRouter(session).disconnectUser(session.mac_address);
     } catch (err) {
+      console.error('Force disconnect: router could not be used:', err.message);
       result = { ok: false };
     }
     if (!result || !result.ok) {

@@ -24,6 +24,7 @@ const getActiveSessions = async (req, res) => {
 
     return res.status(200).json({ success: true, data: enriched });
   } catch (error) {
+    console.error('List active sessions error:', error);
     return res.status(500).json({ success: false, error: 'Failed to fetch active sessions' });
   }
 };
@@ -47,6 +48,7 @@ const disconnectSession = async (req, res) => {
     try {
       result = await getRouter(session).disconnectUser(session.mac_address);
     } catch (err) {
+      console.error('Disconnect: router could not be used:', err.message);
       result = { ok: false };
     }
     if (!result || !result.ok) {
@@ -60,6 +62,7 @@ const disconnectSession = async (req, res) => {
 
     return res.status(200).json({ success: true, message: 'Customer disconnected' });
   } catch (error) {
+    console.error('Disconnect session error:', error);
     return res.status(500).json({ success: false, error: 'Failed to disconnect session' });
   }
 };

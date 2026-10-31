@@ -26,6 +26,7 @@ const listAuditLogs = async (req, res) => {
       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
   } catch (error) {
+    console.error('List audit logs error:', error);
     return res.status(500).json({ success: false, error: 'Failed to list audit logs' });
   }
 };

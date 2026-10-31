@@ -80,6 +80,7 @@ const getTenant = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Get tenant error:', error);
     return res.status(500).json({ success: false, error: 'Failed to get tenant' });
   }
 };
@@ -104,6 +105,7 @@ const toggleTenantStatus = async (req, res) => {
 
     return res.status(200).json({ success: true, message: `Tenant ${action}ed successfully`, data: rows[0] });
   } catch (error) {
+    console.error('Update tenant status error:', error);
     return res.status(500).json({ success: false, error: 'Failed to update tenant status' });
   }
 };
@@ -145,6 +147,7 @@ const impersonateTenant = async (req, res) => {
       tenant_user: { full_name: owner.full_name, email: owner.email }
     });
   } catch (error) {
+    console.error('Start impersonation error:', error);
     return res.status(500).json({ success: false, error: 'Failed to start impersonation' });
   }
 };
