@@ -132,6 +132,9 @@ const getBootstrapScript = async (req, res) => {
 
 /ip firewall filter add chain=input action=accept protocol=tcp dst-port=8728 in-interface=wg-vps src-address=10.20.0.1 place-before=0 comment="Allow VPS API through WireGuard"
 /ip firewall filter add chain=forward action=drop src-address=192.168.88.0/24 out-interface=wg-vps place-before=0 comment="Customers cannot use VPS tunnel"
+# FastTrack skips the hotspot speed limits (a 1 Mbps package got the full line speed).
+# The factory "accept established,related" rule below it still lets the traffic through.
+/ip firewall filter disable [find action=fasttrack-connection]
 
 /ip hotspot profile set [find default=yes] login-by=http-pap
 /ip hotspot profile add name=hsprof1 hotspot-address=192.168.88.1 html-directory=flash/hotspot login-by=http-pap,mac-cookie http-cookie-lifetime=30d
