@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Background Router Pinger
+// Oswagolink - Background Router Pinger
 // Runs once: checks every router, updates its status, then exits.
 // ============================================================
 const db = require('../config/db');

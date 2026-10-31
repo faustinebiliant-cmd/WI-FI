@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Mock Router
+// Oswagolink - Mock Router
 // Used for development before real MikroTik hardware arrives.
 // Has the same methods as MikroTikRouter, so every caller works in mock mode.
 // ============================================================

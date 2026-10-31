@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Input Validators
+// Oswagolink - Input Validators
 // ============================================================
 
 const isValidEmail = (email) => {

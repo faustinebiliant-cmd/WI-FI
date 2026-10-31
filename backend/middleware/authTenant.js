@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Tenant Auth Middleware
+// Oswagolink - Tenant Auth Middleware
 // ============================================================
 const { verifyTenantToken } = require('../services/jwt');
 const db = require('../config/db');

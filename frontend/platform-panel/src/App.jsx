@@ -30,7 +30,7 @@ const PlatformShell = () => {
       user={admin} 
       onLogout={logout} 
       menuItems={menuItems}
-      title="OSWAGOTech"
+      title="Oswagolink"
       subtitle="Platform Admin"
     >
       <Outlet />

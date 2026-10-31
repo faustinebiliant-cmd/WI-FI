@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Timezone Helper (EAT)
+// Oswagolink - Timezone Helper (EAT)
 // ------------------------------------------------------------
 // EAT = Africa/Dar_es_Salaam = UTC+3, no DST.
 //

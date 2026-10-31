@@ -59,7 +59,7 @@ const TenantShell = () => {
           user={user}
           onLogout={logout}
           menuItems={menuItems}
-          title="OSWAGOTech WiFi"
+          title="Oswagolink"
           subtitle="Business Panel"
         >
           <Outlet />
@@ -75,7 +75,7 @@ const ForcedPasswordChange = () => {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <p className="auth-brand">OSWAGOTech WiFi</p>
+        <p className="auth-brand">Oswagolink</p>
         <h1 className="auth-title">Choose a New Password</h1>
         <p className="auth-sub">You are using a temporary password. Choose your own password to continue.</p>
         <ChangePasswordForm onSuccess={markPasswordChanged} />

@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Encryption Service
+// Oswagolink - Encryption Service
 // Used to encrypt MikroTik API passwords before saving to DB
 // ============================================================
 const crypto = require('crypto');

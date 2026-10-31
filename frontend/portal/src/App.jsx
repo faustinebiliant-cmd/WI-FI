@@ -328,7 +328,11 @@ export default function App() {
           </form>
         )}
 
-        <p className="portal-footer">Powered by OSWAGOTech WiFi</p>
+        <p className="portal-footer">
+          Powered by{' '}
+          {/* New tab, so the customer does not lose the login page */}
+          <a href="https://oswagolink.co.tz/" target="_blank" rel="noopener noreferrer">Oswagolink</a>
+        </p>
       </div>
     </div>
   );

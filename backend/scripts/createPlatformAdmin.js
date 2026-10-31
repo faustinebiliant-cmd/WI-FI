@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Create Platform Admin (Raw PostgreSQL)
+// Oswagolink - Create Platform Admin (Raw PostgreSQL)
 // Run: node scripts/createPlatformAdmin.js
 // ============================================================
 const readline = require('readline');

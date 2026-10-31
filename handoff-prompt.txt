@@ -1,7 +1,7 @@
-# OSWAGOTech WiFi — Master Project Handoff (V1.0 Live)
+# Oswagolink — Master Project Handoff (V1.0 Live)
 
 ## 1. PROJECT IDENTITY
-I am building OSWAGOTech WiFi, a multi-tenant hotspot billing SaaS for hotels and guest houses in Tanzania. The business model is voucher-based: guests buy a paper code at reception, enter it on a captive portal, and get WiFi for a set duration and speed.
+I am building Oswagolink, a multi-tenant hotspot billing SaaS for hotels and guest houses in Tanzania. The business model is voucher-based: guests buy a paper code at reception, enter it on a captive portal, and get WiFi for a set duration and speed.
 
 ## 2. CURRENT STATUS: LIVE ON VPS (DOMAIN + SSL)
 - The system is fully deployed, running live, and secured with HTTPS.

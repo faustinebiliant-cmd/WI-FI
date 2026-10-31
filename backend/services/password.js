@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Password Service
+// Oswagolink - Password Service
 // ============================================================
 const bcrypt = require('bcrypt');
 

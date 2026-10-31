@@ -24,7 +24,7 @@ export default function SetupGuidePage() {
       <div className="page-header">
         <div>
           <h1>Router Setup Guide</h1>
-          <p>How to connect a new MikroTik hEX and set it up for a business. For OSWAGOTech technicians only.</p>
+          <p>How to connect a new MikroTik hEX and set it up for a business. For Oswagolink technicians only.</p>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Database Connection (Raw PostgreSQL)
+// Oswagolink - Database Connection (Raw PostgreSQL)
 // ============================================================
 const { Pool } = require('pg');
 const env = require('./env');

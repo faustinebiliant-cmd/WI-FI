@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Platform Auth Routes
+// Oswagolink - Platform Auth Routes
 // ============================================================
 const express = require('express');
 const router = express.Router();

@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Subscription Guard
+// Oswagolink - Subscription Guard
 // A suspended tenant, or one whose trial has ended, is blocked
 // from the tenant panel and from the customer portal.
 // ============================================================
@@ -18,7 +18,7 @@ const TENANT_BLOCKED_SQL = `(
 const TENANT_BLOCKED_ERROR = {
   success: false,
   code: 'TENANT_SUSPENDED',
-  error: 'This account is suspended or its trial has ended. Please contact OSWAGOTech.'
+  error: 'This account is suspended or its trial has ended. Please contact Oswagolink.'
 };
 
 // What customers see on the portal of a blocked tenant

@@ -29,7 +29,7 @@ export default function LoginPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <p className="auth-brand">OSWAGOTech WiFi</p>
+        <p className="auth-brand">Oswagolink</p>
         <h1 className="auth-title">Business Login</h1>
         <p className="auth-sub">Log in to manage your WiFi hotspot.</p>
 

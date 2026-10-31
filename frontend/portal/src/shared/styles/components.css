@@ -8,6 +8,8 @@
 .portal-title { font-size: 22px; font-weight: 700; margin: 0 0 6px 0; }
 .portal-sub { color: var(--gray); font-size: 14px; margin: 0 0 20px 0; }
 .portal-footer { font-size: 12px; color: var(--gray-light); margin: 28px 0 0 0; }
+.portal-footer a { color: var(--primary); font-weight: 600; }
+.portal-footer a:hover { text-decoration: underline; }
 
 .alert { padding: 10px 14px; border-radius: var(--radius-sm); margin: 0 0 16px 0; font-size: 13px; text-align: left; line-height: 1.5; }
 .alert-danger { background: var(--danger-soft); color: #b91c1c; }

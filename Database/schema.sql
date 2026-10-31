@@ -1,5 +1,5 @@
 -- ============================================================
--- OSWAGOTech WiFi - Complete Database Schema (source of truth)
+-- Oswagolink - Complete Database Schema (source of truth)
 --
 -- A NEW database: run this file only; it already contains every change.
 -- An EXISTING database: run only the files in Database/migrations/ that

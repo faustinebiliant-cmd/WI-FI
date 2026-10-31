@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Tenant Dashboard Controller
+// Oswagolink - Tenant Dashboard Controller
 // ============================================================
 const db = require('../config/db');
 const { getTodayRangeEAT, formatDateEAT } = require('../utils/tz');

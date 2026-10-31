@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Environment
+// Oswagolink - Environment
 // ------------------------------------------------------------
 // The one place process.env is read and validated.
 //

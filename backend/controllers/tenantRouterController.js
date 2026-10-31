@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Tenant Router Controller
+// Oswagolink - Tenant Router Controller
 // ============================================================
 const crypto = require('crypto');
 const { execFile } = require('child_process');
@@ -153,14 +153,14 @@ const deleteRouter = async (req, res) => {
       if (!removed) {
         return res.status(503).json({
           success: false,
-          error: 'The router\'s VPN tunnel could not be removed from the server, so the router was NOT deleted. Please try again in a minute. If it keeps failing, contact OSWAGOTech support.'
+          error: 'The router\'s VPN tunnel could not be removed from the server, so the router was NOT deleted. Please try again in a minute. If it keeps failing, contact Oswagolink support.'
         });
       }
     } else if (router.provisioned_at) {
       // Set up by an older version that did not save the key: the peer cannot be found automatically
       return res.status(409).json({
         success: false,
-        error: 'This router was set up with an older version. OSWAGOTech support must remove its VPN tunnel before it can be deleted. Please contact support.'
+        error: 'This router was set up with an older version. Oswagolink support must remove its VPN tunnel before it can be deleted. Please contact support.'
       });
     }
 

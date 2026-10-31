@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# OSWAGOTech WiFi - remove a router's WireGuard peer on the VPS
+# Oswagolink - remove a router's WireGuard peer on the VPS
 # Install: sudo install -o root -g root -m 755 vps/wifi-wireguard-remove-peer /usr/local/sbin/wifi-wireguard-remove-peer
 # Called by the backend (tenantRouterController) through sudo, without a shell.
 # The backend deletes the router ONLY if this script exits with 0.

@@ -10,7 +10,7 @@ export default function DashboardLayout({
   user, 
   onLogout, 
   menuItems, 
-  title = "OSWAGOTech WiFi", 
+  title = "Oswagolink", 
   subtitle = "Dashboard",
   banner = null,
   children 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# OSWAGOTech WiFi - add a router's WireGuard peer on the VPS
+# Oswagolink - add a router's WireGuard peer on the VPS
 # Install: sudo install -o root -g root -m 755 vps/wifi-wireguard-add-peer /usr/local/sbin/wifi-wireguard-add-peer
 # Called by the backend (provisionController) through sudo, without a shell.
 # ============================================================

@@ -1,4 +1,4 @@
-# OSWAGOTech WiFi - nightly database backup (see vps/wifi-db-backup)
+# Oswagolink - nightly database backup (see vps/wifi-db-backup)
 # Install: sudo install -o root -g root -m 644 vps/wifi-db-backup.cron /etc/cron.d/wifi-db-backup
 # Runs at 00:00 VPS time; on a UTC server that is 03:00 in Tanzania (EAT).
 # Replace DATABASE_NAME with the DB_NAME from the backend .env before installing.

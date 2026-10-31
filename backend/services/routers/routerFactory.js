@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Router Factory
+// Oswagolink - Router Factory
 // ============================================================
 const env = require('../../config/env');
 const MockRouter = require('./MockRouter');

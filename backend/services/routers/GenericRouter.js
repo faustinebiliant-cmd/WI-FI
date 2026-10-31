@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Generic Router Adapter
+// Oswagolink - Generic Router Adapter
 // For routers that do not have a programmable API (e.g. TP-Link)
 // Speed limits and timeouts are managed by the cloud portal,
 // not the hardware.

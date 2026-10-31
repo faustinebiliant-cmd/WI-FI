@@ -1,8 +1,8 @@
 {
-  "name": "oswagotech-wifi-backend",
+  "name": "oswagolink-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "OSWAGOTech WiFi - multi-tenant hotspot billing backend",
+  "description": "Oswagolink - multi-tenant hotspot billing backend",
   "main": "server.js",
   "engines": {
     "node": ">=20"

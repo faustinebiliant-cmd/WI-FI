@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# OSWAGOTech WiFi - nightly database backup on the VPS
+# Oswagolink - nightly database backup on the VPS
 # Install: sudo install -o root -g root -m 750 vps/wifi-db-backup /usr/local/sbin/wifi-db-backup
 #          sudo install -o root -g root -m 644 vps/wifi-db-backup.cron /etc/cron.d/wifi-db-backup
 # Test:    sudo /usr/local/sbin/wifi-db-backup DATABASE_NAME

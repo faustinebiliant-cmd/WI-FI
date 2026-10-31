@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - MikroTik Router Adapter
+// Oswagolink - MikroTik Router Adapter
 // Works with ANY client router. Nothing here is specific to one
 // router: everything comes from the router record in the database
 // (ip_address, api_port, api_username, api_password_encrypted).

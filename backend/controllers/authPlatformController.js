@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Platform Auth Controller
+// Oswagolink - Platform Auth Controller
 // ============================================================
 const db = require('../config/db');
 const { verifyPassword } = require('../services/password');

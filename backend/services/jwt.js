@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - JWT Service
+// Oswagolink - JWT Service
 // ============================================================
 const jwt = require('jsonwebtoken');
 const env = require('../config/env');

@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Server
+// Oswagolink - Server
 // ============================================================
 
 // Env must load first. config/env.js runs every boot check and
@@ -198,7 +198,7 @@ const { startSessionCleaner } = require('./services/sessionCleaner');
 const LISTEN_HOST = '127.0.0.1';
 const server = app.listen(env.PORT, LISTEN_HOST, () => {
   console.log('========================================');
-  console.log('   OSWAGOTECH WIFI');
+  console.log('   OSWAGOLINK');
   console.log('========================================');
   console.log(`   Server:      http://${LISTEN_HOST}:${env.PORT}`);
   console.log(`   Environment: ${env.NODE_ENV}`);

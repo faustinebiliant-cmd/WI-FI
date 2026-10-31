@@ -1,5 +1,5 @@
 // ============================================================
-// OSWAGOTech WiFi - Platform Tenant Routes
+// Oswagolink - Platform Tenant Routes
 // ============================================================
 const express = require('express');
 const router = express.Router();

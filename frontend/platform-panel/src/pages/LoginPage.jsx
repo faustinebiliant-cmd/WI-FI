@@ -32,9 +32,9 @@ export default function LoginPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <p className="auth-brand">OSWAGOTech WiFi</p>
+        <p className="auth-brand">Oswagolink</p>
         <h1 className="auth-title">Platform Admin</h1>
-        <p className="auth-sub">For OSWAGOTech staff only.</p>
+        <p className="auth-sub">For Oswagolink staff only.</p>
 
         {error && <div className="alert alert-danger">{error}</div>}
 

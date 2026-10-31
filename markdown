@@ -1,4 +1,4 @@
-# OSWAGOTech WiFi - Localhost vs VPS Checklist
+# Oswagolink - Localhost vs VPS Checklist
 
 ## PART 1: THE "LOCALHOST" SETUP (For your Windows PC)
 Use exactly this code while you are building and testing on your laptop.
