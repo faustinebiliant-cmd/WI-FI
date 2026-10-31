@@ -15,16 +15,16 @@ export default function DashboardPage() {
   }, []);
 
   if (loading) return <Loader message="Loading dashboard..." />;
-  if (!stats) return <div>Failed to load stats.</div>;
+  if (!stats) return <div className="alert alert-danger">Could not load the dashboard. Refresh the page to try again.</div>;
 
   const StatCard = ({ title, value, icon: Icon, color, bg }) => (
-    <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-      <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: bg, color: color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon size={24} />
+    <div className="stat-card">
+      <div className="stat-icon" style={{ backgroundColor: bg, color: color }}>
+        <Icon size={22} />
       </div>
       <div>
-        <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--dark)', lineHeight: '1.2' }}>{value}</div>
-        <div style={{ fontSize: '13px', color: 'var(--gray)', fontWeight: '500' }}>{title}</div>
+        <div className="stat-value">{value}</div>
+        <div className="stat-label">{title}</div>
       </div>
     </div>
   );
@@ -41,7 +41,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+      <div className="stat-grid">
         <StatCard title="Active Customers Online" value={stats.activeCustomers} icon={FiUsers} color="var(--primary)" bg="var(--primary-soft)" />
         <StatCard title="Vouchers Used Today" value={stats.vouchersUsedToday} icon={FiClock} color="var(--info)" bg="#eff6ff" />
         <StatCard title="Vouchers Used (total)" value={stats.totalVouchers - stats.unusedVouchers} icon={FiCheckCircle} color="var(--success)" bg="var(--success-soft)" />

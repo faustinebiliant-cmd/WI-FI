@@ -55,67 +55,70 @@ export default function TenantDetailPage() {
     }
   };
 
-  if (loading) return <Loader message="Loading tenant details..." />;
-  if (!tenant) return <div>Tenant not found.</div>;
+  if (loading) return <Loader message="Loading business details..." />;
+  if (!tenant) return <div className="alert alert-danger">Business not found.</div>;
 
   return (
     <div>
-      <Link to="/" style={{ color: 'var(--primary)', textDecoration: 'none', marginBottom: '20px', display: 'inline-block', fontWeight: '600' }}>
-        &larr; Back to Tenants
+      <Link to="/" className="back-link">
+        &larr; Back to Businesses
       </Link>
-      
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '30px' }}>
+
+      <div className="page-header">
         <div>
-          <h1 style={{ margin: 0 }}>{tenant.business_name}</h1>
-          <p style={{ color: 'var(--gray)', marginTop: '5px' }}>Tenant ID: {tenant.id}</p>
+          <h1>{tenant.business_name}</h1>
+          <p>Business ID: {tenant.id}</p>
         </div>
-        <div style={{ width: '100%', maxWidth: '250px' }}>
-          <button 
-            onClick={() => setShowImpersonate(true)}
-            className="btn btn-primary"
-            style={{ width: '100%', backgroundColor: '#f59e0b', boxShadow: 'none' }}
-          >
-            Impersonate Owner
-          </button>
-        </div>
+        <button onClick={() => setShowImpersonate(true)} className="btn btn-warning">
+          Impersonate Owner
+        </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+      <div className="detail-grid">
         <div className="card">
-          <h3 style={{ marginTop: 0, borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>Owner Details</h3>
-          <p style={{ marginBottom: '10px' }}><strong>Name:</strong> {tenant.owner_name}</p>
-          <p style={{ marginBottom: '10px' }}><strong>Email:</strong> {tenant.owner_email}</p>
-          <p style={{ marginBottom: '10px' }}><strong>Phone:</strong> {tenant.owner_phone}</p>
-          <p style={{ marginBottom: '10px' }}><strong>Status:</strong> <span className={`badge ${tenant.subscription_status === 'active' ? 'badge-success' : 'badge-warning'}`}>{tenant.subscription_status}</span></p>
+          <h2 className="section-title">Owner Details</h2>
+          <dl className="detail-list">
+            <dt>Name</dt><dd>{tenant.owner_name}</dd>
+            <dt>Email</dt><dd>{tenant.owner_email}</dd>
+            <dt>Phone</dt><dd>{tenant.owner_phone}</dd>
+            <dt>Status</dt>
+            <dd><span className={`badge ${tenant.subscription_status === 'active' ? 'badge-success' : 'badge-warning'}`}>{tenant.subscription_status}</span></dd>
+          </dl>
         </div>
 
         <div className="card">
-          <h3 style={{ marginTop: 0, borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>System Stats</h3>
-          <p style={{ marginBottom: '10px' }}><strong>Routers Registered:</strong> {tenant.router_count}</p>
-          <p style={{ marginBottom: '10px' }}><strong>Active Customers Right Now:</strong> {tenant.active_sessions}</p>
+          <h2 className="section-title">System Stats</h2>
+          <dl className="detail-list">
+            <dt>Routers registered</dt><dd>{tenant.router_count}</dd>
+            <dt>Customers online now</dt><dd>{tenant.active_sessions}</dd>
+          </dl>
         </div>
       </div>
 
       {showImpersonate && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 style={{ marginTop: 0 }}>Impersonate Tenant</h2>
-            <p style={{ color: 'var(--gray)', fontSize: '14px' }}>As <strong>{tenant.owner_name}</strong></p>
-            
-            {error && <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>{error}</div>}
+            <h2 className="modal-title">Impersonate Owner</h2>
+            <p className="modal-sub">You will see the Business Panel as <strong>{tenant.owner_name}</strong>. The reason is saved in the Audit Logs.</p>
 
-            <form onSubmit={handleImpersonate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <textarea 
-                required
-                placeholder="Reason"
-                value={reason}
-                onChange={e => setReason(e.target.value)}
-                className="form-control"
-                style={{ height: '100px', resize: 'vertical', fontFamily: 'inherit' }}
-              />
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button type="button" onClick={() => setShowImpersonate(false)} className="btn btn-secondary" style={{ flex: 1 }}>Cancel</button>
-                <button type="submit" disabled={working} className="btn btn-primary" style={{ flex: 2, backgroundColor: '#f59e0b', boxShadow: 'none' }}>
+            {error && <div className="alert alert-danger">{error}</div>}
+
+            <form onSubmit={handleImpersonate}>
+              <div className="form-group">
+                <label>Reason (at least 10 characters)</label>
+                <textarea
+                  required
+                  placeholder="e.g. Owner asked for help creating packages"
+                  value={reason}
+                  onChange={e => setReason(e.target.value)}
+                  className="form-control"
+                  rows={4}
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setShowImpersonate(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" disabled={working} className="btn btn-warning">
                   {working ? 'Starting...' : 'Start Impersonation'}
                 </button>
               </div>

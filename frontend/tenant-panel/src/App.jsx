@@ -5,6 +5,7 @@ import DashboardLayout from './shared/components/DashboardLayout';
 import { FiHome, FiTag, FiPackage, FiWifi, FiActivity, FiSettings } from 'react-icons/fi';
 import apiClient from './api/client';
 import ChangePasswordForm from './components/ChangePasswordForm';
+import Loader from './shared/components/Loader';
 
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -42,30 +43,24 @@ const TenantShell = () => {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      
+    <div>
       {isImpersonating && (
-        <div style={{ 
-          position: 'fixed', top: 0, left: 0, right: 0, height: '50px', 
-          backgroundColor: '#f59e0b', color: 'white', display: 'flex', 
-          justifyContent: 'space-between', alignItems: 'center', 
-          padding: '0 20px', fontWeight: '600', zIndex: 9999 
-        }}>
-          <span>You are impersonating {user?.full_name}</span>
-          <button onClick={handleEndImpersonation} style={{ backgroundColor: 'white', color: '#f59e0b', border: 'none', padding: '6px 16px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>
+        <div className="impersonation-banner">
+          <span>Viewing as {user?.full_name}</span>
+          <button onClick={handleEndImpersonation} className="btn btn-sm">
             End Impersonation
           </button>
         </div>
       )}
 
-      {/* The paddingTop pushes the app down so the 50px banner doesn't hide anything */}
-      <div style={{ paddingTop: isImpersonating ? '50px' : '0' }}>
-        <DashboardLayout 
-          user={user} 
-          onLogout={logout} 
+      {/* has-banner moves the page, the menu and the phone top bar below the 50px banner */}
+      <div className={isImpersonating ? 'has-banner' : undefined}>
+        <DashboardLayout
+          user={user}
+          onLogout={logout}
           menuItems={menuItems}
           title="OSWAGOTech WiFi"
-          subtitle="Tenant Panel"
+          subtitle="Business Panel"
         >
           <Outlet />
         </DashboardLayout>
@@ -78,12 +73,13 @@ const TenantShell = () => {
 const ForcedPasswordChange = () => {
   const { markPasswordChanged, logout } = useAuth();
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6', padding: '20px' }}>
-      <div style={{ padding: '40px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px' }}>
-        <h2 style={{ textAlign: 'center', marginBottom: '10px', fontSize: '24px' }}>Choose a New Password</h2>
-        <p style={{ textAlign: 'center', color: '#6b7280', marginBottom: '20px' }}>You are using a temporary password. Choose your own password to continue.</p>
+    <div className="auth-page">
+      <div className="auth-card">
+        <p className="auth-brand">OSWAGOTech WiFi</p>
+        <h1 className="auth-title">Choose a New Password</h1>
+        <p className="auth-sub">You are using a temporary password. Choose your own password to continue.</p>
         <ChangePasswordForm onSuccess={markPasswordChanged} />
-        <button onClick={logout} style={{ width: '100%', marginTop: '10px', padding: '10px', backgroundColor: 'transparent', border: 'none', color: '#6b7280', cursor: 'pointer' }}>
+        <button onClick={logout} className="btn btn-link btn-block" style={{ marginTop: '8px' }}>
           Log out
         </button>
       </div>
@@ -93,7 +89,7 @@ const ForcedPasswordChange = () => {
 
 const ProtectedRoute = () => {
   const { user, loading } = useAuth();
-  if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>;
+  if (loading) return <Loader message="Loading..." />;
   if (!user) return <Navigate to="/login" replace />;
   const isImpersonating = localStorage.getItem('is_impersonating') === 'true';
   if (user.must_change_password && !isImpersonating) return <ForcedPasswordChange />;

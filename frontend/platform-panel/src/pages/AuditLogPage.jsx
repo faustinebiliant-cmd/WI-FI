@@ -14,36 +14,38 @@ export default function AuditLogPage() {
   }, []);
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '30px' }}>
-        <h1 style={{ margin: 0 }}>Audit Logs</h1>
-        <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Recent actions taken by Platform Admins (EAT).</p>
+    <div className="page-wrapper">
+      <div className="page-header">
+        <div>
+          <h1>Audit Logs</h1>
+          <p>Recent actions taken by Platform Admins (EAT).</p>
+        </div>
       </div>
 
-      <div style={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div className="table-container">
         {loading ? (
           <Loader message="Loading logs..." />
         ) : logs.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center' }}>No audit logs yet.</div>
+          <div className="table-empty">No audit logs yet.</div>
         ) : (
-          <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+          <table>
+            <thead>
               <tr>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Time (EAT)</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Admin</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Action</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Details</th>
+                <th>Time (EAT)</th>
+                <th>Admin</th>
+                <th>Action</th>
+                <th>Details</th>
               </tr>
             </thead>
             <tbody>
               {logs.map((log) => (
-                <tr key={log.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '16px 20px', fontSize: '13px', color: '#6b7280', whiteSpace: 'nowrap' }}>
+                <tr key={log.id}>
+                  <td className="cell-muted">
                     {log.created_at_eat}
                   </td>
-                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{log.admin_email}</td>
-                  <td style={{ padding: '16px 20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{log.action}</td>
-                  <td style={{ padding: '16px 20px', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                  <td>{log.admin_email}</td>
+                  <td className="cell-strong">{log.action}</td>
+                  <td className="col-wrap">
                     {log.target_label ? `Target: ${log.target_label}` : ''}
                     {log.details?.reason ? ` - Reason: ${log.details.reason}` : ''}
                   </td>

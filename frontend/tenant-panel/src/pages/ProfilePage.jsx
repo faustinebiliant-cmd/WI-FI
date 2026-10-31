@@ -36,17 +36,18 @@ export default function ProfilePage() {
   if (loading) return <Loader message="Loading profile..." />;
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+    <div className="narrow-page">
       <div className="page-header">
         <div>
-          <h1 style={{ margin: 0 }}>Business Settings</h1>
+          <h1>Business Settings</h1>
           <p>Manage your payout details for customer payments.</p>
         </div>
       </div>
 
       <div className="card">
-        {message && <div style={{ padding: '10px', marginBottom: '15px', backgroundColor: message.includes('success') ? 'var(--success-soft)' : 'var(--danger-soft)', color: message.includes('success') ? 'var(--success)' : 'var(--danger)', borderRadius: '6px' }}>{message}</div>}
-        
+        <h2 className="section-title">Payment Details</h2>
+        {message && <div className={`alert ${message.includes('success') ? 'alert-success' : 'alert-danger'}`}>{message}</div>}
+
         <form onSubmit={handleSave}>
           <div className="form-group">
             <label>Business Name</label>
@@ -68,17 +69,17 @@ export default function ProfilePage() {
           <div className="form-group">
             <label>Lipa Namba (Payment Number)</label>
             <input className="form-control" type="text" placeholder="e.g. 123456" value={profile.lipa_namba || ''} onChange={e => setProfile({...profile, lipa_namba: e.target.value})} required />
-            <p style={{ fontSize: '12px', color: 'var(--gray)', marginTop: '5px' }}>This is where the money will be sent when customers buy WiFi.</p>
+            <p className="form-hint">This is where the money will be sent when customers buy WiFi.</p>
           </div>
 
-          <button type="submit" className="btn btn-primary" disabled={saving} style={{ width: '100%', marginTop: '10px' }}>
+          <button type="submit" className="btn btn-primary btn-block" disabled={saving}>
             {saving ? 'Saving...' : 'Save Payment Details'}
           </button>
         </form>
       </div>
 
-      <div className="card" style={{ marginTop: '20px' }}>
-        <h3 style={{ marginTop: 0 }}>Change Password</h3>
+      <div className="card">
+        <h2 className="section-title">Change Password</h2>
         <ChangePasswordForm />
       </div>
     </div>

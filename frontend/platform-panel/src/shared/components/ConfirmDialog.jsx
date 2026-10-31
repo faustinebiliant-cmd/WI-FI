@@ -16,39 +16,29 @@ export default function ConfirmDialog({
 
   return (
     <div className="modal-overlay" onClick={loading ? undefined : onCancel}>
-      <div 
-        className="modal-content" 
+      <div
+        className="modal-content modal-narrow modal-center"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '400px', textAlign: 'center', padding: '32px 24px' }}
       >
-        <div style={{ 
-          width: '48px', height: '48px', borderRadius: '50%', margin: '0 auto 16px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backgroundColor: variant === 'danger' ? 'var(--danger-soft)' : 'var(--primary-soft)',
-          color: variant === 'danger' ? 'var(--danger)' : 'var(--primary)'
-        }}>
+        <div className={`dialog-icon ${variant === 'danger' ? '' : 'primary'}`}>
           <FiAlertCircle size={24} />
         </div>
-        
-        <h2 style={{ fontSize: '20px', marginBottom: '8px', color: 'var(--dark)' }}>{title}</h2>
-        <p style={{ color: 'var(--gray)', fontSize: '14px', marginBottom: '24px', lineHeight: 1.5 }}>
-          {message}
-        </p>
 
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-          <button 
-            className="btn btn-secondary" 
+        <h2 className="modal-title">{title}</h2>
+        <p className="modal-sub">{message}</p>
+
+        <div className="modal-actions">
+          <button
+            className="btn btn-secondary"
             onClick={onCancel}
             disabled={loading}
-            style={{ flex: 1 }}
           >
             {cancelLabel}
           </button>
-          <button 
-            className={`btn ${variant === 'danger' ? 'btn-danger' : 'btn-primary'}`}
+          <button
+            className={`btn ${variant === 'danger' ? 'btn-solid-danger' : 'btn-primary'}`}
             onClick={onConfirm}
             disabled={loading}
-            style={{ flex: 1 }}
           >
             {loading ? 'Processing...' : confirmLabel}
           </button>

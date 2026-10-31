@@ -188,25 +188,33 @@ export default function App() {
     }
   };
 
+  const packages = businessInfo?.packages || [];
+  const isLocked = lockoutTimeLeft > 0;
+  const lockClock = `${Math.floor(lockoutTimeLeft / 60)}:${String(lockoutTimeLeft % 60).padStart(2, '0')}`;
+
   if (status === 'success') {
+    const end = successData.expires_at && Number.isFinite(successData.remaining_minutes) ? formatEnd(successData.expires_at) : null;
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backgroundColor: 'var(--light)' }}>
-        <div className="card" style={{ maxWidth: '400px', textAlign: 'center', padding: '40px' }}>
-          <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'var(--success)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', margin: '0 auto 20px' }}>✓</div>
-          <h1 style={{ fontSize: '24px', marginBottom: '10px' }}>Connected!</h1>
-          {successData.expires_at && Number.isFinite(successData.remaining_minutes) && formatEnd(successData.expires_at) ? (
-            <p style={{ color: 'var(--gray)', marginBottom: '20px' }}>
-              {successData.resumed ? 'Welcome back! ' : ''}You have internet until <strong>{formatEnd(successData.expires_at)}</strong> ({formatLeft(successData.remaining_minutes)} left) at <strong>{successData.speed_down_mbps} Mbps</strong>.
-            </p>
+      <div className="portal-page">
+        <div className="portal-card">
+          <div className="success-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>
+          </div>
+          <h1 className="portal-title">{successData.resumed ? 'Welcome back!' : 'Connected!'}</h1>
+          <p className="portal-sub">Enjoy your internet.</p>
+
+          <div className="success-time">
+            {end ? (
+              <>You have internet until <strong>{end}</strong><br />({formatLeft(successData.remaining_minutes)} left) at <strong>{successData.speed_down_mbps} Mbps</strong></>
+            ) : (
+              <>You have internet for <strong>{formatDuration(successData.duration_minutes)}</strong> at <strong>{successData.speed_down_mbps} Mbps</strong></>
+            )}
+          </div>
+
+          {loginUrl ? (
+            <span className="unlocking"><span className="spinner-sm" /> Unlocking internet...</span>
           ) : (
-            <p style={{ color: 'var(--gray)', marginBottom: '20px' }}>You have internet access for <strong>{formatDuration(successData.duration_minutes)}</strong> at <strong>{successData.speed_down_mbps} Mbps</strong>.</p>
-          )}
-          
-          {loginUrl && (
-            <p style={{ fontSize: '13px', color: 'var(--primary)', fontWeight: 'bold' }}>Unlocking internet...</p>
-          )}
-          {!loginUrl && (
-            <button onClick={() => window.location.reload()} className="btn btn-secondary" style={{ width: '100%' }}>Done</button>
+            <button onClick={() => window.location.reload()} className="btn btn-secondary btn-block">Done</button>
           )}
         </div>
       </div>
@@ -214,60 +222,59 @@ export default function App() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backgroundColor: 'var(--light)' }}>
-      <div className="card" style={{ maxWidth: '450px', textAlign: 'center', padding: '40px', width: '100%' }}>
-        
-        <div style={{ width: '64px', height: '64px', borderRadius: '16px', backgroundColor: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: 'bold', margin: '0 auto 20px' }}>
-          {businessInfo?.business_name ? businessInfo.business_name.charAt(0) : 'W'}
+    <div className="portal-page">
+      <div className="portal-card">
+        <div className="portal-logo">
+          {businessInfo?.business_name ? businessInfo.business_name.charAt(0).toUpperCase() : 'W'}
         </div>
-        <h1 style={{ fontSize: '22px', marginBottom: '8px' }}>{businessInfo?.business_name || 'Welcome'}</h1>
-        
-        {errorMessage && <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '20px', fontSize: '13px' }}>{errorMessage}</div>}
+        <h1 className="portal-title">{businessInfo?.business_name || 'Welcome'}</h1>
+        <p className="portal-sub">
+          {PAYMENTS_ENABLED && activeTab === 'buy' ? 'Choose a package to buy.' : 'Enter your voucher code to connect.'}
+        </p>
+
+        {errorMessage && <div className="alert alert-danger">{errorMessage}</div>}
 
         {PAYMENTS_ENABLED && (
-        <div style={{ display: 'flex', borderBottom: '2px solid #e5e7eb', marginBottom: '20px' }}>
-          <button onClick={() => { setActiveTab('buy'); setErrorMessage(''); setSelectedPackage(null); }} style={{ flex: 1, padding: '10px', background: 'none', border: 'none', borderBottom: activeTab === 'buy' ? '2px solid var(--primary)' : 'none', fontWeight: activeTab === 'buy' ? 'bold' : 'normal', color: activeTab === 'buy' ? 'var(--primary)' : 'var(--gray)', cursor: 'pointer', marginBottom: '-2px' }}>Buy WiFi</button>
-          <button onClick={() => { setActiveTab('voucher'); setErrorMessage(''); setSelectedPackage(null); }} style={{ flex: 1, padding: '10px', background: 'none', border: 'none', borderBottom: activeTab === 'voucher' ? '2px solid var(--primary)' : 'none', fontWeight: activeTab === 'voucher' ? 'bold' : 'normal', color: activeTab === 'voucher' ? 'var(--primary)' : 'var(--gray)', cursor: 'pointer', marginBottom: '-2px' }}>Have a Voucher?</button>
+        <div className="tabs">
+          <button className={`tab ${activeTab === 'buy' ? 'active' : ''}`} onClick={() => { setActiveTab('buy'); setErrorMessage(''); setSelectedPackage(null); }}>Buy WiFi</button>
+          <button className={`tab ${activeTab === 'voucher' ? 'active' : ''}`} onClick={() => { setActiveTab('voucher'); setErrorMessage(''); setSelectedPackage(null); }}>Have a Voucher?</button>
         </div>
         )}
 
         {PAYMENTS_ENABLED && activeTab === 'buy' && (
           <div>
             {!selectedPackage ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {businessInfo?.packages?.length > 0 ? businessInfo.packages.map(pkg => (
-                  <div key={pkg.id} onClick={() => handleBuy(pkg)} style={{ padding: '15px', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white' }}>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontWeight: 'bold' }}>{pkg.name}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--gray)' }}>{formatDuration(pkg.duration_minutes)} at {pkg.speed_down_kbps / 1024} Mbps</div>
-                    </div>
-                    <div style={{ fontWeight: 'bold', color: 'var(--primary)' }}>TZS {pkg.price_tzs.toLocaleString()}</div>
-                  </div>
-                )) : (
-                  <p style={{ color: 'var(--gray)' }}>No packages available at this time.</p>
-                )}
-              </div>
+              packages.length > 0 ? packages.map(pkg => (
+                <button key={pkg.id} type="button" className="package-option" onClick={() => handleBuy(pkg)}>
+                  <span>
+                    <strong>{pkg.name}</strong>
+                    <small style={{ display: 'block', color: 'var(--gray)' }}>{formatDuration(pkg.duration_minutes)} at {pkg.speed_down_kbps / 1024} Mbps</small>
+                  </span>
+                  <strong style={{ color: 'var(--primary)' }}>TZS {pkg.price_tzs.toLocaleString()}</strong>
+                </button>
+              )) : (
+                <p className="portal-sub">No packages available at this time.</p>
+              )
             ) : (
-              <form onSubmit={submitPayment} style={{ textAlign: 'left' }}>
-                <div style={{ padding: '15px', backgroundColor: 'var(--light)', borderRadius: '8px', marginBottom: '20px' }}>
-                  <div style={{ fontWeight: 'bold' }}>{selectedPackage.name}</div>
-                  <div style={{ color: 'var(--primary)', fontWeight: 'bold', fontSize: '18px' }}>TZS {selectedPackage.price_tzs.toLocaleString()}</div>
+              <form onSubmit={submitPayment}>
+                <div className="package-summary">
+                  <strong>{selectedPackage.name}</strong>
+                  <div style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '18px' }}>TZS {selectedPackage.price_tzs.toLocaleString()}</div>
                 </div>
-                
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', marginBottom: '5px' }}>Phone Number</label>
-                <input 
-                  className="form-control" 
-                  type="tel" 
-                  placeholder="0712345678" 
-                  value={phoneNumber} 
-                  onChange={e => setPhoneNumber(e.target.value)} 
-                  required 
-                  style={{ marginBottom: '15px' }}
+
+                <label className="form-label">Phone Number</label>
+                <input
+                  className="form-control"
+                  type="tel"
+                  placeholder="0712345678"
+                  value={phoneNumber}
+                  onChange={e => setPhoneNumber(e.target.value)}
+                  required
                 />
-                
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button type="button" onClick={() => setSelectedPackage(null)} className="btn btn-secondary" style={{ flex: 1 }} disabled={status === 'loading'}>Cancel</button>
-                  <button type="submit" className="btn btn-primary" style={{ flex: 2 }} disabled={status === 'loading'}>
+
+                <div className="button-row">
+                  <button type="button" onClick={() => setSelectedPackage(null)} className="btn btn-secondary" disabled={status === 'loading'}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={status === 'loading'}>
                     {status === 'loading' ? 'Processing...' : 'Pay Now'}
                   </button>
                 </div>
@@ -279,34 +286,49 @@ export default function App() {
         {activeTab === 'voucher' && (
           <form onSubmit={handleRedeem}>
             {!macAddress && (
-              <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
+              <div className="alert alert-danger">
                 Your device could not be identified. Please connect to this WiFi network, then open any website so the login page appears again.
               </div>
             )}
-            <p style={{ color: 'var(--gray)', marginBottom: '20px', fontSize: '14px' }}>Enter your voucher code to connect.</p>
-            <input 
-              className="form-control"
-              type="text" 
-              placeholder="000000" 
+            <input
+              className="form-control code-input"
+              type="text"
+              placeholder="Voucher code"
+              aria-label="Voucher code"
               value={voucherCode}
-              onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-              disabled={status === 'loading' || lockoutTimeLeft > 0}
+              onChange={(e) => setVoucherCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+              disabled={status === 'loading' || isLocked}
               maxLength={6}
-              style={{ textAlign: 'center', fontSize: '20px', letterSpacing: '4px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '15px' }}
               autoComplete="off"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
             />
-            <button 
-              type="submit" 
-              className="btn btn-primary" 
-              style={{ width: '100%', backgroundColor: lockoutTimeLeft > 0 ? '#93c5fd' : 'var(--primary)', cursor: lockoutTimeLeft > 0 ? 'not-allowed' : 'pointer' }} 
-              disabled={!macAddress || status === 'loading' || voucherCode.length < 6 || lockoutTimeLeft > 0}
+            <button
+              type="submit"
+              className="btn btn-primary btn-block"
+              disabled={!macAddress || status === 'loading' || voucherCode.length < 6 || isLocked}
             >
-              {status === 'loading' ? 'Connecting...' : lockoutTimeLeft > 0 ? `Locked (${Math.floor(lockoutTimeLeft / 60)}:${String(lockoutTimeLeft % 60).padStart(2, '0')})` : 'Connect'}
+              {status === 'loading' ? 'Connecting...' : isLocked ? `Locked (${lockClock})` : 'Connect'}
             </button>
+
+            {/* So the customer knows what to ask the staff for */}
+            {!PAYMENTS_ENABLED && packages.length > 0 && (
+              <div className="price-list">
+                <p className="price-list-title">Prices</p>
+                {packages.map(pkg => (
+                  <div key={pkg.id} className="price-row">
+                    <span>{pkg.name}<small>{formatDuration(pkg.duration_minutes)} · {pkg.speed_down_kbps / 1024} Mbps</small></span>
+                    <strong>TZS {pkg.price_tzs.toLocaleString()}</strong>
+                  </div>
+                ))}
+                <p className="price-note">No code yet? Please ask the staff for a voucher.</p>
+              </div>
+            )}
           </form>
         )}
 
-        <p style={{ fontSize: '12px', color: 'var(--gray-light)', marginTop: '30px' }}>Powered by OSWAGOTech WiFi</p>
+        <p className="portal-footer">Powered by OSWAGOTech WiFi</p>
       </div>
     </div>
   );

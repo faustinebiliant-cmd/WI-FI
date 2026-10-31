@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
 import ConfirmDialog from '../shared/components/ConfirmDialog';
+import { useToast } from '../shared/components/Toast';
 
 export default function SessionsPage() {
+  const toast = useToast();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,6 +33,7 @@ export default function SessionsPage() {
     try {
       await apiClient.post(`/tenant/sessions/${deleteTarget.id}/disconnect`);
       setDeleteTarget(null);
+      toast('Customer disconnected');
       fetchSessions();
     } catch (error) {
       setDisconnectError(error.response?.data?.error || 'Failed to disconnect customer.');
@@ -41,36 +44,38 @@ export default function SessionsPage() {
 
   return (
     <div className="page-wrapper">
-      <div style={{ marginBottom: '30px' }}>
-        <h1 style={{ margin: 0 }}>Active Sessions</h1>
-        <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Customers currently connected to your WiFi.</p>
+      <div className="page-header">
+        <div>
+          <h1>Active Sessions</h1>
+          <p>Customers currently connected to your WiFi.</p>
+        </div>
       </div>
 
       <div className="table-container">
         {loading ? (
           <Loader message="Loading sessions..." />
         ) : sessions.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center' }}>No active sessions right now.</div>
+          <div className="table-empty">No active sessions right now.</div>
         ) : (
           <table>
-            <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+            <thead>
               <tr>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Voucher Code</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Router</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>MAC Address</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Started (EAT)</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Action</th>
+                <th>Voucher Code</th>
+                <th>Router</th>
+                <th>MAC Address</th>
+                <th>Started (EAT)</th>
+                <th className="col-actions">Action</th>
               </tr>
             </thead>
             <tbody>
               {sessions.map((s) => (
-                <tr key={s.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '16px 20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{s.vouchers?.code}</td>
-                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{s.routers?.name}</td>
-                  <td style={{ padding: '16px 20px', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{s.mac_address}</td>
-                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{s.started_at_eat}</td>
-                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
-                    <button onClick={() => setDeleteTarget(s)} style={{ padding: '6px 12px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                <tr key={s.id}>
+                  <td className="cell-strong">{s.vouchers?.code}</td>
+                  <td>{s.routers?.name}</td>
+                  <td className="cell-mono">{s.mac_address}</td>
+                  <td>{s.started_at_eat}</td>
+                  <td className="col-actions">
+                    <button onClick={() => setDeleteTarget(s)} className="btn btn-sm btn-danger">
                       Disconnect
                     </button>
                   </td>

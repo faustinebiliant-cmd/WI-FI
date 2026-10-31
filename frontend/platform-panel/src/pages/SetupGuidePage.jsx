@@ -2,39 +2,25 @@ import React from 'react';
 
 // Technician guide: how to connect a new MikroTik and run the setup.
 // Only shown in the platform panel. The setup commands themselves come from the
-// business's Tenant Panel (Routers > Add Router, or "Setup Commands").
+// business's Business Panel (Routers > Add Router, or "Setup Commands").
 
-const Code = ({ children }) => (
-  <pre style={{ backgroundColor: '#0f172a', color: '#e2e8f0', padding: '12px', borderRadius: '6px', fontSize: '13px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: '8px 0 12px 0' }}>
-    {children}
-  </pre>
+const Code = ({ children }) => <pre className="guide-code">{children}</pre>;
+
+const NOTE_CLASS = { blue: 'notice-info', amber: 'notice-warning', red: 'notice-danger' };
+const Note = ({ tone = 'blue', children }) => (
+  <div className={`notice ${NOTE_CLASS[tone]}`} style={{ margin: '12px 0' }}>{children}</div>
 );
 
-const Note = ({ tone = 'blue', children }) => {
-  const colors = {
-    blue: { bg: '#eff6ff', border: '#bfdbfe', text: '#1e3a8a' },
-    amber: { bg: '#fffbeb', border: '#fde68a', text: '#92400e' },
-    red: { bg: '#fef2f2', border: '#fecaca', text: '#991b1b' }
-  }[tone];
-  return (
-    <div style={{ backgroundColor: colors.bg, border: `1px solid ${colors.border}`, color: colors.text, padding: '12px', borderRadius: '6px', fontSize: '14px', margin: '12px 0' }}>
-      {children}
-    </div>
-  );
-};
-
 const Section = ({ title, children }) => (
-  <div className="card" style={{ marginBottom: '20px' }}>
-    <h2 style={{ marginTop: 0, fontSize: '19px' }}>{title}</h2>
+  <div className="card">
+    <h2 className="section-title">{title}</h2>
     {children}
   </div>
 );
 
-const listStyle = { paddingLeft: '20px', lineHeight: 1.7, fontSize: '14px' };
-
 export default function SetupGuidePage() {
   return (
-    <div style={{ maxWidth: '900px' }}>
+    <div className="guide-page">
       <div className="page-header">
         <div>
           <h1>Router Setup Guide</h1>
@@ -43,10 +29,10 @@ export default function SetupGuidePage() {
       </div>
 
       <Section title="Before you start">
-        <ul style={listStyle}>
+        <ul className="guide-list">
           <li>A <strong>new or factory-reset</strong> MikroTik hEX, a laptop with Winbox, and network cables.</li>
           <li><strong>Port 1 (ether1) = internet (WAN).</strong> Ports 2 to 5 (ether2 to ether5) = your laptop and the access point (LAN). Never plug the access point into port 1.</li>
-          <li>The setup commands: open the business's Tenant Panel, go to <strong>Routers</strong>, press <strong>Add Router</strong> (or <strong>Setup Commands</strong> for a router that is not set up yet). They work for 12 hours.</li>
+          <li>The setup commands: open the business's Business Panel, go to <strong>Routers</strong>, press <strong>Add Router</strong> (or <strong>Setup Commands</strong> for a router that is not set up yet). They work for 12 hours.</li>
           <li>Winbox login on a factory router: user <strong>admin</strong>, password from the sticker on the router (empty if there is no password on the sticker).</li>
         </ul>
         <Note>
@@ -57,8 +43,8 @@ export default function SetupGuidePage() {
       </Section>
 
       <Section title="Method A (normal): internet in port 1, laptop in port 2">
-        <p style={{ fontSize: '14px' }}>Use this whenever the business already has internet (a modem or another router).</p>
-        <ol style={listStyle}>
+        <p className="guide-text">Use this whenever the business already has internet (a modem or another router).</p>
+        <ol className="guide-list">
           <li>Plug the <strong>internet cable</strong> from the business's modem into <strong>port 1</strong>.</li>
           <li>Plug your <strong>laptop</strong> into <strong>port 2</strong> (or 3, 4, 5).</li>
           <li>Open Winbox, choose the router in the <strong>Neighbors</strong> list (by its MAC address), log in.</li>
@@ -66,8 +52,8 @@ export default function SetupGuidePage() {
             <Code>/ping 8.8.8.8 count=3</Code>
             You must see replies. If not, check the cable in port 1 and the business's modem.
           </li>
-          <li>Run the <strong>3 setup steps</strong> from the Tenant Panel, in order. Step 2 must end with <strong>SETUP COMPLETE</strong>.</li>
-          <li>Wait up to 5 minutes: the router must show <strong>ONLINE</strong> on the Tenant Panel's Routers page.</li>
+          <li>Run the <strong>3 setup steps</strong> from the Business Panel, in order. Step 2 must end with <strong>SETUP COMPLETE</strong>.</li>
+          <li>Wait up to 5 minutes: the router must show <strong>ONLINE</strong> on the Business Panel's Routers page.</li>
           <li>Unplug your laptop. Plug the <strong>access point</strong> into port 2 (see "Access point" below) and test a voucher on a phone.</li>
         </ol>
         <Note>
@@ -77,20 +63,20 @@ export default function SetupGuidePage() {
       </Section>
 
       <Section title="Method B (one laptop port): your laptop gives the internet and runs Winbox on one cable">
-        <p style={{ fontSize: '14px' }}>
+        <p className="guide-text">
           Use this only when there is no other internet and your laptop has a single network port (for example the USB network adapter),
           while the laptop itself is on Wi-Fi. It opens the "MAC door" on port 1 for the time of the setup, and you close it again at the end.
         </p>
 
-        <h3 style={{ fontSize: '16px' }}>1. Turn on internet sharing on the laptop (Windows)</h3>
-        <ol style={listStyle}>
+        <h3 className="guide-step">1. Turn on internet sharing on the laptop (Windows)</h3>
+        <ol className="guide-list">
           <li>Press <strong>Windows + R</strong>, type <strong>ncpa.cpl</strong>, press Enter.</li>
           <li>Right-click your <strong>Wi-Fi</strong> connection, choose <strong>Properties</strong>, open the <strong>Sharing</strong> tab.</li>
           <li>Tick <strong>"Allow other network users to connect through this computer's Internet connection"</strong>, choose your <strong>Ethernet</strong> (USB adapter) in the list, press OK.</li>
         </ol>
 
-        <h3 style={{ fontSize: '16px' }}>2. Prepare the router (cable in port 2)</h3>
-        <ol style={listStyle}>
+        <h3 className="guide-step">2. Prepare the router (cable in port 2)</h3>
+        <ol className="guide-list">
           <li>Plug the cable into <strong>port 2</strong>. Open Winbox, choose the router in <strong>Neighbors</strong>, log in.</li>
           <li>Open New Terminal and paste these two lines:
             <Code>{'/tool mac-server mac-winbox set allowed-interface-list=all\n:put [/interface ethernet get ether1 mac-address]'}</Code>
@@ -98,8 +84,8 @@ export default function SetupGuidePage() {
           </li>
         </ol>
 
-        <h3 style={{ fontSize: '16px' }}>3. Move the cable to port 1 and reconnect</h3>
-        <ol style={listStyle}>
+        <h3 className="guide-step">3. Move the cable to port 1 and reconnect</h3>
+        <ol className="guide-list">
           <li>Close Winbox. Move the cable from port 2 to <strong>port 1</strong>.</li>
           <li>In the laptop's sharing settings, turn sharing <strong>off and on again</strong> (this makes the router get its address).</li>
           <li>Open Winbox, type the <strong>MAC address you wrote down</strong> in "Connect To" (the router may not appear in Neighbors on port 1; that is normal), log in.</li>
@@ -110,17 +96,17 @@ export default function SetupGuidePage() {
           </li>
         </ol>
 
-        <h3 style={{ fontSize: '16px' }}>4. Run the setup</h3>
-        <p style={{ fontSize: '14px' }}>Run the <strong>3 setup steps</strong> from the Tenant Panel, in order. Step 2 must end with <strong>SETUP COMPLETE</strong>.</p>
+        <h3 className="guide-step">4. Run the setup</h3>
+        <p className="guide-text">Run the <strong>3 setup steps</strong> from the Business Panel, in order. Step 2 must end with <strong>SETUP COMPLETE</strong>.</p>
 
-        <h3 style={{ fontSize: '16px' }}>5. Close the door (never skip this)</h3>
+        <h3 className="guide-step">5. Close the door (never skip this)</h3>
         <Code>/tool mac-server mac-winbox set allowed-interface-list=LAN</Code>
-        <p style={{ fontSize: '14px' }}>Winbox disconnects at once. That is normal: the work is finished.</p>
+        <p className="guide-text">Winbox disconnects at once. That is normal: the work is finished.</p>
 
-        <h3 style={{ fontSize: '16px' }}>6. Install at the business</h3>
-        <p style={{ fontSize: '14px' }}>
+        <h3 className="guide-step">6. Install at the business</h3>
+        <p className="guide-text">
           Plug the business's internet into <strong>port 1</strong> and the access point into <strong>port 2</strong>. The router gets its internet
-          from the business's modem by itself, and must show <strong>ONLINE</strong> in the Tenant Panel within about 5 minutes.
+          from the business's modem by itself, and must show <strong>ONLINE</strong> in the Business Panel within about 5 minutes.
         </p>
 
         <Note tone="red">
@@ -130,7 +116,7 @@ export default function SetupGuidePage() {
       </Section>
 
       <Section title="Access point (TP-Link EAP225)">
-        <ul style={listStyle}>
+        <ul className="guide-list">
           <li>Wi-Fi name of your choice, <strong>open</strong> (no password), so the customer login page can appear.</li>
           <li>DHCP <strong>off</strong>. Fixed address <strong>192.168.88.2</strong>, mask 255.255.255.0, gateway 192.168.88.1.</li>
           <li>Plug it into <strong>port 2 to 5</strong> of the hEX, never port 1.</li>
@@ -138,11 +124,11 @@ export default function SetupGuidePage() {
       </Section>
 
       <Section title="If something goes wrong">
-        <ul style={listStyle}>
+        <ul className="guide-list">
           <li><strong>CLOCK NOT SET</strong> or <strong>CERTIFICATE CHECK FAILED</strong>: the router has no internet. Check the cable in port 1 and run <strong>/ping 8.8.8.8 count=3</strong>, then paste step 2 again.</li>
           <li><strong>SCHEDULER IS OFF</strong>: run the command in the orange box of the setup window, unplug the router's power and plug it back in within 5 minutes, then paste step 2 again.</li>
           <li><strong>ALREADY PROVISIONED</strong>: this router was set up before. Reset it to factory settings (<strong>/system reset-configuration</strong>, then confirm with y) and start again. Never repair a half-finished setup by hand.</li>
-          <li><strong>The setup link has expired</strong>: press <strong>Setup Commands</strong> on the Tenant Panel's Routers page to get new commands.</li>
+          <li><strong>The setup link has expired</strong>: press <strong>Setup Commands</strong> on the Business Panel's Routers page to get new commands.</li>
           <li><strong>Router stays OFFLINE</strong> after 5 minutes: on the router run <strong>{'/log print where message~"wg-"'}</strong> and send the result to support.</li>
         </ul>
       </Section>

@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '../api/client';
+import { FiSearch } from 'react-icons/fi';
 import Loader from '../shared/components/Loader';
+import CopyButton from '../shared/components/CopyButton';
+import { useToast } from '../shared/components/Toast';
+
+const SEARCH_DELAY_MS = 350; // wait until the user stops typing before asking the server
 
 export default function VouchersPage() {
+  const toast = useToast();
   const [vouchers, setVouchers] = useState([]);
   const [packages, setPackages] = useState([]);
   const [routers, setRouters] = useState([]);
@@ -14,6 +20,9 @@ export default function VouchersPage() {
   const [generatedCodes, setGeneratedCodes] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [todayOnly, setTodayOnly] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   const [page, setPage] = useState(1);
@@ -28,6 +37,8 @@ export default function VouchersPage() {
     try {
       const qs = new URLSearchParams({ page: String(pageNumber), limit: '20' });
       if (todayOnly) qs.set('today', 'true');
+      if (search) qs.set('search', search);
+      if (statusFilter) qs.set('status', statusFilter);
       const res = await apiClient.get(`/tenant/vouchers?${qs.toString()}`);
       setVouchers(res.data.data);
       setTotalPages(res.data.pagination.pages);
@@ -39,7 +50,14 @@ export default function VouchersPage() {
     } finally {
       setLoading(false);
     }
-  }, [todayOnly]);
+  }, [todayOnly, search, statusFilter]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const isFiltered = todayOnly || search || statusFilter;
 
   // Packages and routers: load once
   useEffect(() => {
@@ -102,6 +120,7 @@ export default function VouchersPage() {
     try {
       await apiClient.patch(`/tenant/vouchers/${revokeTarget.id}/revoke`);
       setRevokeTarget(null);
+      toast(`Voucher ${revokeTarget.code} revoked`);
       fetchVouchers(page);
     } catch (error) {
       setRevokeError(error.response?.data?.error || 'Failed to revoke voucher');
@@ -133,34 +152,51 @@ export default function VouchersPage() {
 
   return (
     <div className="page-wrapper">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+      <div className="page-header">
         <div>
-          <h1 style={{ margin: 0 }}>Vouchers</h1>
-          <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Generate codes to sell to your customers.</p>
+          <h1>Vouchers</h1>
+          <p>Generate codes to sell to your customers.</p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '300px' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: 'var(--gray)' }}>
-            <input
-              type="checkbox"
-              checked={todayOnly}
-              onChange={(e) => { setTodayOnly(e.target.checked); }}
-              style={{ width: '18px', height: '18px' }}
-            />
-            Today only (EAT)
-          </label>
-          <button
-            onClick={() => { setShowModal(true); setGeneratedCodes(null); setErrorMsg(''); }}
-            className="btn btn-primary"
-            style={{ width: '100%' }}
-          >
-            + Generate Vouchers
-          </button>
+        <button
+          onClick={() => { setShowModal(true); setGeneratedCodes(null); setErrorMsg(''); }}
+          className="btn btn-primary"
+        >
+          + Generate Vouchers
+        </button>
+      </div>
+
+      <div className="filter-bar">
+        <div className="search-box">
+          <FiSearch size={16} />
+          <input
+            className="form-control"
+            type="search"
+            placeholder="Search code"
+            aria-label="Search voucher code"
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32))}
+          />
         </div>
+        <select className="form-control" aria-label="Status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <option value="">All statuses</option>
+          <option value="unused">Unused</option>
+          <option value="active">Active</option>
+          <option value="expired">Expired</option>
+          <option value="cancelled">Revoked</option>
+        </select>
+        <label className="check-label">
+          <input
+            type="checkbox"
+            checked={todayOnly}
+            onChange={(e) => { setTodayOnly(e.target.checked); }}
+          />
+          Today only (EAT)
+        </label>
       </div>
 
       {loadError && (
-        <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
+        <div className="alert alert-danger">
           {loadError}
         </div>
       )}
@@ -169,57 +205,55 @@ export default function VouchersPage() {
         {loading ? (
           <Loader message="Loading vouchers..." />
         ) : vouchers.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center' }}>
-            {todayOnly ? 'No vouchers generated today (EAT).' : 'No vouchers generated yet.'}
+          <div className="table-empty">
+            {isFiltered ? 'No vouchers match these filters.' : 'No vouchers generated yet.'}
           </div>
         ) : (
           <table>
-            <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+            <thead>
               <tr>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Code</th>
-                {hasMultipleRouters && <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Router</th>}
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Package</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Status</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Action</th>
+                <th>Code</th>
+                {hasMultipleRouters && <th>Router</th>}
+                <th>Package</th>
+                <th>Status</th>
+                <th className="col-actions">Action</th>
               </tr>
             </thead>
             <tbody>
               {vouchers.map((v) => (
-                <tr key={v.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '16px 20px', fontFamily: 'monospace', fontSize: '16px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{v.code}</td>
+                <tr key={v.id}>
+                  <td className="cell-code">
+                    <span className="code-with-copy">
+                      {v.code}
+                      {(v.status === 'unused' || v.status === 'active') && <CopyButton text={v.code} toastMessage={`${v.code} copied`} />}
+                    </span>
+                  </td>
 
                   {hasMultipleRouters && (
-                    <td style={{ padding: '16px 20px', fontWeight: 'bold', color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                    <td className="cell-strong">
                       {v.packages?.router_name || 'Any'}
                     </td>
                   )}
 
-                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{v.packages?.name}</td>
-                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span className={`badge ${v.status === 'unused' ? 'badge-success' :
-                        v.status === 'active' ? 'badge-warning' :
-                          'badge-danger'
-                        }`} style={{ width: 'fit-content' }}>
-                        {v.status}
-                      </span>
-                      {v.status === 'active' && v.expires_at && (
-                        <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '500' }}>
-                          {getRemainingTime(v.expires_at)}
-                        </span>
-                      )}
-                    </div>
+                  <td>{v.packages?.name}</td>
+                  <td>
+                    <span className={`badge ${v.status === 'unused' ? 'badge-success' :
+                      v.status === 'active' ? 'badge-warning' :
+                        'badge-neutral'
+                      }`}>
+                      {v.status === 'cancelled' ? 'revoked' : v.status}
+                    </span>
+                    {v.status === 'active' && v.expires_at && (
+                      <span className="cell-sub">{getRemainingTime(v.expires_at)}</span>
+                    )}
                   </td>
-                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
+                  <td className="col-actions">
                     {v.status === 'unused' || v.status === 'active' ? (
-                      <button
-                        onClick={() => openRevoke(v)}
-                        style={{ padding: '6px 12px', backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                      >
+                      <button onClick={() => openRevoke(v)} className="btn btn-sm btn-danger">
                         Revoke
                       </button>
                     ) : (
-                      <span style={{ fontSize: '13px', color: '#9ca3af' }}>
+                      <span className="cell-muted">
                         {v.status === 'cancelled' ? 'Revoked' : 'Expired'}
                       </span>
                     )}
@@ -232,14 +266,14 @@ export default function VouchersPage() {
       </div>
 
       {!loading && vouchers.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', width: 'max-content', minWidth: '100%', gap: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}>
-          <button className="btn btn-secondary" disabled={page === 1} onClick={() => fetchVouchers(page - 1)}>
+        <div className="pager">
+          <button className="btn btn-sm btn-secondary" disabled={page === 1} onClick={() => fetchVouchers(page - 1)}>
             Previous
           </button>
-          <span style={{ fontSize: '14px', color: 'var(--gray)', whiteSpace: 'nowrap' }}>
+          <span className="cell-muted">
             Page {page} of {totalPages}
           </span>
-          <button className="btn btn-secondary" disabled={page === totalPages} onClick={() => fetchVouchers(page + 1)}>
+          <button className="btn btn-sm btn-secondary" disabled={page === totalPages} onClick={() => fetchVouchers(page + 1)}>
             Next
           </button>
         </div>
@@ -248,10 +282,11 @@ export default function VouchersPage() {
       {showModal && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 style={{ marginTop: 0 }}>Generate Vouchers</h2>
+            <h2 className="modal-title">Generate Vouchers</h2>
+            <p className="modal-sub">Each code gives one customer the package you choose.</p>
 
             {errorMsg && (
-              <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
+              <div className="alert alert-danger">
                 {errorMsg}
               </div>
             )}
@@ -259,8 +294,8 @@ export default function VouchersPage() {
             {!generatedCodes ? (
               packages.length === 0 ? (
                 <div>
-                  <p style={{ fontSize: '14px' }}>You need to create a package before you can generate vouchers.</p>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                  <p className="notice notice-info">You need to create a package before you can generate vouchers.</p>
+                  <div className="modal-actions">
                     <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary">Close</button>
                   </div>
                 </div>
@@ -295,7 +330,7 @@ export default function VouchersPage() {
                       }}
                     />
                   </div>
-                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                  <div className="modal-actions">
                     <button type="button" onClick={() => setShowModal(false)} className="btn btn-secondary" disabled={isGenerating}>Cancel</button>
                     <button type="submit" className="btn btn-primary" disabled={!quantity || isGenerating}>
                       {isGenerating ? 'Generating...' : 'Generate'}
@@ -305,13 +340,14 @@ export default function VouchersPage() {
               )
             ) : (
               <div>
-                <p style={{ color: 'var(--success)', fontWeight: 'bold' }}>Successfully generated {generatedCodes.length} vouchers!</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginTop: '20px', maxHeight: '300px', overflowY: 'auto', padding: '10px', backgroundColor: 'var(--light)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                <div className="alert alert-success">Successfully generated {generatedCodes.length} vouchers!</div>
+                <div className="code-grid">
                   {generatedCodes.map((code, idx) => (
-                    <div key={idx} style={{ fontFamily: 'monospace', fontSize: '16px', textAlign: 'center', padding: '5px', border: '1px dashed #ccc' }}>{code}</div>
+                    <div key={idx} className="code-chip">{code}</div>
                   ))}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <div className="modal-actions">
+                  <CopyButton text={generatedCodes.join('\n')} label="Copy all" toastMessage={`${generatedCodes.length} codes copied`} />
                   <button onClick={() => setShowModal(false)} className="btn btn-primary">Done</button>
                 </div>
               </div>
@@ -322,9 +358,9 @@ export default function VouchersPage() {
 
       {revokeTarget && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }}>
-            <h2 style={{ marginTop: 0, color: 'var(--danger)' }}>Revoke Voucher?</h2>
-            <p style={{ color: 'var(--dark)', fontSize: '14px', marginBottom: '20px' }}>
+          <div className="modal-content modal-narrow modal-center">
+            <h2 className="modal-title danger">Revoke Voucher?</h2>
+            <p className="modal-sub">
               Are you sure you want to revoke voucher <strong>{revokeTarget.code}</strong>?<br /><br />
               {revokeTarget.status === 'active'
                 ? 'This will immediately disconnect the customer from the WiFi and they will not be able to use this code again.'
@@ -332,23 +368,23 @@ export default function VouchersPage() {
             </p>
 
             {revokeError && (
-              <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px', textAlign: 'left' }}>
+              <div className="alert alert-danger" style={{ textAlign: 'left' }}>
                 {revokeError}
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <div className="modal-actions">
               <button
                 onClick={() => setRevokeTarget(null)}
                 disabled={isRevoking}
-                style={{ padding: '10px 20px', cursor: isRevoking ? 'not-allowed' : 'pointer', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
+                className="btn btn-secondary"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmRevoke}
                 disabled={isRevoking}
-                style={{ padding: '10px 20px', cursor: isRevoking ? 'not-allowed' : 'pointer', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}
+                className="btn btn-solid-danger"
               >
                 {isRevoking ? 'Revoking...' : 'Yes, Revoke'}
               </button>

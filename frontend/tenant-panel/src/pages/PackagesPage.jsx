@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
 import ConfirmDialog from '../shared/components/ConfirmDialog';
+import { useToast } from '../shared/components/Toast';
 
 // Speeds the router setup prepares (1 to 20 Mbps, whole numbers only)
 const MIN_SPEED_MBPS = 1;
 const MAX_SPEED_MBPS = 20;
 
 export default function PackagesPage() {
+  const toast = useToast();
   const [packages, setPackages] = useState([]);
   const [routers, setRouters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -86,6 +88,7 @@ export default function PackagesPage() {
         router_id: formData.router_id
       });
       setShowModal(false);
+      toast(`Package "${formData.name}" created`);
       setFormData({ name: '', price_tzs: '', duration_value: 1, duration_unit: 'hours', speed_mbps: 5, router_id: routers[0]?.id || '' });
       fetchPackages();
     } catch (error) {
@@ -102,6 +105,7 @@ export default function PackagesPage() {
     try {
       await apiClient.delete(`/tenant/packages/${deleteTarget.id}`);
       setDeleteTarget(null);
+      toast('Package deleted');
       fetchPackages();
     } catch (error) {
       setDeleteError(error.response?.data?.error || 'Failed to delete package.');
@@ -118,12 +122,12 @@ export default function PackagesPage() {
 
   return (
     <div className="page-wrapper">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '30px' }}>
+      <div className="page-header">
         <div>
-          <h1 style={{ margin: 0 }}>WiFi Packages</h1>
-          <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Set your own prices, speeds, and durations.</p>
+          <h1>WiFi Packages</h1>
+          <p>Set your own prices, speeds, and durations.</p>
         </div>
-        <button onClick={() => { setShowModal(true); setErrorMsg(''); }} style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', width: '100%', maxWidth: '200px' }}>
+        <button onClick={() => { setShowModal(true); setErrorMsg(''); }} className="btn btn-primary">
           + Create Package
         </button>
       </div>
@@ -132,29 +136,29 @@ export default function PackagesPage() {
         {loading ? (
           <Loader message="Loading packages..." />
         ) : packages.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center' }}>No packages yet.</div>
+          <div className="table-empty">No packages yet.</div>
         ) : (
           <table>
-            <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+            <thead>
               <tr>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Name</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Router</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Price</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Duration</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Speed</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280', whiteSpace: 'nowrap' }}>Action</th>
+                <th>Name</th>
+                <th>Router</th>
+                <th>Price</th>
+                <th>Duration</th>
+                <th>Speed</th>
+                <th className="col-actions">Action</th>
               </tr>
             </thead>
             <tbody>
               {packages.map((pkg) => (
-                <tr key={pkg.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '16px 20px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>{pkg.name}</td>
-                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{pkg.router_name || '-'}</td>
-                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>TZS {pkg.price_tzs.toLocaleString()}</td>
-                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{formatDuration(pkg.duration_minutes)}</td>
-                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>{pkg.speed_down_kbps / 1024} Mbps</td>
-                  <td style={{ padding: '16px 20px', whiteSpace: 'nowrap' }}>
-                    <button onClick={() => setDeleteTarget(pkg)} style={{ padding: '6px 12px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                <tr key={pkg.id}>
+                  <td className="cell-strong">{pkg.name}</td>
+                  <td>{pkg.router_name || '-'}</td>
+                  <td>TZS {pkg.price_tzs.toLocaleString()}</td>
+                  <td>{formatDuration(pkg.duration_minutes)}</td>
+                  <td>{pkg.speed_down_kbps / 1024} Mbps</td>
+                  <td className="col-actions">
+                    <button onClick={() => setDeleteTarget(pkg)} className="btn btn-sm btn-danger">
                       Delete
                     </button>
                   </td>
@@ -166,32 +170,47 @@ export default function PackagesPage() {
       </div>
 
       {showModal && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '100%', maxWidth: '500px' }}>
-            <h2 style={{ marginTop: 0 }}>Create Package</h2>
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 className="modal-title">Create Package</h2>
+            <p className="modal-sub">What customers buy: a price, a time and a speed.</p>
 
             {errorMsg && (
-              <div style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-soft)', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
+              <div className="alert alert-danger">
                 {errorMsg}
               </div>
             )}
 
-            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <input required type="text" placeholder="Package Name (e.g. Daily 5Mbps)" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} disabled={isSubmitting} />
-              <input required type="number" min="0" placeholder="Price (TZS)" value={formData.price_tzs} onChange={e => setFormData({ ...formData, price_tzs: e.target.value })} style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} disabled={isSubmitting} />
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <input required type="number" min="1" placeholder="Duration" value={formData.duration_value} onChange={e => setFormData({ ...formData, duration_value: e.target.value })} style={{ padding: '10px', flex: 1, border: '1px solid #ccc', borderRadius: '4px' }} disabled={isSubmitting} />
-                <select value={formData.duration_unit} onChange={e => setFormData({ ...formData, duration_unit: e.target.value })} style={{ padding: '10px', flex: 1, border: '1px solid #ccc', borderRadius: '4px' }} disabled={isSubmitting}>
-                  <option value="hours">Hours</option>
-                  <option value="days">Days</option>
-                  <option value="weeks">Weeks</option>
-                </select>
+            <form onSubmit={handleCreate} className="form-stack">
+              <div className="form-group">
+                <label>Package Name</label>
+                <input className="form-control" required type="text" placeholder="e.g. Daily 5 Mbps" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} disabled={isSubmitting} />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>Speed (Mbps, {MIN_SPEED_MBPS} to {MAX_SPEED_MBPS})</label>
+              <div className="form-group">
+                <label>Price (TZS)</label>
+                <input className="form-control" required type="number" min="0" inputMode="numeric" placeholder="e.g. 1000" value={formData.price_tzs} onChange={e => setFormData({ ...formData, price_tzs: e.target.value })} disabled={isSubmitting} />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Duration</label>
+                  <input className="form-control" required type="number" min="1" inputMode="numeric" value={formData.duration_value} onChange={e => setFormData({ ...formData, duration_value: e.target.value })} disabled={isSubmitting} />
+                </div>
+                <div className="form-group">
+                  <label>Unit</label>
+                  <select className="form-control" value={formData.duration_unit} onChange={e => setFormData({ ...formData, duration_unit: e.target.value })} disabled={isSubmitting}>
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                    <option value="weeks">Weeks</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Speed (Mbps, {MIN_SPEED_MBPS} to {MAX_SPEED_MBPS})</label>
                 <input
+                  className="form-control"
                   required
                   type="number"
                   min={MIN_SPEED_MBPS}
@@ -201,29 +220,28 @@ export default function PackagesPage() {
                   placeholder={`${MIN_SPEED_MBPS} - ${MAX_SPEED_MBPS}`}
                   value={formData.speed_mbps}
                   onChange={e => setFormData({ ...formData, speed_mbps: e.target.value.replace(/[^0-9]/g, '') })}
-                  style={{ padding: '10px', width: '100%', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }}
                   disabled={isSubmitting}
                 />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>Router</label>
+              <div className="form-group">
+                <label>Router</label>
                 <select
+                  className="form-control"
                   required
                   value={formData.router_id}
                   onChange={e => setFormData({ ...formData, router_id: e.target.value })}
-                  style={{ padding: '10px', width: '100%', border: '1px solid #ccc', borderRadius: '4px' }}
                   disabled={isSubmitting}
                 >
                   {routers.length === 0 && <option value="">Add a router first (Routers page)</option>}
                   {routers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
-                <p style={{ fontSize: '12px', color: '#6b7280', margin: '4px 0 0 0' }}>Customers see this package only on this router's WiFi.</p>
+                <p className="form-hint">Customers see this package only on this router's WiFi.</p>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
-                <button type="button" onClick={() => setShowModal(false)} disabled={isSubmitting} style={{ padding: '10px 20px', cursor: isSubmitting ? 'not-allowed' : 'pointer', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px' }}>Cancel</button>
-                <button type="submit" disabled={isSubmitting} style={{ padding: '10px 20px', cursor: isSubmitting ? 'not-allowed' : 'pointer', backgroundColor: isSubmitting ? '#93c5fd' : '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setShowModal(false)} disabled={isSubmitting} className="btn btn-secondary">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="btn btn-primary">
                   {isSubmitting ? 'Saving...' : 'Save Package'}
                 </button>
               </div>

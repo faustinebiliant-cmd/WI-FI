@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
+import { useToast } from '../shared/components/Toast';
 
 const CopyIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -18,11 +19,6 @@ function CommandBox({ title, note, text, tone = 'blue' }) {
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  const palette = {
-    blue: { bg: '#eff6ff', border: '#bfdbfe', title: '#1e40af', code: '#1e40af', button: '#2563eb' },
-    amber: { bg: '#fef3c7', border: '#f59e0b', title: '#92400e', code: '#0f172a', button: '#d97706' }
-  }[tone];
-
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
@@ -35,26 +31,22 @@ function CommandBox({ title, note, text, tone = 'blue' }) {
   };
 
   return (
-    <div style={{ backgroundColor: palette.bg, border: `1px solid ${palette.border}`, padding: '15px', borderRadius: '6px', marginBottom: '16px' }}>
-      <p style={{ color: palette.title, fontWeight: 'bold', margin: '0 0 6px 0', fontSize: '14px' }}>{title}</p>
-      {note && <p style={{ color: '#475569', margin: '0 0 8px 0', fontSize: '13px' }}>{note}</p>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <code style={{ backgroundColor: 'white', padding: '10px', borderRadius: '4px', color: palette.code, fontSize: '12px', border: '1px solid #cbd5e1', wordBreak: 'break-all', userSelect: 'all' }}>
-          {text}
-        </code>
-        <button
-          onClick={copy}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '8px', backgroundColor: copied ? '#10b981' : palette.button, color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}
-        >
+    <div className={`cmd-box ${tone === 'amber' ? 'warning' : ''}`}>
+      <p className="cmd-title">{title}</p>
+      {note && <p className="cmd-note">{note}</p>}
+      <code className="cmd-code">{text}</code>
+      <div className="cmd-actions">
+        <button onClick={copy} className={`btn btn-sm ${copied ? 'btn-copied' : 'btn-primary'}`}>
           {copied ? 'Copied!' : <><CopyIcon /> Copy Command</>}
         </button>
-        {failed && <span style={{ color: '#dc2626', fontSize: '12px' }}>Copy failed. Click the text above to select it, then copy it by hand.</span>}
+        {failed && <span className="cell-muted">Copy failed. Click the text above to select it, then copy it by hand.</span>}
       </div>
     </div>
   );
 }
 
 export default function RoutersPage() {
+  const toast = useToast();
   const [routers, setRouters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -146,6 +138,7 @@ export default function RoutersPage() {
     setDeleteError('');
     try {
       await apiClient.delete(`/tenant/routers/${deleteTarget.id}`);
+      toast(`Router "${deleteTarget.name}" deleted`);
       closeDelete();
       fetchRouters();
     } catch (error) {
@@ -174,18 +167,18 @@ export default function RoutersPage() {
 
   return (
     <div className="page-wrapper">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px', marginBottom: '30px' }}>
+      <div className="page-header">
         <div>
-          <h1 style={{ margin: 0 }}>Routers</h1>
-          <p style={{ margin: '5px 0 0 0', color: '#6b7280' }}>Manage your MikroTik hardware.</p>
+          <h1>Routers</h1>
+          <p>Manage your MikroTik hardware.</p>
         </div>
-        <button onClick={() => { setShowModal(true); setErrorMsg(''); }} style={{ padding: '8px 16px', cursor: 'pointer', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>
+        <button onClick={() => { setShowModal(true); setErrorMsg(''); }} className="btn btn-primary">
           + Add Router
         </button>
       </div>
 
       {(loadError || actionError) && (
-        <div style={{ color: '#dc2626', backgroundColor: '#fef2f2', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
+        <div className="alert alert-danger">
           {loadError || actionError}
         </div>
       )}
@@ -194,15 +187,15 @@ export default function RoutersPage() {
         {loading ? (
           <Loader message="Loading routers..." />
         ) : routers.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center' }}>No routers found.</div>
+          <div className="table-empty">No routers yet. Click "+ Add Router" to set up your first one.</div>
         ) : (
           <table>
-            <thead style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+            <thead>
               <tr>
-                <th style={{ padding: '12px 20px', color: '#6b7280' }}>Name</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280' }}>Status</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280' }}>IP Address</th>
-                <th style={{ padding: '12px 20px', color: '#6b7280' }}>Action</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>IP Address</th>
+                <th className="col-actions">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -210,25 +203,27 @@ export default function RoutersPage() {
                 const isOnline = (router.status || '').toLowerCase() === 'online';
                 const waiting = !router.ip_address || router.ip_address === '0.0.0.0';
                 return (
-                  <tr key={router.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{router.name}</td>
-                    <td style={{ padding: '16px 20px' }}>
-                      <span style={{ padding: '4px 10px', borderRadius: '50px', fontSize: '12px', fontWeight: 'bold', backgroundColor: isOnline ? '#ecfdf5' : '#fef2f2', color: isOnline ? '#059669' : '#dc2626' }}>
-                        {isOnline ? 'ONLINE' : 'OFFLINE'}
+                  <tr key={router.id}>
+                    <td className="cell-strong">{router.name}</td>
+                    <td>
+                      <span className={`badge ${isOnline ? 'badge-success' : 'badge-danger'}`}>
+                        {isOnline ? 'Online' : 'Offline'}
                       </span>
                     </td>
-                    <td style={{ padding: '16px 20px', color: waiting ? '#9ca3af' : 'inherit' }}>
+                    <td className={waiting ? 'cell-muted' : undefined}>
                       {waiting ? 'Waiting for setup' : router.ip_address}
                     </td>
-                    <td style={{ padding: '16px 20px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {!router.provisioned && (
-                        <button onClick={() => showSetupAgain(router)} style={{ padding: '6px 12px', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-                          Setup Commands
+                    <td className="col-actions">
+                      <div className="actions">
+                        {!router.provisioned && (
+                          <button onClick={() => showSetupAgain(router)} className="btn btn-sm btn-soft">
+                            Setup Commands
+                          </button>
+                        )}
+                        <button onClick={() => { setDeleteError(''); setDeleteTarget(router); }} className="btn btn-sm btn-danger">
+                          Delete
                         </button>
-                      )}
-                      <button onClick={() => { setDeleteError(''); setDeleteTarget(router); }} style={{ padding: '6px 12px', backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-                        Delete
-                      </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -242,18 +237,25 @@ export default function RoutersPage() {
       {showModal && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 style={{ marginTop: 0 }}>Name Your Router</h2>
+            <h2 className="modal-title">Name Your Router</h2>
+            <p className="modal-sub">Next you get the setup commands for this router.</p>
             {errorMsg && (
-              <div style={{ color: '#dc2626', backgroundColor: '#fef2f2', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
+              <div className="alert alert-danger">
                 {errorMsg}
               </div>
             )}
-            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <input required type="text" placeholder="Router Name (e.g. Main Lobby)" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} />
-              <input type="text" placeholder="Location (Optional)" value={formData.location_label} onChange={e => setFormData({ ...formData, location_label: e.target.value })} style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }} />
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button type="button" onClick={() => setShowModal(false)} disabled={isCreating} style={{ padding: '10px 20px', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px' }}>Cancel</button>
-                <button type="submit" disabled={isCreating} style={{ padding: '10px 20px', backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>
+            <form onSubmit={handleCreate}>
+              <div className="form-group">
+                <label>Router Name</label>
+                <input className="form-control" required type="text" placeholder="e.g. Main Lobby" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>Location (optional)</label>
+                <input className="form-control" type="text" placeholder="e.g. Ground floor" value={formData.location_label} onChange={e => setFormData({ ...formData, location_label: e.target.value })} />
+              </div>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setShowModal(false)} disabled={isCreating} className="btn btn-secondary">Cancel</button>
+                <button type="submit" disabled={isCreating} className="btn btn-primary">
                   {isCreating ? 'Creating...' : 'Generate'}
                 </button>
               </div>
@@ -265,15 +267,15 @@ export default function RoutersPage() {
       {/* SETUP MODAL */}
       {showSetupModal && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '700px', padding: '20px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h2 style={{ marginTop: 0, fontSize: '20px' }}>Connect Your MikroTik</h2>
-            <p style={{ color: '#64748b', marginBottom: '8px', fontSize: '14px' }}>
+          <div className="modal-content modal-wide">
+            <h2 className="modal-title">Connect Your MikroTik</h2>
+            <p className="modal-sub">
               Use a brand-new (or factory-reset) router with its default configuration.
             </p>
-            <p style={{ color: '#1e3a8a', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', padding: '10px', borderRadius: '6px', marginBottom: '8px', fontSize: '13px' }}>
+            <p className="notice notice-info">
               <strong>How to connect:</strong> put the internet cable (from your modem) in <strong>port 1 (ether1)</strong>. Connect your computer to <strong>port 2, 3, 4 or 5</strong> and open Winbox <strong>by MAC address</strong> (pick the router in the Neighbors list), not by IP address. The router must have internet before step 2.
             </p>
-            <p style={{ color: '#b45309', backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px' }}>
+            <p className="notice notice-warning" style={{ marginBottom: '20px' }}>
               The setup commands below contain a secret: never share them. They work for 12 hours. If they expire, or you close this window too early, press "Setup Commands" on the Routers page to get new ones (only while the router is not set up yet).
             </p>
 
@@ -309,8 +311,8 @@ export default function RoutersPage() {
               text={loginFetchCommand}
             />
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={() => { setShowSetupModal(false); setSetupToken(''); }} style={{ padding: '10px 20px', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>Close</button>
+            <div className="modal-actions">
+              <button onClick={() => { setShowSetupModal(false); setSetupToken(''); }} className="btn btn-secondary">Close</button>
             </div>
           </div>
         </div>
@@ -319,18 +321,21 @@ export default function RoutersPage() {
       {/* DELETE ROUTER MODAL */}
       {deleteTarget && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '450px', borderTop: '4px solid #dc2626' }}>
-            <h2 style={{ marginTop: 0, color: '#dc2626', fontSize: '20px' }}>Delete Router</h2>
-            <p style={{ fontSize: '14px', marginBottom: '20px' }}>Are you sure you want to delete <strong>{deleteTarget.name}</strong>? This will delete all packages and vouchers.</p>
+          <div className="modal-content modal-narrow">
+            <h2 className="modal-title danger">Delete Router</h2>
+            <p className="modal-sub">Are you sure you want to delete <strong>{deleteTarget.name}</strong>? This will delete all packages and vouchers.</p>
             {deleteError && (
-              <div style={{ color: '#dc2626', backgroundColor: '#fef2f2', padding: '10px', borderRadius: '6px', marginBottom: '15px', fontSize: '13px' }}>
+              <div className="alert alert-danger">
                 {deleteError}
               </div>
             )}
-            <input type="text" placeholder="Type DELETE" value={deleteInput} onChange={e => setDeleteInput(e.target.value)} style={{ width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px', marginBottom: '20px' }} />
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button onClick={closeDelete} disabled={isDeleting} style={{ padding: '10px 20px', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px' }}>Cancel</button>
-              <button onClick={handleDelete} disabled={deleteInput !== 'DELETE' || isDeleting} style={{ padding: '10px 20px', backgroundColor: deleteInput === 'DELETE' ? '#dc2626' : '#fca5a5', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Type DELETE to confirm</label>
+              <input className="form-control" type="text" placeholder="DELETE" value={deleteInput} onChange={e => setDeleteInput(e.target.value)} />
+            </div>
+            <div className="modal-actions">
+              <button onClick={closeDelete} disabled={isDeleting} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleDelete} disabled={deleteInput !== 'DELETE' || isDeleting} className="btn btn-solid-danger">
                 {isDeleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>

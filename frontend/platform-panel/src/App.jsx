@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import DashboardLayout from './shared/components/DashboardLayout';
+import Loader from './shared/components/Loader';
 import { FiUsers, FiWifi, FiActivity, FiFileText, FiBookOpen } from 'react-icons/fi';
 
 // Import Pages
@@ -17,7 +18,7 @@ const PlatformShell = () => {
   const { admin, logout } = useAuth();
   
   const menuItems = [
-    { path: '/', label: 'Tenants', icon: FiUsers },
+    { path: '/', label: 'Businesses', icon: FiUsers },
     { path: '/routers', label: 'All Routers', icon: FiWifi },
     { path: '/sessions', label: 'Active Sessions', icon: FiActivity },
     { path: '/audit', label: 'Audit Logs', icon: FiFileText },
@@ -40,7 +41,7 @@ const PlatformShell = () => {
 const ProtectedRoute = () => {
   const { admin, loading } = useAuth();
   
-  if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>;
+  if (loading) return <Loader message="Loading..." />;
   if (!admin) return <Navigate to="/login" replace />;
   
   return <PlatformShell />;

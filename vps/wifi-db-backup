@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# ============================================================
+# OSWAGOTech WiFi - nightly database backup on the VPS
+# Install: sudo install -o root -g root -m 750 vps/wifi-db-backup /usr/local/sbin/wifi-db-backup
+#          sudo install -o root -g root -m 644 vps/wifi-db-backup.cron /etc/cron.d/wifi-db-backup
+# Test:    sudo /usr/local/sbin/wifi-db-backup DATABASE_NAME
+#
+# Saves the whole database to /var/backups/wifi-db (only root can read it)
+# and deletes copies older than KEEP_DAYS. Uses the "postgres" system user,
+# so no database password is stored here.
+# Restore (only when needed, overwrites the data):
+#   sudo -u postgres pg_restore --clean --if-exists -d DATABASE_NAME /var/backups/wifi-db/FILE.dump
+# ============================================================
+
+set -euo pipefail
+umask 077
+
+BACKUP_DIR="/var/backups/wifi-db"
+KEEP_DAYS=14
+
+fail() {
+    echo "$1" >&2
+    logger -t wifi-db-backup "FAILED: $1"
+    exit 1
+}
+
+if [ "$#" -ne 1 ]; then
+    fail "Usage: wifi-db-backup DATABASE_NAME"
+fi
+
+DB_NAME="$1"
+if [[ ! "$DB_NAME" =~ ^[A-Za-z0-9_]{1,63}$ ]]; then
+    fail "Invalid database name"
+fi
+
+mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
+
+STAMP="$(date +%Y-%m-%d_%H%M)"
+FINAL="$BACKUP_DIR/${DB_NAME}_${STAMP}.dump"
+PARTIAL="$FINAL.partial"
+
+# Written to a .partial file first, so a failed run never looks like a good backup
+if ! sudo -u postgres pg_dump --format=custom "$DB_NAME" > "$PARTIAL"; then
+    rm -f "$PARTIAL"
+    fail "pg_dump of $DB_NAME did not finish"
+fi
+
+# An empty or tiny file means something went wrong
+if [ "$(stat -c %s "$PARTIAL")" -lt 1024 ]; then
+    rm -f "$PARTIAL"
+    fail "backup of $DB_NAME is suspiciously small"
+fi
+
+mv "$PARTIAL" "$FINAL"
+
+# Keep the last KEEP_DAYS days only
+find "$BACKUP_DIR" -maxdepth 1 -name "${DB_NAME}_*.dump" -type f -mtime +"$KEEP_DAYS" -delete
+
+logger -t wifi-db-backup "OK: $FINAL ($(du -h "$FINAL" | cut -f1))"
+echo "Backup saved: $FINAL"

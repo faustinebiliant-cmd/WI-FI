@@ -44,8 +44,8 @@ export default function ChangePasswordForm({ onSuccess }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      {error && <div style={{ padding: '10px', marginBottom: '15px', backgroundColor: 'var(--danger-soft)', color: 'var(--danger)', borderRadius: '6px' }}>{error}</div>}
-      {message && <div style={{ padding: '10px', marginBottom: '15px', backgroundColor: 'var(--success-soft)', color: 'var(--success)', borderRadius: '6px' }}>{message}</div>}
+      {error && <div className="alert alert-danger">{error}</div>}
+      {message && <div className="alert alert-success">{message}</div>}
 
       <div className="form-group">
         <label>Current Password</label>
@@ -62,7 +62,7 @@ export default function ChangePasswordForm({ onSuccess }) {
         <input className="form-control" type="password" autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required disabled={saving} />
       </div>
 
-      <button type="submit" className="btn btn-primary" disabled={saving} style={{ width: '100%', marginTop: '10px' }}>
+      <button type="submit" className="btn btn-primary btn-block" disabled={saving}>
         {saving ? 'Saving...' : 'Change Password'}
       </button>
     </form>

@@ -193,11 +193,14 @@ const { startSessionCleaner } = require('./services/sessionCleaner');
 // ------------------------------------------------------------
 // Start Server
 // ------------------------------------------------------------
-const server = app.listen(env.PORT, () => {
+// Only reachable from inside this machine: the public reaches the API through Nginx
+// (proxy_pass http://127.0.0.1:5001), never on port 5001 directly, even if the firewall changes.
+const LISTEN_HOST = '127.0.0.1';
+const server = app.listen(env.PORT, LISTEN_HOST, () => {
   console.log('========================================');
   console.log('   OSWAGOTECH WIFI');
   console.log('========================================');
-  console.log(`   Server:      http://localhost:${env.PORT}`);
+  console.log(`   Server:      http://${LISTEN_HOST}:${env.PORT}`);
   console.log(`   Environment: ${env.NODE_ENV}`);
   console.log(`   Router mode: ${env.ROUTER_MODE}`);
   console.log('========================================');

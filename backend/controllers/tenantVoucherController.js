@@ -4,6 +4,7 @@ const { getTodayRangeEAT, formatDateTimeEAT } = require('../utils/tz');
 const { getRouter } = require('../services/routers/routerFactory');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VOUCHER_STATUSES = ['unused', 'active', 'expired', 'cancelled'];
 
 const generateCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();
 
@@ -90,6 +91,23 @@ const listVouchers = async (req, res) => {
         query += ` AND v.created_at >= $2 AND v.created_at <= $3`;
       }
       params.push(start.toISOString(), end.toISOString());
+    }
+
+    // Filter by status (only known values; anything else is ignored)
+    const status = String(req.query.status || '');
+    if (VOUCHER_STATUSES.includes(status)) {
+      params.push(status);
+      query += ` AND v.status = $${params.length}`;
+    }
+
+    // Search by code: letters and digits only, so the text is safe inside LIKE
+    const search = String(req.query.search || '').trim().toUpperCase();
+    if (search) {
+      if (!/^[A-Z0-9]{1,32}$/.test(search)) {
+        return res.status(400).json({ success: false, error: 'Search with letters and numbers only.' });
+      }
+      params.push(`%${search}%`);
+      query += ` AND upper(v.code) LIKE $${params.length}`;
     }
 
     const countRes = await db.query(`SELECT COUNT(*) FROM (${query}) AS sub`, params);
