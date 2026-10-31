@@ -8,3 +8,5 @@ venv/
 frontend/platform-panel/.env.local
 frontend/tenant-panel/.env.local
 frontend/portal/.env.local
+# Build output (made by npm run build, then copied to /var/www)
+dist/
