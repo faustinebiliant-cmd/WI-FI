@@ -8,6 +8,7 @@ import ChangePasswordForm from './components/ChangePasswordForm';
 import Loader from './shared/components/Loader';
 
 import LoginPage from './pages/LoginPage';
+import ImpersonatePage from './pages/ImpersonatePage';
 import DashboardPage from './pages/DashboardPage';
 import PackagesPage from './pages/PackagesPage';
 import VouchersPage from './pages/VouchersPage';
@@ -102,6 +103,7 @@ export default function App() {
       <BrowserRouter basename="/tenant">
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/impersonate" element={<ImpersonatePage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/packages" element={<PackagesPage />} />

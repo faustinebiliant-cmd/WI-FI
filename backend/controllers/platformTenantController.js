@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const db = require('../config/db');
 const { hashPassword } = require('../services/password');
 const { signTenantToken } = require('../services/jwt');
+const { issueImpersonationCode } = require('../services/impersonationCodes');
 const { isValidEmail, isValidPhone, isSafeText } = require('../utils/validators');
 
 // Easy to read out over the phone: no 0/O, 1/l/I
@@ -140,11 +141,14 @@ const impersonateTenant = async (req, res) => {
       [req.admin.id, req.admin.email, id, owner.full_name, JSON.stringify({ reason: reason.trim() })]
     );
 
+    // The token itself never goes to the admin panel: it gets a one-time code
+    // that the Business Panel swaps for the token (see services/impersonationCodes)
+    const code = issueImpersonationCode(impersonationToken, { full_name: owner.full_name, email: owner.email });
+
     return res.status(200).json({
       success: true,
       message: 'Impersonation session started',
-      token: impersonationToken,
-      tenant_user: { full_name: owner.full_name, email: owner.email }
+      code
     });
   } catch (error) {
     console.error('Start impersonation error:', error);

@@ -17,9 +17,7 @@ export default function SessionsPage() {
 
   const fetchSessions = async () => {
     try {
-      // Note: The endpoint differs depending on if it's tenant or platform, 
-      // but the table layout is the same.
-      const res = await apiClient.get(window.location.pathname.includes('platform') ? '/platform/sessions' : '/tenant/sessions/active');
+      const res = await apiClient.get('/platform/sessions');
       setSessions(res.data.data);
     } catch (error) {
       console.error(error);
@@ -33,11 +31,7 @@ export default function SessionsPage() {
     setIsDeleting(true);
     setDisconnectError('');
     try {
-      const endpoint = window.location.pathname.includes('platform') 
-        ? `/platform/sessions/${deleteTarget.id}/disconnect` 
-        : `/tenant/sessions/${deleteTarget.id}/disconnect`;
-      
-      await apiClient.post(endpoint);
+      await apiClient.post(`/platform/sessions/${deleteTarget.id}/disconnect`);
       setDeleteTarget(null);
       toast('Customer disconnected');
       fetchSessions();
@@ -48,7 +42,8 @@ export default function SessionsPage() {
     }
   };
 
-  const isPlatform = window.location.pathname.includes('platform');
+  // This page lives in the admin panel only (it used to guess that from the address)
+  const isPlatform = true;
 
   return (
     <div className="page-wrapper">

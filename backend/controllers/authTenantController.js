@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const { verifyPassword, hashPassword } = require('../services/password');
 const { signTenantToken } = require('../services/jwt');
+const { redeemImpersonationCode } = require('../services/impersonationCodes');
 const { TENANT_BLOCKED_SQL, TENANT_BLOCKED_ERROR } = require('../middleware/subscriptionGuard');
 
 // Every tenant created before random passwords got this one. Whoever still
@@ -121,4 +122,18 @@ const endImpersonationSelf = async (req, res) => {
   }
 };
 
-module.exports = { login, changePassword, endImpersonationSelf };
+// The Business Panel swaps the one-time code from the admin panel for the login token
+const exchangeImpersonationCode = async (req, res) => {
+  try {
+    const result = redeemImpersonationCode(req.body && req.body.code);
+    if (!result) {
+      return res.status(400).json({ success: false, error: 'This impersonation link has expired or was already used. Start it again from the admin panel.' });
+    }
+    return res.status(200).json({ success: true, token: result.token, user: result.tenantUser });
+  } catch (error) {
+    console.error('Impersonation exchange error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to start impersonation' });
+  }
+};
+
+module.exports = { login, changePassword, endImpersonationSelf, exchangeImpersonationCode };

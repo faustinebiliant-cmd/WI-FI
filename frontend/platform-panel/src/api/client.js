@@ -23,7 +23,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('adminToken');
       localStorage.removeItem('admin');
-      window.location.href = import.meta.env.VITE_PLATFORM_BASE + '/login';
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }

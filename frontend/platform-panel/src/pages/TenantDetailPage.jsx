@@ -34,20 +34,11 @@ export default function TenantDetailPage() {
 
     try {
       const res = await apiClient.post(`/platform/tenants/${id}/impersonate`, { reason });
-      
-      // The impersonation token is for the tenant panel only.
-      // The admin's own login (adminToken) is left untouched.
-      localStorage.setItem('tenantToken', res.data.token);
-      localStorage.setItem('tenantUser', JSON.stringify({
-        full_name: res.data.tenant_user.full_name,
-        email: res.data.tenant_user.email
-      }));
-      
-      // THIS IS THE FLAG THE TENANT PANEL WILL READ
-      localStorage.setItem('is_impersonating', 'true');
 
-      // Redirect to the tenant panel
-      window.location.href = import.meta.env.VITE_TENANT_BASE + '/';
+      // The Business Panel is another site, so it cannot read this panel's storage.
+      // It gets a one-time code (60 seconds) and swaps it for the login itself.
+      // The code goes after "#", so it is never sent to or logged by the web server.
+      window.location.href = `${import.meta.env.VITE_TENANT_BASE}/impersonate#code=${encodeURIComponent(res.data.code)}`;
       
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to start impersonation');

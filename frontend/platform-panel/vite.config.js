@@ -25,7 +25,7 @@ const contentSecurityPolicy = () => ({
 })
 
 export default defineConfig({
-  base: '/platform/',
+  base: '/', // served at the root of admin.oswagolink.co.tz
   plugins: [react(), contentSecurityPolicy()],
   server: { port: 3002 }
 })

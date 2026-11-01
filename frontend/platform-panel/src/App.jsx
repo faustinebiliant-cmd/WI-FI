@@ -50,8 +50,8 @@ const ProtectedRoute = () => {
 export default function App() {
   return (
     <AuthProvider>
-      {/* Added basename="/platform" so React Router knows the app lives in a subfolder */}
-      <BrowserRouter basename="/platform">
+      {/* The admin panel has its own address (admin.oswagolink.co.tz), so it lives at the root */}
+      <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           

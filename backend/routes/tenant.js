@@ -3,7 +3,7 @@ const router = express.Router();
 const authTenant = require('../middleware/authTenant');
 const { tenantLoginLimiter, tenantGlobalLimiter } = require('../middleware/rateLimiter');
 
-const { login, changePassword, endImpersonationSelf } = require('../controllers/authTenantController');
+const { login, changePassword, endImpersonationSelf, exchangeImpersonationCode } = require('../controllers/authTenantController');
 const { listPackages, createPackage, deletePackage } = require('../controllers/tenantPackageController');
 const { listRouters, createRouter, newSetupToken, deleteRouter } = require('../controllers/tenantRouterController');
 const { generateVouchers, listVouchers, revokeVoucher } = require('../controllers/tenantVoucherController');
@@ -12,6 +12,8 @@ const { getDashboardStats } = require('../controllers/tenantDashboardController'
 const { updateProfile, getProfile } = require('../controllers/tenantProfileController');
 
 router.post('/auth/login', tenantLoginLimiter, login);
+// Before authTenant: the code itself is the proof (one use, 60 seconds)
+router.post('/auth/impersonation/exchange', tenantLoginLimiter, exchangeImpersonationCode);
 
 router.use(authTenant);
 router.use(tenantGlobalLimiter);
