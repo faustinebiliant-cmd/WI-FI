@@ -1,0 +1,12 @@
+# Oswagolink - renew the HTTPS certificates automatically
+# Install: sudo install -o root -g root -m 644 vps/certbot-renew.cron /etc/cron.d/certbot-renew
+# Test:    sudo certbot renew --dry-run
+#
+# Let's Encrypt certificates last about 90 days. "certbot renew" only renews a
+# certificate in its last 30 days, so running it twice a day does nothing most
+# days. After a real renewal, Nginx is reloaded so it uses the new certificate.
+# Covers every certificate on the server (oswagolink.co.tz + www, admin.oswagolink.co.tz).
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+
+17 3,15 * * * root certbot renew --quiet --deploy-hook "systemctl reload nginx"
