@@ -104,6 +104,8 @@ cmd_init() {
     # Allowed-device list: verified pass + known fingerprint -> device name
     cat > "$MAP_CONF" <<EOF
 # Managed by wifi-admin-device. Do not edit by hand.
+# Each entry ("SUCCESS:" + 40-character fingerprint) is longer than the default 64-byte bucket
+map_hash_bucket_size 128;
 map "\$ssl_client_verify:\$ssl_client_fingerprint" \$oswagolink_admin_device {
     default "";
     include $ALLOWED;
@@ -160,7 +162,14 @@ cmd_add() {
     chmod 644 "$DIR/devices/$name.crt"
     echo "\"SUCCESS:$(fingerprint "$tmp/cert.pem")\" $name;" >> "$ALLOWED"
 
-    reload_nginx
+    # If Nginx does not accept the new list, undo everything this command did
+    if ! nginx -t 2>/tmp/wifi-admin-device-nginx-test; then
+        cat /tmp/wifi-admin-device-nginx-test >&2
+        sed -i "/ $name;\$/d" "$ALLOWED"
+        rm -f "$DIR/devices/$name.crt" "$p12"
+        fail "Nginx test failed; the device was NOT added and nothing was reloaded"
+    fi
+    systemctl reload nginx
     echo
     echo "Pass for '$name' created (valid $PASS_DAYS days)."
     echo "  File:     $p12"
