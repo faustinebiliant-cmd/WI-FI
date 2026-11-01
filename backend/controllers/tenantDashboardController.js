@@ -8,34 +8,29 @@ const getDashboardStats = async (req, res) => {
   try {
     const tenantId = req.tenantId;
 
-    // 1. Active sessions (customers online right now)
-    const activeSessions = await db.query('SELECT COUNT(*) FROM sessions WHERE tenant_id = $1 AND ended_at IS NULL', [tenantId]);
-    
-    // 2. Total vouchers generated
-    const totalVouchers = await db.query('SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1', [tenantId]);
-    
-    // 3. Unused vouchers
-    const unusedVouchers = await db.query("SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1 AND status = 'unused'", [tenantId]);
-    
-    // 4. Total routers
-    const totalRouters = await db.query('SELECT COUNT(*) FROM routers WHERE tenant_id = $1', [tenantId]);
-
-    // 5. Vouchers USED TODAY (EAT day boundaries, converted to UTC)
+    // All five numbers in one trip to the database.
+    // "Used today" uses EAT day boundaries, converted to UTC; a voucher used
+    // today may already have expired: it still counts.
     const today = getTodayRangeEAT();
-    const vouchersUsedToday = await db.query(
-      // A voucher used today may already have expired: it still counts
-      "SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1 AND status IN ('active', 'expired') AND used_at >= $2 AND used_at <= $3",
-      [tenantId, today.start.toISOString(), today.end.toISOString()]
-    );
+    const { rows } = await db.query(`
+      SELECT
+        (SELECT COUNT(*) FROM sessions WHERE tenant_id = $1 AND ended_at IS NULL) AS active_customers,
+        (SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1) AS total_vouchers,
+        (SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1 AND status = 'unused') AS unused_vouchers,
+        (SELECT COUNT(*) FROM routers WHERE tenant_id = $1) AS total_routers,
+        (SELECT COUNT(*) FROM vouchers
+         WHERE tenant_id = $1 AND status IN ('active', 'expired') AND used_at >= $2 AND used_at <= $3) AS used_today
+    `, [tenantId, today.start.toISOString(), today.end.toISOString()]);
+    const stats = rows[0];
 
     return res.status(200).json({
       success: true,
       data: {
-        activeCustomers: parseInt(activeSessions.rows[0].count),
-        totalVouchers: parseInt(totalVouchers.rows[0].count),
-        unusedVouchers: parseInt(unusedVouchers.rows[0].count),
-        totalRouters: parseInt(totalRouters.rows[0].count),
-        vouchersUsedToday: parseInt(vouchersUsedToday.rows[0].count),
+        activeCustomers: parseInt(stats.active_customers, 10),
+        totalVouchers: parseInt(stats.total_vouchers, 10),
+        unusedVouchers: parseInt(stats.unused_vouchers, 10),
+        totalRouters: parseInt(stats.total_routers, 10),
+        vouchersUsedToday: parseInt(stats.used_today, 10),
         todayEAT: formatDateEAT(new Date()),
         timezone: 'Africa/Dar_es_Salaam',
       },

@@ -64,10 +64,14 @@ const getPortalInfo = async (req, res) => {
     const router = routerRes.rows[0];
     if (router.tenant_blocked) return res.status(403).json(PORTAL_BLOCKED_ERROR);
 
-    const packagesRes = await db.query(
-      'SELECT id, name, price_tzs, duration_minutes, speed_down_kbps FROM packages WHERE tenant_id = $1 AND router_id = $2 AND is_active = true',
-      [router.tenant_id, router.id]
-    );
+    // Prices and this phone's voucher state at the same time, not one after the other
+    const [packagesRes, device] = await Promise.all([
+      db.query(
+        'SELECT id, name, price_tzs, duration_minutes, speed_down_kbps FROM packages WHERE tenant_id = $1 AND router_id = $2 AND is_active = true',
+        [router.tenant_id, router.id]
+      ),
+      getDeviceState(router.id, req.query.mac)
+    ]);
 
     return res.status(200).json({
       success: true,
@@ -75,7 +79,7 @@ const getPortalInfo = async (req, res) => {
         business_name: router.business_name,
         logo_url: router.logo_url,
         packages: packagesRes.rows,
-        device: await getDeviceState(router.id, req.query.mac)
+        device
       }
     });
   } catch (error) {

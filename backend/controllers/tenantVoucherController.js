@@ -110,13 +110,13 @@ const listVouchers = async (req, res) => {
       query += ` AND upper(v.code) LIKE $${params.length}`;
     }
 
-    const countRes = await db.query(`SELECT COUNT(*) FROM (${query}) AS sub`, params);
+    // The total and the page itself at the same time
+    const pageQuery = `${query} ORDER BY v.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    const [countRes, { rows }] = await Promise.all([
+      db.query(`SELECT COUNT(*) FROM (${query}) AS sub`, params),
+      db.query(pageQuery, [...params, limit, offset])
+    ]);
     const total = parseInt(countRes.rows[0].count, 10);
-
-    query += ` ORDER BY v.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    params.push(limit, offset);
-
-    const { rows } = await db.query(query, params);
 
     const formattedData = rows.map(r => ({
       ...r,

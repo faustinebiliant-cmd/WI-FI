@@ -10,7 +10,15 @@ const pool = new Pool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  ssl: false // Local server connection, no SSL needed
+  ssl: false, // Local server connection, no SSL needed
+  // Up to 20 queries at the same time (the backend and the router pinger each
+  // have their own pool: 40 together, well below PostgreSQL's 100)
+  max: 20,
+  idleTimeoutMillis: 30000,
+  // All connections busy: wait at most 5 seconds instead of forever
+  connectionTimeoutMillis: 5000,
+  // One stuck query is stopped after 10 seconds, so it cannot hold up everything
+  statement_timeout: 10000
 });
 
 pool.on('connect', () => {

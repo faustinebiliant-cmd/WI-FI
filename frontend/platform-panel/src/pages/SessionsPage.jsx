@@ -7,6 +7,7 @@ import { useToast } from '../shared/components/Toast';
 export default function SessionsPage() {
   const toast = useToast();
   const [sessions, setSessions] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -19,6 +20,7 @@ export default function SessionsPage() {
     try {
       const res = await apiClient.get('/platform/sessions');
       setSessions(res.data.data);
+      setTotal(res.data.total ?? res.data.data.length);
     } catch (error) {
       console.error(error);
     } finally {
@@ -50,7 +52,10 @@ export default function SessionsPage() {
       <div className="page-header">
         <div>
           <h1>Active Sessions</h1>
-          <p>Customers currently connected{isPlatform ? ' across all routers' : ' to your WiFi'}.</p>
+          <p>
+            Customers currently connected{isPlatform ? ' across all routers' : ' to your WiFi'}
+            {total > sessions.length ? `: showing the newest ${sessions.length} of ${total}.` : '.'}
+          </p>
         </div>
       </div>
 

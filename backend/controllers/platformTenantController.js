@@ -3,7 +3,7 @@ const db = require('../config/db');
 const { hashPassword } = require('../services/password');
 const { signTenantToken } = require('../services/jwt');
 const { issueImpersonationCode } = require('../services/impersonationCodes');
-const { isValidEmail, isValidPhone, isSafeText } = require('../utils/validators');
+const { isValidEmail, isValidPhone, isSafeText, isValidUUID } = require('../utils/validators');
 
 // Easy to read out over the phone: no 0/O, 1/l/I
 const TEMP_PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
@@ -65,19 +65,24 @@ const listTenants = async (req, res) => {
 const getTenant = async (req, res) => {
   try {
     const { id } = req.params;
-    const tenantRes = await db.query('SELECT * FROM tenants WHERE id = $1', [id]);
-    if (tenantRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Tenant not found' });
-    
-    const tenant = tenantRes.rows[0];
-    const routerCount = await db.query('SELECT COUNT(*) FROM routers WHERE tenant_id = $1', [id]);
-    const activeSessions = await db.query('SELECT COUNT(*) FROM sessions WHERE tenant_id = $1 AND ended_at IS NULL', [id]);
+    if (!isValidUUID(id)) return res.status(404).json({ success: false, error: 'Tenant not found' });
 
+    // The business and its two counts in one trip to the database
+    const tenantRes = await db.query(`
+      SELECT t.*,
+        (SELECT COUNT(*) FROM routers WHERE tenant_id = t.id) AS router_count,
+        (SELECT COUNT(*) FROM sessions WHERE tenant_id = t.id AND ended_at IS NULL) AS active_sessions
+      FROM tenants t WHERE t.id = $1
+    `, [id]);
+    if (tenantRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Tenant not found' });
+
+    const tenant = tenantRes.rows[0];
     return res.status(200).json({
       success: true,
       data: {
         ...tenant,
-        router_count: parseInt(routerCount.rows[0].count),
-        active_sessions: parseInt(activeSessions.rows[0].count)
+        router_count: parseInt(tenant.router_count, 10),
+        active_sessions: parseInt(tenant.active_sessions, 10)
       }
     });
   } catch (error) {
