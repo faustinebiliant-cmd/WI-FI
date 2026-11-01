@@ -117,7 +117,7 @@ const getBootstrapScript = async (req, res) => {
 # ===== OSWAGOLINK AUTO-PROVISIONING =====
 # Run ONLY on a factory-fresh router, after setting the admin password.
 :if ([:len [/interface wireguard find name=wg-vps]] > 0) do={ :error "ALREADY PROVISIONED - this router is already set up. Nothing was changed." }
-:if (![/system device-mode get scheduler]) do={ :error "SCHEDULER IS OFF - run: /system device-mode update scheduler=yes, then unplug and replug the power within 5 minutes, then run this setup again. Nothing was changed." }
+:if (![/system device-mode get scheduler]) do={ :error "SCHEDULER IS OFF - paste step 2 from the Business Panel again: it switches the scheduler on (you will be asked to unplug the power once). Nothing was changed." }
 
 /system identity set name=oswagolink-${assignedIp.replace(/\./g, '-')}
 /system clock set time-zone-autodetect=no time-zone-name=Africa/Dar_es_Salaam

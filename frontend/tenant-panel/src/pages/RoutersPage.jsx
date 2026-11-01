@@ -10,14 +10,16 @@ const CopyIcon = () => (
   </svg>
 );
 
-// Official SHA-256 fingerprint of Let's Encrypt's root certificate "ISRG Root X1"
-// (valid until 2035). It signs the certificate of oswagolink.co.tz.
-const ISRG_ROOT_X1_FINGERPRINT = '96bcec06264976f37460779acf28c5a7cfe8a3c0aae11a8ffcee05c0bddf08c6';
+// Longer commands are hidden until "Show command" is pressed; short ones stay visible
+// (step 1 must stay visible: the password in it has to be changed before pasting)
+const LONG_COMMAND = 120;
 
 // One command with its own copy button
 function CommandBox({ title, note, text, tone = 'blue' }) {
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
+  const isLong = text.length > LONG_COMMAND;
+  const [showText, setShowText] = useState(!isLong);
 
   const copy = async () => {
     try {
@@ -34,12 +36,17 @@ function CommandBox({ title, note, text, tone = 'blue' }) {
     <div className={`cmd-box ${tone === 'amber' ? 'warning' : ''}`}>
       <p className="cmd-title">{title}</p>
       {note && <p className="cmd-note">{note}</p>}
-      <code className="cmd-code">{text}</code>
+      {showText && <code className="cmd-code">{text}</code>}
       <div className="cmd-actions">
         <button onClick={copy} className={`btn btn-sm ${copied ? 'btn-copied' : 'btn-primary'}`}>
           {copied ? 'Copied!' : <><CopyIcon /> Copy Command</>}
         </button>
-        {failed && <span className="cell-muted">Copy failed. Click the text above to select it, then copy it by hand.</span>}
+        {isLong && (
+          <button type="button" onClick={() => setShowText(!showText)} className="btn btn-sm btn-link">
+            {showText ? 'Hide command' : 'Show command'}
+          </button>
+        )}
+        {failed && <span className="cell-muted">Copy failed. Press "Show command", select the text, and copy it by hand.</span>}
       </div>
     </div>
   );
@@ -148,11 +155,11 @@ export default function RoutersPage() {
     }
   };
 
-  // Teaches a factory router to trust our server's certificate (Let's Encrypt root, ISRG Root X1).
-  // The certificate is downloaded without a check (the router cannot check anything yet), so it is
-  // accepted only if its SHA-256 fingerprint is exactly the official one. Safe to run twice.
+  // Switches on RouterOS's built-in list of trusted certificate authorities (like a phone's),
+  // so the router can check that it really talks to oswagolink.co.tz. Older RouterOS versions do
+  // not have this setting: :parse turns that into a clear message instead of a syntax error.
   const trustCommand =
-    `:if ([:len [/certificate find where fingerprint="${ISRG_ROOT_X1_FINGERPRINT}"]] = 0) do={ /tool fetch url="https://letsencrypt.org/certs/isrgrootx1.pem" dst-path=isrgrootx1.pem check-certificate=no; :delay 2s; /certificate import file-name=isrgrootx1.pem passphrase=""; /file remove isrgrootx1.pem }; /certificate remove [find where common-name="ISRG Root X1" and fingerprint!="${ISRG_ROOT_X1_FINGERPRINT}"]; :if ([:len [/certificate find where fingerprint="${ISRG_ROOT_X1_FINGERPRINT}" and trusted=yes]] = 0) do={ :error "CERTIFICATE CHECK FAILED - nothing else was changed. Check the internet connection and run this step again." } else={ :put "OK - the router now trusts oswagolink.co.tz" }`;
+    `:do { [[:parse "/certificate settings set builtin-trust-anchors=trusted"]] } on-error={ :error "ROUTEROS TOO OLD - update RouterOS (System > Packages > Check For Updates), then paste step 2 again. Nothing was changed." }`;
   // check-certificate: the router refuses to run a script from anyone pretending to be our server
   const setupCommand =
     `/tool fetch url="https://oswagolink.co.tz/api/provision/bootstrap/${setupToken}" dst-path=bootstrap.rsc check-certificate=yes-without-crl; :delay 2s; /import file-name=bootstrap.rsc; /file remove bootstrap.rsc`;
@@ -160,8 +167,17 @@ export default function RoutersPage() {
   // certificate check with a wrong date fails. So the clock is set from the internet FIRST.
   const clockCommand =
     `/system ntp client set enabled=yes servers=time.google.com,pool.ntp.org,time.cloudflare.com; :local n 0; :while (([/system ntp client get status] != "synchronized") && ($n < 30)) do={ :delay 2s; :set n ($n + 1) }; :if ([/system ntp client get status] != "synchronized") do={ :error "CLOCK NOT SET - the router could not get the time from the internet. Check that the internet cable is in ether1, then paste step 2 again." } else={ :put "OK - the router clock is correct" }`;
-  // One paste: clock, then trust, then setup. Any :error stops the line before the next part runs.
-  const trustAndSetupCommand = `${clockCommand}; ${trustCommand}; ${setupCommand}`;
+  // New routers can have some features switched off ("device-mode"). The setup needs the
+  // scheduler (WireGuard start and watchdog), fetch (downloads) and the hotspot. Switching them on
+  // only takes effect after the power is unplugged within 5 minutes, so the command asks for that
+  // and stops; if the power is not unplugged in time, it stops with a message instead of going on.
+  const deviceModeCommand =
+    `:if (![/system device-mode get scheduler] || ![/system device-mode get fetch] || ![/system device-mode get hotspot]) do={ :put "SOME FEATURES ARE OFF - UNPLUG THE ROUTER'S POWER NOW, plug it back in, log in again and paste step 2 again. Nothing else was changed."; /system device-mode update scheduler=yes fetch=yes hotspot=yes; :error "THE POWER WAS NOT UNPLUGGED IN TIME - paste step 2 again and unplug the power within 5 minutes." }`;
+  // One paste: trust, features, clock, then setup. Any :error stops the line before the next part runs.
+  const trustAndSetupCommand = `${trustCommand}; ${deviceModeCommand}; ${clockCommand}; ${setupCommand}`;
+  // A leftover FILE named flash/hotspot (from earlier failed attempts) makes reset-html fail; a real folder is never touched
+  const resetHtmlCommand =
+    `:foreach f in=[/file find where name="flash/hotspot" and type!="directory"] do={ /file remove $f }\n/ip hotspot reset-html`;
   const loginFetchCommand =
     `/file remove flash/hotspot/login.html\n/tool fetch url="https://oswagolink.co.tz/api/provision/login/${setupToken}" dst-path=flash/hotspot/login.html check-certificate=yes-without-crl`;
 
@@ -288,21 +304,14 @@ export default function RoutersPage() {
 
             <CommandBox
               title="Step 2: Set up the router (one paste)"
-              note={'The router first sets its clock from the internet (up to 1 minute), checks our server\'s certificate, then builds the hotspot and registers itself on this account. Wait until it shows SETUP COMPLETE. If it stops with CLOCK NOT SET or CERTIFICATE CHECK FAILED, check that the internet cable is in ether1 and paste it again.'}
+              note={'Copy and paste it into the terminal. The router sets its clock (up to 1 minute), downloads its setup from our server over a checked, secure connection, builds the hotspot and registers itself on this account. Wait until it shows SETUP COMPLETE. If it shows SOME FEATURES ARE OFF: unplug the router\'s power, plug it back in, log in again and paste step 2 again (a new router needs this once). If it stops with CLOCK NOT SET or a "failure" line, check that the internet cable is in ether1 and paste it again. ROUTEROS TOO OLD: update RouterOS first.'}
               text={trustAndSetupCommand}
             />
 
             <CommandBox
-              tone="amber"
-              title={'Only if step 2 stopped with "SCHEDULER IS OFF"'}
-              note="Run this, then unplug the router's power and plug it back in within 5 minutes. Then paste step 2 again. Nothing was changed by the stopped attempt."
-              text="/system device-mode update scheduler=yes"
-            />
-
-            <CommandBox
               title="Step 3 (part 1 of 2): Build the customer login pages"
-              note="Run this, then type 0 when it asks for numbers, and y to confirm. Wait until it finishes before part 2."
-              text="/ip hotspot reset-html"
+              note="Paste both lines together, then type 0 when it asks for numbers, and y to confirm. Wait until it finishes before part 2."
+              text={resetHtmlCommand}
             />
 
             <CommandBox
