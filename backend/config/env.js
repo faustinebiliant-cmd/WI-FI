@@ -121,6 +121,16 @@ if (ROUTER_ENCRYPTION_KEY.length !== 32) {
 }
 
 // ------------------------------------------------------------
+// ADMIN_HOST (optional, e.g. "admin.oswagolink.co.tz")
+// When set, the admin API answers only on this address, where Nginx
+// checks the device passes. Empty = no restriction (development).
+// ------------------------------------------------------------
+const ADMIN_HOST = (trimmed(process.env.ADMIN_HOST) || '').toLowerCase();
+if (ADMIN_HOST && !/^[a-z0-9.-]{1,253}$/.test(ADMIN_HOST)) {
+  fail('ADMIN_HOST must be a plain host name such as admin.oswagolink.co.tz (no https://, no slash).');
+}
+
+// ------------------------------------------------------------
 // Frozen export. Nothing downstream reads process.env.
 // ------------------------------------------------------------
 const env = Object.freeze({
@@ -140,6 +150,7 @@ const env = Object.freeze({
   JWT_EXPIRES_IN,
 
   ALLOWED_ORIGINS,
+  ADMIN_HOST,
 
   ROUTER_MODE,
   ROUTER_ENCRYPTION_KEY

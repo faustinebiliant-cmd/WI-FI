@@ -106,16 +106,27 @@ app.get('/api/health', async (req, res) => {
 // ------------------------------------------------------------
 // Routes
 // ------------------------------------------------------------
+// The admin API answers only on the admin address (env.ADMIN_HOST), where Nginx
+// checks the device passes; on oswagolink.co.tz it does not exist. The Host header
+// is used, not req.hostname: with "trust proxy" req.hostname would believe a
+// visitor's own X-Forwarded-Host header.
+const adminHostOnly = (req, res, next) => {
+  if (!env.ADMIN_HOST) return next();
+  const host = String(req.headers.host || '').split(':')[0].toLowerCase();
+  if (host === env.ADMIN_HOST) return next();
+  return res.status(404).json({ success: false, error: 'Not found' });
+};
+
 const authPlatformRoutes = require('./routes/authPlatform');
-app.use('/api/auth/platform', authPlatformRoutes);
+app.use('/api/auth/platform', adminHostOnly, authPlatformRoutes);
 
 // Platform Tenant Management
 const platformTenantRoutes = require('./routes/platformTenant');
-app.use('/api/platform/tenants', platformTenantRoutes);
+app.use('/api/platform/tenants', adminHostOnly, platformTenantRoutes);
 
 // Platform Monitoring (Routers, Sessions, Audit)
 const platformMonitorRoutes = require('./routes/platformMonitor');
-app.use('/api/platform', platformMonitorRoutes);
+app.use('/api/platform', adminHostOnly, platformMonitorRoutes);
 
 const tenantRoutes = require('./routes/tenant');
 app.use('/api/tenant', tenantRoutes);

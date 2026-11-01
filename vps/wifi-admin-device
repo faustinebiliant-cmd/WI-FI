@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+# ============================================================
+# Oswagolink - device passes for the admin panel (admin.oswagolink.co.tz)
+# Install: sudo install -o root -g root -m 750 vps/wifi-admin-device /usr/local/sbin/wifi-admin-device
+#
+# Only browsers holding a pass (client certificate) from this server's own
+# pass office, and listed as allowed, can open the admin panel.
+#
+#   sudo wifi-admin-device init           create the pass office (once) and prepare Nginx
+#   sudo wifi-admin-device add laptop     make a pass file for a device and allow it
+#   sudo wifi-admin-device list           show allowed devices
+#   sudo wifi-admin-device remove phone   cancel a device (lost / stolen / replaced)
+#   sudo wifi-admin-device mode soft      ask for passes, but let everyone in (testing)
+#   sudo wifi-admin-device mode enforce   no pass, no admin panel
+#   sudo wifi-admin-device mode off       stop asking for passes
+#
+# Test page (all modes): https://admin.oswagolink.co.tz/device-check
+# Emergency (locked out): from the VPS console or SSH run: sudo wifi-admin-device mode off
+# ============================================================
+
+set -euo pipefail
+umask 077
+
+DIR="/etc/nginx/admin-devices"
+CA_KEY="$DIR/ca.key"
+CA_CRT="$DIR/ca.crt"
+ALLOWED="$DIR/allowed.map"
+MAP_CONF="/etc/nginx/conf.d/oswagolink-admin-devices.conf"
+SNIPPET="/etc/nginx/snippets/oswagolink-admin-devices.conf"
+ADMIN_SITE="/etc/nginx/sites-available/oswagolink-admin"
+INCLUDE_LINE="    include snippets/oswagolink-admin-devices.conf;"
+OUT_USER="biliant"
+OUT_DIR="/home/$OUT_USER"
+LOCK_FILE="/run/lock/wifi-admin-device.lock"
+PASS_DAYS=730     # a device pass works 2 years
+CA_DAYS=3650      # the pass office works 10 years
+
+fail() { echo "ERROR: $1" >&2; exit 1; }
+
+[ "$(id -u)" -eq 0 ] || fail "run with sudo"
+
+exec 9>"$LOCK_FILE"
+flock -n 9 || fail "another wifi-admin-device command is running"
+
+reload_nginx() {
+    if nginx -t 2>/tmp/wifi-admin-device-nginx-test; then
+        systemctl reload nginx
+    else
+        cat /tmp/wifi-admin-device-nginx-test >&2
+        fail "Nginx test failed; nothing was reloaded"
+    fi
+}
+
+valid_name() {
+    [[ "$1" =~ ^[a-z0-9-]{1,32}$ ]] || fail "device name: use small letters, digits and - only (example: laptop, phone)"
+}
+
+# Nginx's $ssl_client_fingerprint: SHA-1, lowercase hex, no colons
+fingerprint() {
+    openssl x509 -in "$1" -noout -fingerprint -sha1 | cut -d= -f2 | tr -d ':' | tr 'A-F' 'a-f'
+}
+
+write_snippet() {
+    local mode="$1"
+    {
+        echo "# Managed by wifi-admin-device (mode: $mode). Do not edit by hand."
+        if [ "$mode" != "off" ]; then
+            echo "ssl_client_certificate $CA_CRT;"
+            echo "ssl_verify_client optional;"
+            echo "ssl_verify_depth 1;"
+            echo 'location = /device-check {'
+            echo '    default_type text/plain;'
+            echo '    return 200 "Device pass: $oswagolink_admin_device_text\n";'
+            echo '}'
+        fi
+        if [ "$mode" = "enforce" ]; then
+            echo 'if ($oswagolink_admin_device = "") { return 403; }'
+        fi
+    } > "$SNIPPET"
+    chmod 644 "$SNIPPET"
+}
+
+cmd_init() {
+    [ -f "$ADMIN_SITE" ] || fail "$ADMIN_SITE not found (install the admin site first)"
+    install -d -m 700 "$DIR"
+
+    if [ -f "$CA_KEY" ]; then
+        echo "Pass office already exists, keeping it."
+    else
+        openssl req -x509 -newkey rsa:3072 -sha256 -nodes -days "$CA_DAYS" \
+            -keyout "$CA_KEY" -out "$CA_CRT" \
+            -subj "/O=Oswagolink/CN=Oswagolink admin device pass office" \
+            -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
+            -addext "keyUsage=critical,keyCertSign,cRLSign" 2>/dev/null
+        chmod 600 "$CA_KEY"
+        chmod 644 "$CA_CRT"
+        echo "Pass office created (valid $CA_DAYS days)."
+    fi
+
+    [ -f "$ALLOWED" ] || : > "$ALLOWED"
+    chmod 644 "$ALLOWED"
+    install -d -m 755 "$DIR/devices"
+
+    # Allowed-device list: verified pass + known fingerprint -> device name
+    cat > "$MAP_CONF" <<EOF
+# Managed by wifi-admin-device. Do not edit by hand.
+map "\$ssl_client_verify:\$ssl_client_fingerprint" \$oswagolink_admin_device {
+    default "";
+    include $ALLOWED;
+}
+map \$oswagolink_admin_device \$oswagolink_admin_device_text {
+    ""      "none - this browser has no allowed pass";
+    default "OK (\$oswagolink_admin_device)";
+}
+EOF
+    chmod 644 "$MAP_CONF"
+
+    [ -f "$SNIPPET" ] || write_snippet off
+
+    # Hook the snippet into the HTTPS part of the admin site (once)
+    if ! grep -qF "include snippets/oswagolink-admin-devices.conf;" "$ADMIN_SITE"; then
+        grep -q "listen 443 ssl; # managed by Certbot" "$ADMIN_SITE" \
+            || fail "could not find the HTTPS part of $ADMIN_SITE"
+        cp -p "$ADMIN_SITE" "$ADMIN_SITE.before-device-passes"
+        sed -i "/listen 443 ssl; # managed by Certbot/a\\$INCLUDE_LINE" "$ADMIN_SITE"
+        echo "Admin site prepared (backup: $ADMIN_SITE.before-device-passes)."
+    fi
+
+    reload_nginx
+    echo "Ready. Mode: $(head -1 "$SNIPPET" | sed 's/.*mode: \(.*\))\..*/\1/'). Next: wifi-admin-device add laptop"
+}
+
+cmd_add() {
+    local name="$1"
+    valid_name "$name"
+    [ -f "$CA_KEY" ] || fail "run: wifi-admin-device init"
+    grep -q " $name;\$" "$ALLOWED" && fail "device '$name' already exists (remove it first to make a new pass)"
+
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"' EXIT
+
+    openssl req -newkey rsa:2048 -sha256 -nodes -keyout "$tmp/key.pem" -out "$tmp/req.csr" \
+        -subj "/O=Oswagolink/CN=$name" 2>/dev/null
+    printf "basicConstraints=CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=clientAuth\n" > "$tmp/ext.cnf"
+    openssl x509 -req -in "$tmp/req.csr" -CA "$CA_CRT" -CAkey "$CA_KEY" -CAcreateserial \
+        -days "$PASS_DAYS" -sha256 -extfile "$tmp/ext.cnf" -out "$tmp/cert.pem" 2>/dev/null
+
+    local password; password="$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-16)"
+    local p12="$OUT_DIR/admin-pass-$name.p12"
+    # 3DES/SHA-1 packaging: the format every Android and Windows version can import.
+    # The file is only a carrier: delete it once the pass is installed.
+    openssl pkcs12 -export -in "$tmp/cert.pem" -inkey "$tmp/key.pem" -certfile "$CA_CRT" \
+        -name "Oswagolink admin - $name" \
+        -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1 \
+        -passout "pass:$password" -out "$p12"
+    chown "$OUT_USER:$OUT_USER" "$p12"
+    chmod 600 "$p12"
+
+    cp "$tmp/cert.pem" "$DIR/devices/$name.crt"
+    chmod 644 "$DIR/devices/$name.crt"
+    echo "\"SUCCESS:$(fingerprint "$tmp/cert.pem")\" $name;" >> "$ALLOWED"
+
+    reload_nginx
+    echo
+    echo "Pass for '$name' created (valid $PASS_DAYS days)."
+    echo "  File:     $p12"
+    echo "  Password: $password"
+    echo "Write the password down now: it is shown only once. Install the file on the"
+    echo "device, then delete it from the VPS:  rm $p12"
+}
+
+cmd_list() {
+    [ -s "$ALLOWED" ] || { echo "No devices yet."; return; }
+    echo "Allowed devices:"
+    while read -r _ name; do
+        name="${name%;}"
+        local until; until="$(openssl x509 -in "$DIR/devices/$name.crt" -noout -enddate 2>/dev/null | cut -d= -f2)"
+        echo "  $name   (pass valid until: ${until:-unknown})"
+    done < "$ALLOWED"
+    echo "Mode: $(head -1 "$SNIPPET" 2>/dev/null | sed 's/.*mode: \(.*\))\..*/\1/')"
+}
+
+cmd_remove() {
+    local name="$1"
+    valid_name "$name"
+    grep -q " $name;\$" "$ALLOWED" || fail "device '$name' not found"
+    sed -i "/ $name;\$/d" "$ALLOWED"
+    rm -f "$DIR/devices/$name.crt" "$OUT_DIR/admin-pass-$name.p12"
+    reload_nginx
+    echo "Device '$name' removed: its pass no longer opens the admin panel."
+}
+
+cmd_mode() {
+    local mode="$1"
+    case "$mode" in
+        off|soft) ;;
+        enforce)
+            [ -s "$ALLOWED" ] || fail "no allowed devices yet: enforcing now would lock everyone out"
+            ;;
+        *) fail "mode must be off, soft or enforce" ;;
+    esac
+    [ -f "$CA_CRT" ] || [ "$mode" = "off" ] || fail "run: wifi-admin-device init"
+    cp -p "$SNIPPET" "$SNIPPET.previous" 2>/dev/null || true
+    write_snippet "$mode"
+    if ! nginx -t 2>/tmp/wifi-admin-device-nginx-test; then
+        cat /tmp/wifi-admin-device-nginx-test >&2
+        [ -f "$SNIPPET.previous" ] && mv "$SNIPPET.previous" "$SNIPPET"
+        fail "Nginx test failed; previous mode kept"
+    fi
+    systemctl reload nginx
+    echo "Mode is now: $mode"
+}
+
+case "${1:-}" in
+    init)   cmd_init ;;
+    add)    [ $# -eq 2 ] || fail "usage: wifi-admin-device add NAME"; cmd_add "$2" ;;
+    list)   cmd_list ;;
+    remove) [ $# -eq 2 ] || fail "usage: wifi-admin-device remove NAME"; cmd_remove "$2" ;;
+    mode)   [ $# -eq 2 ] || fail "usage: wifi-admin-device mode off|soft|enforce"; cmd_mode "$2" ;;
+    *) sed -n '2,20p' "$0"; exit 1 ;;
+esac
