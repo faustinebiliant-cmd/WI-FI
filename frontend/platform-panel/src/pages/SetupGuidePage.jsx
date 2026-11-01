@@ -47,12 +47,12 @@ export default function SetupGuidePage() {
         <ol className="guide-list">
           <li>Plug the <strong>internet cable</strong> from the business's modem into <strong>port 1</strong>.</li>
           <li>Plug your <strong>laptop</strong> into <strong>port 2</strong> (or 3, 4, 5).</li>
-          <li>Open Winbox, choose the router in the <strong>Neighbors</strong> list (by its MAC address), log in.</li>
+          <li>Open Winbox, choose the router in the <strong>Neighbors</strong> list (by its MAC address), log in. On a new or reset router Winbox first asks you to set a new password: choose a strong one and give it to the business owner.</li>
           <li>Open <strong>New Terminal</strong> and check the router has internet:
             <Code>/ping 8.8.8.8 count=3</Code>
             You must see replies. If not, check the cable in port 1 and the business's modem.
           </li>
-          <li>Run the <strong>3 setup steps</strong> from the Business Panel, in order. Step 2 must end with <strong>SETUP COMPLETE</strong>.</li>
+          <li>Run the <strong>2 setup steps</strong> from the Business Panel, in order. Step 1 must end with <strong>SETUP COMPLETE</strong>.</li>
           <li>Wait up to 5 minutes: the router must show <strong>ONLINE</strong> on the Business Panel's Routers page.</li>
           <li>Unplug your laptop. Plug the <strong>access point</strong> into port 2 (see "Access point" below) and test a voucher on a phone.</li>
         </ol>
@@ -97,7 +97,7 @@ export default function SetupGuidePage() {
         </ol>
 
         <h3 className="guide-step">4. Run the setup</h3>
-        <p className="guide-text">Run the <strong>3 setup steps</strong> from the Business Panel, in order. Step 2 must end with <strong>SETUP COMPLETE</strong>.</p>
+        <p className="guide-text">Run the <strong>2 setup steps</strong> from the Business Panel, in order. Step 1 must end with <strong>SETUP COMPLETE</strong>.</p>
 
         <h3 className="guide-step">5. Close the door (never skip this)</h3>
         <Code>/tool mac-server mac-winbox set allowed-interface-list=LAN</Code>
@@ -125,10 +125,10 @@ export default function SetupGuidePage() {
 
       <Section title="If something goes wrong">
         <ul className="guide-list">
-          <li><strong>CLOCK NOT SET</strong>, or a <strong>failure</strong> line from step 2: the router has no internet. Check the cable in port 1 and run <strong>/ping 8.8.8.8 count=3</strong>, then paste step 2 again.</li>
-          <li><strong>ROUTEROS TOO OLD</strong>: the router's software is too old for the secure setup. Update it (System &gt; Packages &gt; Check For Updates, then Download &amp; Install; the router restarts), then paste step 2 again.</li>
-          <li><strong>SOME FEATURES ARE OFF</strong> (normal once on a new router): step 2 has already asked the router to switch them on. Unplug the router's power, plug it back in, log in again and paste step 2 again. If it then says <strong>THE POWER WAS NOT UNPLUGGED IN TIME</strong>, paste step 2 again and unplug within 5 minutes.</li>
-          <li><strong>A download fails</strong> (step 2 or step 3): check in this order: the router can reach the internet and names (<strong>/ping 8.8.8.8 count=3</strong> and <strong>/ping oswagolink.co.tz count=3</strong>); the login page goes to <strong>flash/hotspot/login.html</strong> (not hotspot/…); and <strong>/file print where name~"flash/hotspot"</strong> shows a folder, not an empty file (step 3 part 1 removes such a file by itself).</li>
+          <li><strong>CLOCK NOT SET</strong>, or a <strong>failure</strong> line from step 1: the router has no internet. Check the cable in port 1 and run <strong>/ping 8.8.8.8 count=3</strong>, then paste step 1 again.</li>
+          <li><strong>ROUTEROS TOO OLD</strong>: the router's software is too old for the secure setup. Update it (System &gt; Packages &gt; Check For Updates, then Download &amp; Install; the router restarts), then paste step 1 again.</li>
+          <li><strong>SOME FEATURES ARE OFF</strong> (normal once on a new router): step 1 has already asked the router to switch them on. Unplug the router's power, plug it back in, log in again and paste step 1 again. If it then says <strong>THE POWER WAS NOT UNPLUGGED IN TIME</strong>, paste step 1 again and unplug within 5 minutes.</li>
+          <li><strong>A download fails</strong> (step 1 or step 2): check in this order: the router can reach the internet and names (<strong>/ping 8.8.8.8 count=3</strong> and <strong>/ping oswagolink.co.tz count=3</strong>); the login page goes to <strong>flash/hotspot/login.html</strong> (not hotspot/…); and <strong>/file print where name~"flash/hotspot"</strong> shows a folder, not an empty file (step 2 part 1 removes such a file by itself).</li>
           <li><strong>ALREADY PROVISIONED</strong>: this router was set up before. Reset it to factory settings (<strong>/system reset-configuration</strong>, then confirm with y) and start again. Never repair a half-finished setup by hand.</li>
           <li><strong>The setup link has expired</strong>: press <strong>Setup Commands</strong> on the Business Panel's Routers page to get new commands.</li>
           <li><strong>Router stays OFFLINE</strong> after 5 minutes: on the router run <strong>{'/log print where message~"wg-"'}</strong> and send the result to support.</li>

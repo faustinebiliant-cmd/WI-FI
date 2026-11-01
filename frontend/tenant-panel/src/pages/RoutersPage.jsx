@@ -11,7 +11,6 @@ const CopyIcon = () => (
 );
 
 // Longer commands are hidden until "Show command" is pressed; short ones stay visible
-// (step 1 must stay visible: the password in it has to be changed before pasting)
 const LONG_COMMAND = 120;
 
 // One command with its own copy button
@@ -159,20 +158,20 @@ export default function RoutersPage() {
   // so the router can check that it really talks to oswagolink.co.tz. Older RouterOS versions do
   // not have this setting: :parse turns that into a clear message instead of a syntax error.
   const trustCommand =
-    `:do { [[:parse "/certificate settings set builtin-trust-anchors=trusted"]] } on-error={ :error "ROUTEROS TOO OLD - update RouterOS (System > Packages > Check For Updates), then paste step 2 again. Nothing was changed." }`;
+    `:do { [[:parse "/certificate settings set builtin-trust-anchors=trusted"]] } on-error={ :error "ROUTEROS TOO OLD - update RouterOS (System > Packages > Check For Updates), then paste step 1 again. Nothing was changed." }`;
   // check-certificate: the router refuses to run a script from anyone pretending to be our server
   const setupCommand =
     `/tool fetch url="https://oswagolink.co.tz/api/provision/bootstrap/${setupToken}" dst-path=bootstrap.rsc check-certificate=yes-without-crl; :delay 2s; /import file-name=bootstrap.rsc; /file remove bootstrap.rsc`;
   // The hEX has no clock battery: after a power cut, or when new, its date can be far off, and a
   // certificate check with a wrong date fails. So the clock is set from the internet FIRST.
   const clockCommand =
-    `/system ntp client set enabled=yes servers=time.google.com,pool.ntp.org,time.cloudflare.com; :local n 0; :while (([/system ntp client get status] != "synchronized") && ($n < 30)) do={ :delay 2s; :set n ($n + 1) }; :if ([/system ntp client get status] != "synchronized") do={ :error "CLOCK NOT SET - the router could not get the time from the internet. Check that the internet cable is in ether1, then paste step 2 again." } else={ :put "OK - the router clock is correct" }`;
+    `/system ntp client set enabled=yes servers=time.google.com,pool.ntp.org,time.cloudflare.com; :local n 0; :while (([/system ntp client get status] != "synchronized") && ($n < 30)) do={ :delay 2s; :set n ($n + 1) }; :if ([/system ntp client get status] != "synchronized") do={ :error "CLOCK NOT SET - the router could not get the time from the internet. Check that the internet cable is in ether1, then paste step 1 again." } else={ :put "OK - the router clock is correct" }`;
   // New routers can have some features switched off ("device-mode"). The setup needs the
   // scheduler (WireGuard start and watchdog), fetch (downloads) and the hotspot. Switching them on
   // only takes effect after the power is unplugged within 5 minutes, so the command asks for that
   // and stops; if the power is not unplugged in time, it stops with a message instead of going on.
   const deviceModeCommand =
-    `:if (![/system device-mode get scheduler] || ![/system device-mode get fetch] || ![/system device-mode get hotspot]) do={ :put "SOME FEATURES ARE OFF - UNPLUG THE ROUTER'S POWER NOW, plug it back in, log in again and paste step 2 again. Nothing else was changed."; /system device-mode update scheduler=yes fetch=yes hotspot=yes; :error "THE POWER WAS NOT UNPLUGGED IN TIME - paste step 2 again and unplug the power within 5 minutes." }`;
+    `:if (![/system device-mode get scheduler] || ![/system device-mode get fetch] || ![/system device-mode get hotspot]) do={ :put "SOME FEATURES ARE OFF - UNPLUG THE ROUTER'S POWER NOW, plug it back in, log in again and paste step 1 again. Nothing else was changed."; /system device-mode update scheduler=yes fetch=yes hotspot=yes; :error "THE POWER WAS NOT UNPLUGGED IN TIME - paste step 1 again and unplug the power within 5 minutes." }`;
   // One paste: trust, features, clock, then setup. Any :error stops the line before the next part runs.
   const trustAndSetupCommand = `${trustCommand}; ${deviceModeCommand}; ${clockCommand}; ${setupCommand}`;
   // A leftover FILE named flash/hotspot (from earlier failed attempts) makes reset-html fail; a real folder is never touched
@@ -289,33 +288,29 @@ export default function RoutersPage() {
               Use a brand-new (or factory-reset) router with its default configuration.
             </p>
             <p className="notice notice-info">
-              <strong>How to connect:</strong> put the internet cable (from your modem) in <strong>port 1 (ether1)</strong>. Connect your computer to <strong>port 2, 3, 4 or 5</strong> and open Winbox <strong>by MAC address</strong> (pick the router in the Neighbors list), not by IP address. The router must have internet before step 2.
+              <strong>How to connect:</strong> put the internet cable (from your modem) in <strong>port 1 (ether1)</strong>. Connect your computer to <strong>port 2, 3, 4 or 5</strong> and open Winbox <strong>by MAC address</strong> (pick the router in the Neighbors list), not by IP address. The router must have internet before step 1.
+            </p>
+            <p className="notice notice-info">
+              <strong>Router password:</strong> the first time you log in, Winbox asks you to set a new password. Choose a strong one and write it down: you need it every time you open the router.
             </p>
             <p className="notice notice-warning" style={{ marginBottom: '20px' }}>
               The setup commands below contain a secret: never share them. They work for 12 hours. If they expire, or you close this window too early, press "Setup Commands" on the Routers page to get new ones (only while the router is not set up yet).
             </p>
 
             <CommandBox
-              tone="amber"
-              title="Step 1: Set the router password"
-              note="Replace the words in capitals with a strong password of your own, and write it down. Without this the router has no password."
-              text={'/user set admin password="CHOOSE_A_STRONG_PASSWORD"'}
-            />
-
-            <CommandBox
-              title="Step 2: Set up the router (one paste)"
-              note={'Copy and paste it into the terminal. The router sets its clock (up to 1 minute), downloads its setup from our server over a checked, secure connection, builds the hotspot and registers itself on this account. Wait until it shows SETUP COMPLETE. If it shows SOME FEATURES ARE OFF: unplug the router\'s power, plug it back in, log in again and paste step 2 again (a new router needs this once). If it stops with CLOCK NOT SET or a "failure" line, check that the internet cable is in ether1 and paste it again. ROUTEROS TOO OLD: update RouterOS first.'}
+              title="Step 1: Set up the router (one paste)"
+              note={'Copy and paste it into the terminal. The router sets its clock (up to 1 minute), downloads its setup from our server over a checked, secure connection, builds the hotspot and registers itself on this account. Wait until it shows SETUP COMPLETE. If it shows SOME FEATURES ARE OFF: unplug the router\'s power, plug it back in, log in again and paste step 1 again (a new router needs this once). If it stops with CLOCK NOT SET or a "failure" line, check that the internet cable is in ether1 and paste it again. ROUTEROS TOO OLD: update RouterOS first.'}
               text={trustAndSetupCommand}
             />
 
             <CommandBox
-              title="Step 3 (part 1 of 2): Build the customer login pages"
+              title="Step 2 (part 1 of 2): Build the customer login pages"
               note="Paste both lines together, then type 0 when it asks for numbers, and y to confirm. Wait until it finishes before part 2."
               text={resetHtmlCommand}
             />
 
             <CommandBox
-              title="Step 3 (part 2 of 2): Install your customer login page"
+              title="Step 2 (part 2 of 2): Install your customer login page"
               note="Paste both lines together. Afterwards the router shows your portal to your customers."
               text={loginFetchCommand}
             />
