@@ -11,6 +11,7 @@
 --   2026-11-01-scaling-indexes.sql         indexes for 500 businesses, duplicates removed
 --   2026-11-01-provision-token-unique.sql  UNIQUE (provision_token) where it was missing
 --   2026-11-01-one-open-session.sql        one open session per voucher and device
+--   2026-11-01-history-retention-indexes.sql  indexes for the nightly history clean-up
 --
 -- When the database changes: update this file AND add a migration file.
 -- ============================================================
@@ -238,3 +239,7 @@ CREATE INDEX idx_vouchers_active_expires ON public.vouchers(expires_at) WHERE st
 -- Rule: one voucher on one device has at most one open session
 -- (the portal and the cleaner insert with ON CONFLICT DO NOTHING)
 CREATE UNIQUE INDEX idx_sessions_one_open ON public.sessions(voucher_id, mac_address) WHERE ended_at IS NULL;
+-- Nightly history clean-up (backend/scripts/deleteOldHistory.js) finds old rows fast
+CREATE INDEX idx_sessions_ended ON public.sessions(ended_at) WHERE ended_at IS NOT NULL;
+CREATE INDEX idx_vouchers_finished ON public.vouchers((GREATEST(created_at, used_at, expires_at)))
+  WHERE status IN ('expired', 'cancelled');

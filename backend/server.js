@@ -198,6 +198,33 @@ const runPinger = () => {
 runPinger();
 const pingerInterval = setInterval(runPinger, 5 * 60 * 1000);
 
+// ------------------------------------------------------------
+// History clean-up: deletes history older than 1 month.
+// Every night at 02:00 Tanzania time (23:00 UTC), one hour before
+// the database backup, and once 2 minutes after start-up.
+// ------------------------------------------------------------
+let historyRunning = false;
+const runHistoryCleanup = () => {
+  if (historyRunning) return;
+  historyRunning = true;
+  execFile(
+    process.execPath,
+    [path.join(__dirname, 'scripts', 'deleteOldHistory.js')],
+    { timeout: 30 * 60 * 1000, cwd: __dirname },
+    (err, stdout, stderr) => {
+      historyRunning = false;
+      if (err) console.error('History clean-up error:', err.message);
+      if (stdout) console.log(stdout.trim());
+      if (stderr) console.error(stderr.trim());
+    }
+  );
+};
+const historyStartTimer = setTimeout(runHistoryCleanup, 2 * 60 * 1000);
+// Checked every hour, so it runs exactly once during the 23:00 UTC hour
+const historyInterval = setInterval(() => {
+  if (new Date().getUTCHours() === 23) runHistoryCleanup();
+}, 60 * 60 * 1000);
+
 // Session cleaner: expires vouchers and clears stale sessions
 const { startSessionCleaner } = require('./services/sessionCleaner');
 
@@ -232,6 +259,8 @@ const gracefulShutdown = (signal) => {
 
     // 2. Stop background tasks
     clearInterval(pingerInterval);
+    clearInterval(historyInterval);
+    clearTimeout(historyStartTimer);
     console.log('Background tasks stopped.');
 
     // 3. Close database connection
