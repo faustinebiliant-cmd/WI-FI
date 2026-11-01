@@ -8,7 +8,42 @@ const { TENANT_BLOCKED_SQL, PORTAL_BLOCKED_ERROR } = require('../middleware/subs
 const TOKEN_RE = /^[A-Za-z0-9_-]{8,128}$/;
 const NOT_REACHABLE = 'The WiFi system is not reachable right now. Please try again in a moment.';
 
-// GET /api/portal/info/:router_token
+// What the portal should tell this device on this router:
+//   { active_until, speed_mbps }  its voucher still runs (show the time left)
+//   { ended_at }                  its voucher ended in the last 24 hours ("your time is over")
+//   null                          nothing known (first visit, no MAC, or older than 24 hours)
+const DEVICE_ENDED_WINDOW_HOURS = 24;
+const getDeviceState = async (routerId, mac) => {
+  const deviceMac = String(mac || '').trim().toUpperCase().replace(/-/g, ':');
+  if (!isValidMACAddress(deviceMac) || deviceMac === '00:00:00:00:00:00') return null;
+
+  const active = await db.query(
+    `SELECT v.expires_at, p.speed_down_kbps
+     FROM sessions s
+     JOIN vouchers v ON v.id = s.voucher_id
+     JOIN packages p ON p.id = v.package_id
+     WHERE s.router_id = $1 AND s.mac_address = $2 AND v.status = 'active' AND v.expires_at > NOW()
+     ORDER BY v.expires_at DESC LIMIT 1`,
+    [routerId, deviceMac]
+  );
+  if (active.rows.length > 0) {
+    return { active_until: active.rows[0].expires_at, speed_mbps: active.rows[0].speed_down_kbps / 1024 };
+  }
+
+  const ended = await db.query(
+    `SELECT v.expires_at
+     FROM sessions s
+     JOIN vouchers v ON v.id = s.voucher_id
+     WHERE s.router_id = $1 AND s.mac_address = $2 AND v.status = 'expired'
+       AND v.expires_at <= NOW() AND v.expires_at > NOW() - make_interval(hours => $3)
+     ORDER BY v.expires_at DESC LIMIT 1`,
+    [routerId, deviceMac, DEVICE_ENDED_WINDOW_HOURS]
+  );
+  if (ended.rows.length > 0) return { ended_at: ended.rows[0].expires_at };
+  return null;
+};
+
+// GET /api/portal/info/:router_token   (optional ?mac=AA:BB:... for the device state)
 const getPortalInfo = async (req, res) => {
   try {
     const { router_token } = req.params;
@@ -39,7 +74,8 @@ const getPortalInfo = async (req, res) => {
       data: {
         business_name: router.business_name,
         logo_url: router.logo_url,
-        packages: packagesRes.rows
+        packages: packagesRes.rows,
+        device: await getDeviceState(router.id, req.query.mac)
       }
     });
   } catch (error) {

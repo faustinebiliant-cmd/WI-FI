@@ -30,15 +30,38 @@ export default function App() {
   const loginUrl = queryParams.get('login') || null;
   const origUrl = queryParams.get('orig') || null;
 
+  // The page info includes this device's state (time left, or when its time ended)
+  const loadInfo = () => {
+    const macQuery = macAddress ? `?mac=${encodeURIComponent(macAddress)}` : '';
+    return apiClient.get(`/portal/info/${routerToken}${macQuery}`)
+      .then(res => setBusinessInfo(res.data.data))
+      .catch((err) => setErrorMessage(err.response?.data?.error || 'Invalid or inactive router.'));
+  };
+
   useEffect(() => {
     if (!routerToken) {
       setErrorMessage('This portal is not configured correctly (Missing Router Token).');
       return;
     }
-    apiClient.get(`/portal/info/${routerToken}`)
-      .then(res => setBusinessInfo(res.data.data))
-      .catch((err) => setErrorMessage(err.response?.data?.error || 'Invalid or inactive router.'));
+    loadInfo();
   }, [routerToken]);
+
+  // While the device's time runs, count down; at zero, ask the server again so the page
+  // switches to "your time is over" by itself
+  const activeUntil = businessInfo?.device?.active_until ? new Date(businessInfo.device.active_until) : null;
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!activeUntil) return;
+    const timer = setInterval(() => {
+      setNow(Date.now());
+      if (Date.now() >= activeUntil.getTime()) {
+        clearInterval(timer);
+        // The router needs up to a minute to end the session; then the server says "ended"
+        setTimeout(loadInfo, 5000);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [businessInfo?.device?.active_until]);
 
   useEffect(() => {
     const checkLockout = () => {
@@ -124,14 +147,16 @@ export default function App() {
         passwordInput.value = voucherCode.toUpperCase();
         form.appendChild(passwordInput);
 
-        // If there is an original URL (e.g. apple.com), tell MikroTik to go there after login
-        if (origUrl) {
-          const dstInput = document.createElement('input');
-          dstInput.type = 'hidden';
-          dstInput.name = 'dst';
-          dstInput.value = origUrl;
-          form.appendChild(dstInput);
-        }
+        // After login the router opens this portal again (without "orig"): it then shows
+        // "You're connected" with a live countdown, and "your time is over" when it ends.
+        // The portal stays reachable after the time ends (it is in the walled garden).
+        const statusUrl = new URL(window.location.href);
+        statusUrl.searchParams.delete('orig');
+        const dstInput = document.createElement('input');
+        dstInput.type = 'hidden';
+        dstInput.name = 'dst';
+        dstInput.value = statusUrl.toString();
+        form.appendChild(dstInput);
 
         document.body.appendChild(form);
         
@@ -221,6 +246,39 @@ export default function App() {
     );
   }
 
+  // This device still has time: show "You're connected" with a live countdown
+  if (activeUntil && now < activeUntil.getTime()) {
+    const minutesLeft = Math.ceil((activeUntil.getTime() - now) / 60000);
+    return (
+      <div className="portal-page">
+        <div className="portal-card">
+          <div className="success-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>
+          </div>
+          <h1 className="portal-title">You're connected</h1>
+          <p className="portal-sub">{businessInfo?.business_name || 'Enjoy your internet.'}</p>
+
+          <div className="success-time">
+            Time left: <strong>{minutesLeft <= 1 ? 'less than a minute' : formatLeft(minutesLeft)}</strong><br />
+            until <strong>{formatEnd(activeUntil)}</strong>
+            {businessInfo.device.speed_mbps ? <> at <strong>{businessInfo.device.speed_mbps} Mbps</strong></> : null}
+          </div>
+
+          <p className="price-note">Keep this page open: it tells you when your time is over.</p>
+          <p className="portal-footer">
+            Powered by{' '}
+            <a href="https://oswagolink.co.tz/" target="_blank" rel="noopener noreferrer">Oswagolink</a>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Time just ran out on this page, or the server knows it ended in the last 24 hours
+  const endedAt = businessInfo?.device?.ended_at
+    ? new Date(businessInfo.device.ended_at)
+    : (activeUntil && now >= activeUntil.getTime() ? activeUntil : null);
+
   return (
     <div className="portal-page">
       <div className="portal-card">
@@ -229,8 +287,16 @@ export default function App() {
         </div>
         <h1 className="portal-title">{businessInfo?.business_name || 'Welcome'}</h1>
         <p className="portal-sub">
-          {PAYMENTS_ENABLED && activeTab === 'buy' ? 'Choose a package to buy.' : 'Enter your voucher code to connect.'}
+          {endedAt
+            ? 'Your WiFi time is over.'
+            : (PAYMENTS_ENABLED && activeTab === 'buy' ? 'Choose a package to buy.' : 'Enter your voucher code to connect.')}
         </p>
+
+        {endedAt && (
+          <div className="alert alert-warning">
+            Your WiFi time ended at <strong>{formatEnd(endedAt)}</strong>. Enter a new voucher code to continue.
+          </div>
+        )}
 
         {errorMessage && <div className="alert alert-danger">{errorMessage}</div>}
 

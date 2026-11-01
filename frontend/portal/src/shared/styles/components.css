@@ -13,6 +13,7 @@
 
 .alert { padding: 10px 14px; border-radius: var(--radius-sm); margin: 0 0 16px 0; font-size: 13px; text-align: left; line-height: 1.5; }
 .alert-danger { background: var(--danger-soft); color: #b91c1c; }
+.alert-warning { background: var(--warning-soft); color: #92400e; }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 20px; border: 1px solid transparent; border-radius: var(--radius); font-weight: 600; font-size: 15px; cursor: pointer; transition: background var(--transition); }
 .btn:disabled { opacity: 0.55; cursor: not-allowed; }
