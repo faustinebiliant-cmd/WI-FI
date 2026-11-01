@@ -71,6 +71,7 @@ export default function PackagesPage() {
     }
     setIsSubmitting(true);
 
+    // Minutes stay as they are; the other units are turned into minutes
     let duration_minutes = parseInt(formData.duration_value, 10);
     if (formData.duration_unit === 'hours') duration_minutes *= 60;
     if (formData.duration_unit === 'days') duration_minutes *= 1440;
@@ -115,9 +116,9 @@ export default function PackagesPage() {
   };
 
   const formatDuration = (mins) => {
-    if (mins >= 1440 && mins % 1440 === 0) return `${mins / 1440} Days`;
-    if (mins >= 60 && mins % 60 === 0) return `${mins / 60} Hours`;
-    return `${mins} Mins`;
+    if (mins >= 1440 && mins % 1440 === 0) return `${mins / 1440} Day${mins / 1440 > 1 ? 's' : ''}`;
+    if (mins >= 60 && mins % 60 === 0) return `${mins / 60} Hour${mins / 60 > 1 ? 's' : ''}`;
+    return `${mins} Min${mins > 1 ? 's' : ''}`;
   };
 
   return (
@@ -200,6 +201,7 @@ export default function PackagesPage() {
                 <div className="form-group">
                   <label>Unit</label>
                   <select className="form-control" value={formData.duration_unit} onChange={e => setFormData({ ...formData, duration_unit: e.target.value })} disabled={isSubmitting}>
+                    <option value="minutes">Minutes</option>
                     <option value="hours">Hours</option>
                     <option value="days">Days</option>
                     <option value="weeks">Weeks</option>

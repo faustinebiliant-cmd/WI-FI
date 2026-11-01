@@ -87,7 +87,7 @@ export default function App() {
   const formatDuration = (mins) => {
     if (mins >= 1440 && mins % 1440 === 0) return `${mins / 1440} Day${mins / 1440 > 1 ? 's' : ''}`;
     if (mins >= 60 && mins % 60 === 0) return `${mins / 60} Hour${mins / 60 > 1 ? 's' : ''}`;
-    return `${mins} Mins`;
+    return `${mins} Min${mins > 1 ? 's' : ''}`;
   };
 
   // "1d 4h", "4h 12m" or "12m", from the minutes left that the server sent

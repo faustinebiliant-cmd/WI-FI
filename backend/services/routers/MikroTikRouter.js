@@ -98,19 +98,28 @@ class MikroTikRouter {
     return conn;
   }
 
-  // Runs one step on its own short, clean connection.
-  // A step that gets no answer fails after STEP_TIMEOUT_MS instead of waiting forever.
-  async _step(work) {
+  // One login for a whole action (redeem, remove, disconnect): every login over
+  // the tunnel costs time, so an action no longer logs in once per small step.
+  // work(step) runs its steps one after the other on that connection; a step that
+  // gets no answer fails after STEP_TIMEOUT_MS, which ends the whole action.
+  // (The "!empty" patch above keeps the connection usable after an empty search.)
+  async _session(work) {
     let conn;
-    let timer;
     try {
       conn = await this.getConnection();
-      const timeout = new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error('Router did not answer in time')), STEP_TIMEOUT_MS);
-      });
-      return await Promise.race([work(conn), timeout]);
+      const step = async (fn) => {
+        let timer;
+        const timeout = new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Router did not answer in time')), STEP_TIMEOUT_MS);
+        });
+        try {
+          return await Promise.race([fn(conn), timeout]);
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+      return await work(step);
     } finally {
-      clearTimeout(timer);
       if (conn) {
         try {
           const closing = conn.close();
@@ -120,8 +129,14 @@ class MikroTikRouter {
     }
   }
 
+  // An action of a single step
+  _step(fn) {
+    return this._session((step) => step(fn));
+  }
+
   // Makes sure a speed profile exists on THIS router and returns its name
-  async ensureSpeedProfile(downKbps, upKbps) {
+  // (step: from the action's _session, so it uses the same login)
+  async ensureSpeedProfile(step, downKbps, upKbps) {
     const down = Math.round(Number(downKbps));
     const up = Math.round(Number(upKbps));
     if (!Number.isInteger(down) || !Number.isInteger(up) ||
@@ -131,13 +146,13 @@ class MikroTikRouter {
 
     const name = `spd-${down}d-${up}u`;
 
-    const profiles = await this._step((conn) =>
+    const profiles = await step((conn) =>
       safePrint(conn, '/ip/hotspot/user/profile/print', ['=.proplist=name', `?name=${name}`])
     );
 
     if (!profiles.some((p) => p.name === name)) {
       try {
-        await this._step((conn) =>
+        await step((conn) =>
           conn.write('/ip/hotspot/user/profile/add', [
             `=name=${name}`,
             `=rate-limit=${up}k/${down}k`, // upload/download, from the customer's side
@@ -165,33 +180,35 @@ class MikroTikRouter {
       const minutes = Math.max(1, Math.round(Number(durationMinutes)));
       if (!Number.isFinite(minutes)) throw new Error('Invalid duration');
 
-      const profile = await this.ensureSpeedProfile(speedDownKbps, speedUpKbps);
+      await this._session(async (step) => {
+        const profile = await this.ensureSpeedProfile(step, speedDownKbps, speedUpKbps);
 
-      // Ask the router for this one code only, not its whole user list
-      // (the code was checked by cleanCode, so it is safe inside the query)
-      const users = await this._step((conn) =>
-        safePrint(conn, '/ip/hotspot/user/print', ['=.proplist=.id,name', `?name=${voucher}`])
-      );
-      const existing = users.find((u) => u.name === voucher);
+        // Ask the router for this one code only, not its whole user list
+        // (the code was checked by cleanCode, so it is safe inside the query)
+        const users = await step((conn) =>
+          safePrint(conn, '/ip/hotspot/user/print', ['=.proplist=.id,name', `?name=${voucher}`])
+        );
+        const existing = users.find((u) => u.name === voucher);
 
-      if (existing) {
-        // The router kept the user: only make sure the speed is right
-        await this._step((conn) =>
-          conn.write('/ip/hotspot/user/set', [
-            `=.id=${existing['.id']}`,
-            `=profile=${profile}`
-          ])
-        );
-      } else {
-        await this._step((conn) =>
-          conn.write('/ip/hotspot/user/add', [
-            `=name=${voucher}`,
-            `=password=${voucher}`, // the password is the same as the code
-            `=limit-uptime=${minutes}m`,
-            `=profile=${profile}`
-          ])
-        );
-      }
+        if (existing) {
+          // The router kept the user: only make sure the speed is right
+          await step((conn) =>
+            conn.write('/ip/hotspot/user/set', [
+              `=.id=${existing['.id']}`,
+              `=profile=${profile}`
+            ])
+          );
+        } else {
+          await step((conn) =>
+            conn.write('/ip/hotspot/user/add', [
+              `=name=${voucher}`,
+              `=password=${voucher}`, // the password is the same as the code
+              `=limit-uptime=${minutes}m`,
+              `=profile=${profile}`
+            ])
+          );
+        }
+      });
 
       return { ok: true, expiresAt: new Date(Date.now() + minutes * 60000) };
     } catch (error) {
@@ -210,35 +227,37 @@ class MikroTikRouter {
     try {
       const voucher = cleanCode(code);
 
-      // 1. Forget every device the router remembers for this voucher
-      const cookies = await this._step((conn) =>
-        safePrint(conn, '/ip/hotspot/cookie/print', ['=.proplist=.id', `?user=${voucher}`])
-      );
-      for (const cookie of cookies) {
-        await this._step((conn) =>
-          conn.write('/ip/hotspot/cookie/remove', [`=.id=${cookie['.id']}`])
+      await this._session(async (step) => {
+        // 1. Forget every device the router remembers for this voucher
+        const cookies = await step((conn) =>
+          safePrint(conn, '/ip/hotspot/cookie/print', ['=.proplist=.id', `?user=${voucher}`])
         );
-      }
+        for (const cookie of cookies) {
+          await step((conn) =>
+            conn.write('/ip/hotspot/cookie/remove', [`=.id=${cookie['.id']}`])
+          );
+        }
 
-      // 2. Delete the hotspot user, so nothing can log in with this code any more
-      const users = await this._step((conn) =>
-        safePrint(conn, '/ip/hotspot/user/print', ['=.proplist=.id,name', `?name=${voucher}`])
-      );
-      for (const user of users.filter((u) => u.name === voucher)) {
-        await this._step((conn) =>
-          conn.write('/ip/hotspot/user/remove', [`=.id=${user['.id']}`])
+        // 2. Delete the hotspot user, so nothing can log in with this code any more
+        const users = await step((conn) =>
+          safePrint(conn, '/ip/hotspot/user/print', ['=.proplist=.id,name', `?name=${voucher}`])
         );
-      }
+        for (const user of users.filter((u) => u.name === voucher)) {
+          await step((conn) =>
+            conn.write('/ip/hotspot/user/remove', [`=.id=${user['.id']}`])
+          );
+        }
 
-      // 3. Disconnect running sessions of this voucher
-      const active = await this._step((conn) =>
-        safePrint(conn, '/ip/hotspot/active/print', ['=.proplist=.id', `?user=${voucher}`])
-      );
-      for (const session of active) {
-        await this._step((conn) =>
-          conn.write('/ip/hotspot/active/remove', [`=.id=${session['.id']}`])
+        // 3. Disconnect running sessions of this voucher
+        const active = await step((conn) =>
+          safePrint(conn, '/ip/hotspot/active/print', ['=.proplist=.id', `?user=${voucher}`])
         );
-      }
+        for (const session of active) {
+          await step((conn) =>
+            conn.write('/ip/hotspot/active/remove', [`=.id=${session['.id']}`])
+          );
+        }
+      });
 
       return { ok: true };
     } catch (error) {
@@ -276,14 +295,16 @@ class MikroTikRouter {
   async disconnectUser(macAddress) {
     try {
       const mac = cleanMac(macAddress);
-      const active = await this._step((conn) =>
-        safePrint(conn, '/ip/hotspot/active/print', ['=.proplist=.id', `?mac-address=${mac}`])
-      );
-      for (const session of active) {
-        await this._step((conn) =>
-          conn.write('/ip/hotspot/active/remove', [`=.id=${session['.id']}`])
+      await this._session(async (step) => {
+        const active = await step((conn) =>
+          safePrint(conn, '/ip/hotspot/active/print', ['=.proplist=.id', `?mac-address=${mac}`])
         );
-      }
+        for (const session of active) {
+          await step((conn) =>
+            conn.write('/ip/hotspot/active/remove', [`=.id=${session['.id']}`])
+          );
+        }
+      });
       return { ok: true };
     } catch (error) {
       console.error('[MikroTik] Failed to disconnect device:', error.message);

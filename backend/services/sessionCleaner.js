@@ -6,6 +6,18 @@ const MikroTikRouter = require('./routers/MikroTikRouter');
 let running = false;
 
 const EXPIRE_BATCH = 200;
+const SYNC_CONCURRENCY = 10; // routers handled at the same time
+
+// Runs work(item) for every item, at most `limit` at the same time
+const runAtSameTime = async (items, limit, work) => {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      await work(items[next++]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+};
 
 // Takes a voucher's user off its router. In mock mode there is no router to talk to.
 const removeFromRouter = async (router, code) => {
@@ -35,33 +47,47 @@ const expireVouchers = async () => {
     LIMIT $1
   `, [EXPIRE_BATCH, env.ROUTER_MODE !== 'real']);
 
-  const failedRouters = new Set();
-
+  // Grouped by router: several routers are handled at the same time (a busy
+  // evening must not make customers wait in one long line for their removal),
+  // and the vouchers of one router one after the other.
+  const byRouter = new Map();
   for (const v of rows) {
     const hasRouter = v.router_id && v.ip_address && v.ip_address !== '0.0.0.0';
-    if (hasRouter) {
-      if (failedRouters.has(v.router_id)) continue;
-      const result = await removeFromRouter(v, v.code);
-      if (!result || !result.ok) {
-        failedRouters.add(v.router_id);
-        continue;
-      }
-    }
-
-    // Both or neither: an expired voucher never keeps an open session
-    await db.transaction(async (client) => {
-      await client.query("UPDATE vouchers SET status = 'expired' WHERE id = $1 AND status = 'active'", [v.id]);
-      await client.query(
-        "UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'Voucher expired' WHERE voucher_id = $1 AND ended_at IS NULL",
-        [v.id]
-      );
-    });
-    // The code is also the router password, so only the id is logged
-    console.log(`[Cleaner] Voucher ${v.id} expired`);
+    const key = hasRouter ? v.router_id : `none:${v.id}`;
+    if (!byRouter.has(key)) byRouter.set(key, []);
+    byRouter.get(key).push({ ...v, hasRouter });
   }
+
+  const expireGroup = async (vouchers) => {
+    for (const v of vouchers) {
+      if (v.hasRouter) {
+        const result = await removeFromRouter(v, v.code);
+        // Router not reachable: its other vouchers wait for the next minute too
+        if (!result || !result.ok) return;
+      }
+
+      // Both or neither: an expired voucher never keeps an open session
+      await db.transaction(async (client) => {
+        await client.query("UPDATE vouchers SET status = 'expired' WHERE id = $1 AND status = 'active'", [v.id]);
+        await client.query(
+          "UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'Voucher expired' WHERE voucher_id = $1 AND ended_at IS NULL",
+          [v.id]
+        );
+      });
+      // The code is also the router password, so only the id is logged
+      console.log(`[Cleaner] Voucher ${v.id} expired`);
+    }
+  };
+
+  await runAtSameTime([...byRouter.values()], SYNC_CONCURRENCY, async (group) => {
+    try {
+      await expireGroup(group);
+    } catch (err) {
+      console.error('[Cleaner] Voucher expiry failed for one router:', err.message);
+    }
+  });
 };
 
-const SYNC_CONCURRENCY = 10;
 // A router that cannot be asked this many minutes in a row counts as offline.
 // One failed check is often a short internet hiccup while customers are still online.
 const OFFLINE_AFTER_FAILED_CHECKS = 3;
@@ -69,15 +95,17 @@ const failedChecks = new Map(); // router id -> failed checks in a row
 
 // Compares the open sessions of one router with the customers the router really has online
 const syncRouterSessions = async (router) => {
-  let activeOnRouter = null; // null = we could not ask the router
+  // One question, one login: the list of online customers. An answer (even an
+  // empty list) also proves the router is online; null = we could not ask it.
+  let activeOnRouter = null;
   try {
-    const adapter = getRouter(router);
-    const status = await adapter.checkStatus();
-    if (status && status.online) {
-      activeOnRouter = await adapter.getActiveUsers();
-    }
+    activeOnRouter = await getRouter(router).getActiveUsers();
   } catch (err) {
     activeOnRouter = null;
+  }
+  if (activeOnRouter !== null) {
+    // The router answered: the 5-minute pinger does not need to ask it again
+    await db.query("UPDATE routers SET status = 'online', last_seen_at = NOW() WHERE id = $1", [router.id]);
   }
 
   let routerOffline = false;
@@ -178,18 +206,13 @@ const cleanExpiredSessions = async () => {
     `);
 
     // Several routers at the same time, so hundreds of routers still fit in one round
-    let next = 0;
-    const worker = async () => {
-      while (next < routers.length) {
-        const router = routers[next++];
-        try {
-          await syncRouterSessions(router);
-        } catch (err) {
-          console.error(`[Cleaner] Session sync failed for router ${router.id}:`, err.message);
-        }
+    await runAtSameTime(routers, SYNC_CONCURRENCY, async (router) => {
+      try {
+        await syncRouterSessions(router);
+      } catch (err) {
+        console.error(`[Cleaner] Session sync failed for router ${router.id}:`, err.message);
       }
-    };
-    await Promise.all(Array.from({ length: Math.min(SYNC_CONCURRENCY, routers.length) }, worker));
+    });
   } catch (error) {
     console.error('[Cleaner] Database error:', error);
   } finally {

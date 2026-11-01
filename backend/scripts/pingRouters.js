@@ -11,6 +11,7 @@ const MikroTikRouter = require('../services/routers/MikroTikRouter');
 const CONCURRENCY = 25;           // routers checked at the same time
 const CHECK_TIMEOUT_MS = 8000;    // give up on one router after 8 seconds
 const OFFLINE_AFTER_MINUTES = 8;  // show "offline" only after this long without an answer
+const RECENTLY_SEEN_MINUTES = 3;  // the session cleaner (every minute) answered for these already
 
 const withTimeout = (promise, ms) =>
   Promise.race([
@@ -55,8 +56,12 @@ const run = async () => {
 
   console.log('[Pinger] Checking router statuses...');
   const { rows: routers } = await db.query(
+    // Routers the session cleaner heard from in the last few minutes are online: no need to ask again.
     // Random order: if a run is ever cut short, a different set of routers misses out each time
-    'SELECT id, ip_address, api_port, api_username, api_password_encrypted FROM routers ORDER BY random()'
+    `SELECT id, ip_address, api_port, api_username, api_password_encrypted FROM routers
+     WHERE last_seen_at IS NULL OR last_seen_at < NOW() - make_interval(mins => $1::int)
+     ORDER BY random()`,
+    [RECENTLY_SEEN_MINUTES]
   );
 
   const counts = { online: 0, 'no-answer': 0, skipped: 0 };
