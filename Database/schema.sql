@@ -9,6 +9,7 @@
 --   2026-10-31-must-change-password.sql    tenant_users.must_change_password
 --   2026-10-31-provision-token-expiry.sql  routers.provision_token_expires_at
 --   2026-11-01-scaling-indexes.sql         indexes for 500 businesses, duplicates removed
+--   2026-11-01-provision-token-unique.sql  UNIQUE (provision_token) where it was missing
 --
 -- When the database changes: update this file AND add a migration file.
 -- ============================================================
