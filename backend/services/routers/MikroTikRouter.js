@@ -56,6 +56,17 @@ const safePrint = async (conn, path, query = []) => {
 const MAX_SPEED_KBPS = 1000000;
 const STEP_TIMEOUT_MS = 15000;
 
+// Removes one item. Already gone ("no such item": the customer left, or the
+// router's own timer removed it, between our search and the remove) is fine:
+// the goal, the item not being there, is reached.
+const removeIfThere = async (step, path, id) => {
+  try {
+    await step((conn) => conn.write(path, [`=.id=${id}`]));
+  } catch (err) {
+    if (!/no such item/i.test(String(err?.message || err))) throw err;
+  }
+};
+
 const cleanCode = (code) => {
   const value = String(code || '');
   if (!/^[A-Za-z0-9_-]{1,32}$/.test(value)) throw new Error('Invalid voucher code');
@@ -233,9 +244,7 @@ class MikroTikRouter {
           safePrint(conn, '/ip/hotspot/cookie/print', ['=.proplist=.id', `?user=${voucher}`])
         );
         for (const cookie of cookies) {
-          await step((conn) =>
-            conn.write('/ip/hotspot/cookie/remove', [`=.id=${cookie['.id']}`])
-          );
+          await removeIfThere(step, '/ip/hotspot/cookie/remove', cookie['.id']);
         }
 
         // 2. Delete the hotspot user, so nothing can log in with this code any more
@@ -243,9 +252,7 @@ class MikroTikRouter {
           safePrint(conn, '/ip/hotspot/user/print', ['=.proplist=.id,name', `?name=${voucher}`])
         );
         for (const user of users.filter((u) => u.name === voucher)) {
-          await step((conn) =>
-            conn.write('/ip/hotspot/user/remove', [`=.id=${user['.id']}`])
-          );
+          await removeIfThere(step, '/ip/hotspot/user/remove', user['.id']);
         }
 
         // 3. Disconnect running sessions of this voucher
@@ -253,9 +260,7 @@ class MikroTikRouter {
           safePrint(conn, '/ip/hotspot/active/print', ['=.proplist=.id', `?user=${voucher}`])
         );
         for (const session of active) {
-          await step((conn) =>
-            conn.write('/ip/hotspot/active/remove', [`=.id=${session['.id']}`])
-          );
+          await removeIfThere(step, '/ip/hotspot/active/remove', session['.id']);
         }
       });
 
@@ -300,9 +305,7 @@ class MikroTikRouter {
           safePrint(conn, '/ip/hotspot/active/print', ['=.proplist=.id', `?mac-address=${mac}`])
         );
         for (const session of active) {
-          await step((conn) =>
-            conn.write('/ip/hotspot/active/remove', [`=.id=${session['.id']}`])
-          );
+          await removeIfThere(step, '/ip/hotspot/active/remove', session['.id']);
         }
       });
       return { ok: true };

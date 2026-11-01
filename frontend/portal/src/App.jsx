@@ -160,10 +160,11 @@ export default function App() {
 
         document.body.appendChild(form);
         
-        // Wait 2 seconds so they can see the "Connected!" screen, then unlock the internet
+        // Wait 4 seconds so they can read the "Connected!" screen, then unlock the internet.
+        // (Android closes its "Sign in to network" window by itself once the internet works.)
         setTimeout(() => {
           form.submit();
-        }, 2000);
+        }, 4000);
       }
 
     } catch (error) {
@@ -237,7 +238,13 @@ export default function App() {
           </div>
 
           {loginUrl ? (
-            <span className="unlocking"><span className="spinner-sm" /> Unlocking internet...</span>
+            <>
+              <span className="unlocking"><span className="spinner-sm" /> Unlocking internet...</span>
+              <p className="price-note">
+                This window may close by itself once the internet is on. When your time is over,
+                your phone will bring you back here.
+              </p>
+            </>
           ) : (
             <button onClick={() => window.location.reload()} className="btn btn-secondary btn-block">Done</button>
           )}
@@ -264,7 +271,7 @@ export default function App() {
             {businessInfo.device.speed_mbps ? <> at <strong>{businessInfo.device.speed_mbps} Mbps</strong></> : null}
           </div>
 
-          <p className="price-note">Keep this page open: it tells you when your time is over.</p>
+          <p className="price-note">You can close this page. When your time is over, your phone will bring you back here.</p>
           <p className="portal-footer">
             Powered by{' '}
             <a href="https://oswagolink.co.tz/" target="_blank" rel="noopener noreferrer">Oswagolink</a>

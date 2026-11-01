@@ -64,6 +64,9 @@ const run = async () => {
     [RECENTLY_SEEN_MINUTES]
   );
 
+  const { rows: [{ total }] } = await db.query('SELECT COUNT(*)::int AS total FROM routers');
+  const seenByCleaner = total - routers.length;
+
   const counts = { online: 0, 'no-answer': 0, skipped: 0 };
   let next = 0;
 
@@ -80,7 +83,8 @@ const run = async () => {
   );
 
   console.log(
-    `[Pinger] Finished checking routers. online=${counts.online} no-answer=${counts['no-answer']} skipped=${counts.skipped}`
+    `[Pinger] Finished checking routers. online=${counts.online} no-answer=${counts['no-answer']} skipped=${counts.skipped}` +
+    ` seen-by-cleaner=${seenByCleaner}`
   );
 };
 
