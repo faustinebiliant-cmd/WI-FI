@@ -12,7 +12,7 @@ const generateVouchers = async (req, res) => {
   try {
     const { package_id, quantity } = req.body;
 
-    let count = parseInt(quantity, 10);
+    const count = parseInt(quantity, 10);
     if (!count || count < 1 || count > 50) {
       return res.status(400).json({ success: false, error: 'You can generate between 1 and 50 vouchers at a time.' });
     }
@@ -27,36 +27,40 @@ const generateVouchers = async (req, res) => {
     );
     if (pkgCheck.rows.length === 0) return res.status(404).json({ success: false, error: 'Package not found' });
 
-    // Hourly limit (150 per hour)
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const countRes = await db.query(
-      'SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1 AND created_at >= $2',
-      [req.tenantId, oneHourAgo]
-    );
-    const remainingAllowance = 150 - parseInt(countRes.rows[0].count, 10);
+    // Hourly limit (150 per hour). Count and create under one lock per business,
+    // so two quick clicks cannot together pass the limit.
+    const created = await db.transaction(async (client) => {
+      await db.lockTenant(client, 'vouchers', req.tenantId);
+      const countRes = await client.query(
+        "SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1 AND created_at >= NOW() - INTERVAL '1 hour'",
+        [req.tenantId]
+      );
+      const remainingAllowance = 150 - parseInt(countRes.rows[0].count, 10);
+      if (remainingAllowance <= 0) return null;
+      const want = Math.min(count, remainingAllowance);
 
-    if (remainingAllowance <= 0) {
+      // Insert in batches; a duplicate code is skipped and retried
+      const codes = [];
+      for (let attempt = 0; attempt < 5 && codes.length < want; attempt++) {
+        const need = want - codes.length;
+        const batch = new Set();
+        while (batch.size < need) batch.add(generateCode());
+
+        const { rows } = await client.query(
+          `INSERT INTO vouchers (tenant_id, package_id, code, status, created_by)
+           SELECT $1::uuid, $2::uuid, c, 'unused', $3::uuid FROM unnest($4::text[]) AS c
+           ON CONFLICT (tenant_id, code) DO NOTHING
+           RETURNING code`,
+          [req.tenantId, package_id, req.tenantUser.id, [...batch]]
+        );
+        rows.forEach(r => codes.push(r.code));
+      }
+      return codes;
+    });
+
+    if (created === null) {
       return res.status(400).json({ success: false, error: 'You have reached the maximum limit per hour. Please wait before generating more.' });
     }
-    if (count > remainingAllowance) count = remainingAllowance;
-
-    // Insert in batches; a duplicate code is skipped and retried
-    const created = [];
-    for (let attempt = 0; attempt < 5 && created.length < count; attempt++) {
-      const need = count - created.length;
-      const batch = new Set();
-      while (batch.size < need) batch.add(generateCode());
-
-      const { rows } = await db.query(
-        `INSERT INTO vouchers (tenant_id, package_id, code, status, created_by)
-         SELECT $1::uuid, $2::uuid, c, 'unused', $3::uuid FROM unnest($4::text[]) AS c
-         ON CONFLICT (tenant_id, code) DO NOTHING
-         RETURNING code`,
-        [req.tenantId, package_id, req.tenantUser.id, [...batch]]
-      );
-      rows.forEach(r => created.push(r.code));
-    }
-
     if (created.length === 0) {
       return res.status(500).json({ success: false, error: 'Could not generate unique codes, please try again.' });
     }

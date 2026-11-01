@@ -34,19 +34,25 @@ const createTenant = async (req, res) => {
     const tempPassword = makeTempPassword();
     const passwordHash = await hashPassword(tempPassword);
 
-    const { rows } = await db.query(
-      `SELECT create_tenant_with_owner($1, $2, $3, $4, $5, $6) as result`,
-      [business_name.trim(), owner_name.trim(), cleanEmail, owner_phone.trim(), passwordHash, monthly_fee || 0]
-    );
-
-    const result = rows[0].result;
-    await db.query('UPDATE tenant_users SET must_change_password = true WHERE id = $1', [result.user_id]);
+    // Business, owner login and "must change password" together, or none of them
+    const result = await db.transaction(async (client) => {
+      const { rows } = await client.query(
+        `SELECT create_tenant_with_owner($1, $2, $3, $4, $5, $6) as result`,
+        [business_name.trim(), owner_name.trim(), cleanEmail, owner_phone.trim(), passwordHash, monthly_fee || 0]
+      );
+      await client.query('UPDATE tenant_users SET must_change_password = true WHERE id = $1', [rows[0].result.user_id]);
+      return rows[0].result;
+    });
     return res.status(201).json({
       success: true,
       message: 'Tenant created successfully',
       data: { tenant_id: result.tenant_id, owner_email: cleanEmail, temp_password: tempPassword }
     });
   } catch (error) {
+    // Two creations with the same email at the same moment: the database refuses the second
+    if (error.code === '23505') {
+      return res.status(400).json({ success: false, error: 'Email is already registered to another tenant' });
+    }
     console.error('Create tenant error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
@@ -97,19 +103,26 @@ const toggleTenantStatus = async (req, res) => {
     const { action, reason } = req.body;
     const newStatus = action === 'suspend' ? 'suspended' : 'active';
 
-    const { rows } = await db.query(
-      'UPDATE tenants SET subscription_status = $1 WHERE id = $2 RETURNING *',
-      [newStatus, id]
-    );
-    if (rows.length === 0) return res.status(404).json({ success: false, error: 'Tenant not found' });
+    if (!isValidUUID(id)) return res.status(404).json({ success: false, error: 'Tenant not found' });
 
-    await db.query(
-      `INSERT INTO platform_audit_logs (admin_id, admin_email, action, target_type, target_id, target_label, details) 
-       VALUES ($1, $2, $3, 'tenant', $4, $5, $6)`,
-      [req.admin.id, req.admin.email, action === 'suspend' ? 'Tenant Suspended' : 'Tenant Unsuspended', id, rows[0].business_name, JSON.stringify({ reason: reason || 'No reason provided' })]
-    );
+    // The change and its audit log line together: no change without a record
+    const tenant = await db.transaction(async (client) => {
+      const { rows } = await client.query(
+        'UPDATE tenants SET subscription_status = $1 WHERE id = $2 RETURNING *',
+        [newStatus, id]
+      );
+      if (rows.length === 0) return null;
 
-    return res.status(200).json({ success: true, message: `Tenant ${action}ed successfully`, data: rows[0] });
+      await client.query(
+        `INSERT INTO platform_audit_logs (admin_id, admin_email, action, target_type, target_id, target_label, details)
+         VALUES ($1, $2, $3, 'tenant', $4, $5, $6)`,
+        [req.admin.id, req.admin.email, action === 'suspend' ? 'Tenant Suspended' : 'Tenant Unsuspended', id, rows[0].business_name, JSON.stringify({ reason: reason || 'No reason provided' })]
+      );
+      return rows[0];
+    });
+    if (!tenant) return res.status(404).json({ success: false, error: 'Tenant not found' });
+
+    return res.status(200).json({ success: true, message: `Tenant ${action}ed successfully`, data: tenant });
   } catch (error) {
     console.error('Update tenant status error:', error);
     return res.status(500).json({ success: false, error: 'Failed to update tenant status' });
@@ -121,6 +134,7 @@ const impersonateTenant = async (req, res) => {
     const { id } = req.params;
     const { reason } = req.body;
     if (!reason || reason.trim().length < 10) return res.status(400).json({ success: false, error: 'A detailed reason (min 10 chars) is required' });
+    if (!isValidUUID(id)) return res.status(404).json({ success: false, error: 'Tenant owner not found' });
 
     const ownerRes = await db.query("SELECT * FROM tenant_users WHERE tenant_id = $1 AND role = 'owner'", [id]);
     if (ownerRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Tenant owner not found' });
@@ -129,22 +143,24 @@ const impersonateTenant = async (req, res) => {
     const tokenId = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-    await db.query(
-      `INSERT INTO impersonation_sessions (admin_id, admin_email, tenant_id, tenant_user_id, reason, token_id, expires_at) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [req.admin.id, req.admin.email, id, owner.id, reason.trim(), tokenId, expiresAt.toISOString()]
-    );
+    // The session and its audit log line together: no impersonation without a record
+    await db.transaction(async (client) => {
+      await client.query(
+        `INSERT INTO impersonation_sessions (admin_id, admin_email, tenant_id, tenant_user_id, reason, token_id, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [req.admin.id, req.admin.email, id, owner.id, reason.trim(), tokenId, expiresAt.toISOString()]
+      );
+      await client.query(
+        `INSERT INTO platform_audit_logs (admin_id, admin_email, action, target_type, target_id, target_label, details)
+         VALUES ($1, $2, 'Impersonation Started', 'tenant', $3, $4, $5)`,
+        [req.admin.id, req.admin.email, id, owner.full_name, JSON.stringify({ reason: reason.trim() })]
+      );
+    });
 
     const impersonationToken = signTenantToken({
       id: owner.id, email: owner.email, full_name: owner.full_name,
       tenant_id: id, role: 'owner', impersonation_token_id: tokenId
     });
-
-    await db.query(
-      `INSERT INTO platform_audit_logs (admin_id, admin_email, action, target_type, target_id, target_label, details) 
-       VALUES ($1, $2, 'Impersonation Started', 'tenant', $3, $4, $5)`,
-      [req.admin.id, req.admin.email, id, owner.full_name, JSON.stringify({ reason: reason.trim() })]
-    );
 
     // The token itself never goes to the admin panel: it gets a one-time code
     // that the Business Panel swaps for the token (see services/impersonationCodes)

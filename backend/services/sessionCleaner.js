@@ -48,11 +48,14 @@ const expireVouchers = async () => {
       }
     }
 
-    await db.query("UPDATE vouchers SET status = 'expired' WHERE id = $1 AND status = 'active'", [v.id]);
-    await db.query(
-      "UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'Voucher expired' WHERE voucher_id = $1 AND ended_at IS NULL",
-      [v.id]
-    );
+    // Both or neither: an expired voucher never keeps an open session
+    await db.transaction(async (client) => {
+      await client.query("UPDATE vouchers SET status = 'expired' WHERE id = $1 AND status = 'active'", [v.id]);
+      await client.query(
+        "UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'Voucher expired' WHERE voucher_id = $1 AND ended_at IS NULL",
+        [v.id]
+      );
+    });
     // The code is also the router password, so only the id is logged
     console.log(`[Cleaner] Voucher ${v.id} expired`);
   }
@@ -134,13 +137,18 @@ const syncRouterSessions = async (router) => {
     `, [router.tenant_id, code, router.id]);
     if (vouchers.length === 0) continue; // not one of our valid vouchers (for example a router test user)
 
-    await db.query(
+    // DO NOTHING: the portal may have recorded this same device a moment ago
+    // (only one open session per voucher and device, see idx_sessions_one_open)
+    const inserted = await db.query(
       `INSERT INTO sessions (tenant_id, router_id, voucher_id, mac_address, ip_address, started_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT DO NOTHING`,
       [router.tenant_id, router.id, vouchers[0].id, mac, user.ip || null]
     );
     stillOpenMacs.add(mac);
-    console.log(`[Cleaner] Recorded returning customer session for voucher ${vouchers[0].id}`);
+    if (inserted.rowCount > 0) {
+      console.log(`[Cleaner] Recorded returning customer session for voucher ${vouchers[0].id}`);
+    }
   }
 };
 

@@ -10,6 +10,7 @@
 --   2026-10-31-provision-token-expiry.sql  routers.provision_token_expires_at
 --   2026-11-01-scaling-indexes.sql         indexes for 500 businesses, duplicates removed
 --   2026-11-01-provision-token-unique.sql  UNIQUE (provision_token) where it was missing
+--   2026-11-01-one-open-session.sql        one open session per voucher and device
 --
 -- When the database changes: update this file AND add a migration file.
 -- ============================================================
@@ -233,3 +234,7 @@ CREATE INDEX idx_sessions_router_open ON public.sessions(router_id) WHERE ended_
 CREATE INDEX idx_sessions_tenant_open ON public.sessions(tenant_id, started_at DESC) WHERE ended_at IS NULL;
 CREATE INDEX idx_sessions_open_started ON public.sessions(started_at DESC) WHERE ended_at IS NULL;
 CREATE INDEX idx_vouchers_active_expires ON public.vouchers(expires_at) WHERE status = 'active';
+
+-- Rule: one voucher on one device has at most one open session
+-- (the portal and the cleaner insert with ON CONFLICT DO NOTHING)
+CREATE UNIQUE INDEX idx_sessions_one_open ON public.sessions(voucher_id, mac_address) WHERE ended_at IS NULL;

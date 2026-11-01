@@ -32,12 +32,6 @@ const createPackage = async (req, res) => {
       return res.status(400).json({ success: false, error: 'All fields, including Router, are required' });
     }
 
-    // Limit check: Max 20 packages per tenant
-    const countRes = await db.query('SELECT COUNT(*) FROM packages WHERE tenant_id = $1', [req.tenantId]);
-    if (parseInt(countRes.rows[0].count) >= 20) {
-      return res.status(400).json({ success: false, error: 'You have reached the maximum limit of 20 packages.' });
-    }
-
     if (!isValidUUID(router_id)) {
       return res.status(400).json({ success: false, error: 'Invalid router selected.' });
     }
@@ -63,13 +57,25 @@ const createPackage = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Speed must be a whole number from 1 to 20 Mbps.' });
     }
     
-    const { rows } = await db.query(
-      `INSERT INTO packages (tenant_id, router_id, name, price_tzs, duration_minutes, speed_down_kbps, speed_up_kbps) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [req.tenantId, router_id, name.trim(), price, duration, down, up]
-    );
-    
-    return res.status(201).json({ success: true, data: rows[0] });
+    // Limit: max 20 packages per tenant. Count and add under one lock per business,
+    // so two quick clicks cannot pass the limit.
+    const created = await db.transaction(async (client) => {
+      await db.lockTenant(client, 'packages', req.tenantId);
+      const countRes = await client.query('SELECT COUNT(*) FROM packages WHERE tenant_id = $1', [req.tenantId]);
+      if (parseInt(countRes.rows[0].count, 10) >= 20) return null;
+
+      const { rows } = await client.query(
+        `INSERT INTO packages (tenant_id, router_id, name, price_tzs, duration_minutes, speed_down_kbps, speed_up_kbps)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [req.tenantId, router_id, name.trim(), price, duration, down, up]
+      );
+      return rows[0];
+    });
+    if (!created) {
+      return res.status(400).json({ success: false, error: 'You have reached the maximum limit of 20 packages.' });
+    }
+
+    return res.status(201).json({ success: true, data: created });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: false, error: 'Failed to create package' });

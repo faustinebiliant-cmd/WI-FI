@@ -196,16 +196,20 @@ const redeemVoucher = async (req, res) => {
       return res.status(503).json({ success: false, error: NOT_REACHABLE });
     }
 
-    // Close any old open session of this voucher, then record the new one
-    await db.query(
-      "UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'new login' WHERE voucher_id = $1 AND ended_at IS NULL",
-      [voucher.id]
-    );
-    await db.query(
-      `INSERT INTO sessions (tenant_id, router_id, voucher_id, mac_address, ip_address, started_at) 
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [router.tenant_id, router.id, voucher.id, deviceMac, ip_address || null]
-    );
+    // Close any old open session of this voucher, then record the new one: both or neither.
+    // DO NOTHING: the same phone pressing Connect twice at once records one session.
+    await db.transaction(async (client) => {
+      await client.query(
+        "UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'new login' WHERE voucher_id = $1 AND ended_at IS NULL",
+        [voucher.id]
+      );
+      await client.query(
+        `INSERT INTO sessions (tenant_id, router_id, voucher_id, mac_address, ip_address, started_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT DO NOTHING`,
+        [router.tenant_id, router.id, voucher.id, deviceMac, ip_address || null]
+      );
+    });
 
     return res.status(200).json({
       success: true,
