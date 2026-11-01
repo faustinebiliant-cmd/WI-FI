@@ -8,6 +8,7 @@
 -- Changes included so far:
 --   2026-10-31-must-change-password.sql    tenant_users.must_change_password
 --   2026-10-31-provision-token-expiry.sql  routers.provision_token_expires_at
+--   2026-11-01-scaling-indexes.sql         indexes for 500 businesses, duplicates removed
 --
 -- When the database changes: update this file AND add a migration file.
 -- ============================================================
@@ -203,17 +204,16 @@ $$;
 -- ==========================================
 -- INDEXES FOR PERFORMANCE & PAGINATION
 -- ==========================================
+-- UNIQUE columns (vouchers (tenant_id, code), routers.provision_token, ...)
+-- already have their own index: never add a second one.
+
 -- Base indexes (tenant scoping)
 CREATE INDEX idx_tenant_users_tenant ON public.tenant_users(tenant_id);
 CREATE INDEX idx_routers_tenant ON public.routers(tenant_id);
 CREATE INDEX idx_packages_tenant ON public.packages(tenant_id);
-CREATE INDEX idx_vouchers_tenant ON public.vouchers(tenant_id);
-CREATE INDEX idx_sessions_tenant ON public.sessions(tenant_id);
-
--- Lookup indexes
-CREATE INDEX idx_vouchers_code ON public.vouchers(tenant_id, code);
-CREATE INDEX idx_sessions_active ON public.sessions(tenant_id, ended_at);
+CREATE INDEX idx_packages_router ON public.packages(router_id);
 CREATE INDEX idx_vouchers_tenant_status ON public.vouchers(tenant_id, status);
+CREATE INDEX idx_vouchers_package ON public.vouchers(package_id);
 
 -- Sorting indexes for Pagination (Newest first)
 CREATE INDEX idx_packages_tenant_created ON public.packages(tenant_id, created_at DESC);
@@ -221,5 +221,14 @@ CREATE INDEX idx_vouchers_tenant_created ON public.vouchers(tenant_id, created_a
 CREATE INDEX idx_sessions_tenant_started ON public.sessions(tenant_id, started_at DESC);
 CREATE INDEX idx_audit_created ON public.platform_audit_logs(created_at DESC);
 
--- New Index for Zero-Touch Provisioning
-CREATE INDEX idx_routers_provision_token ON public.routers(provision_token);
+-- Busy lookups: every redeem, portal visit and cleaner minute
+CREATE INDEX idx_sessions_voucher ON public.sessions(voucher_id);
+CREATE INDEX idx_sessions_router_mac ON public.sessions(router_id, mac_address, started_at DESC);
+CREATE INDEX idx_vouchers_tenant_used ON public.vouchers(tenant_id, used_at) WHERE used_at IS NOT NULL;
+
+-- Partial indexes: only open sessions / running vouchers, so they stay small
+-- however long the history grows
+CREATE INDEX idx_sessions_router_open ON public.sessions(router_id) WHERE ended_at IS NULL;
+CREATE INDEX idx_sessions_tenant_open ON public.sessions(tenant_id, started_at DESC) WHERE ended_at IS NULL;
+CREATE INDEX idx_sessions_open_started ON public.sessions(started_at DESC) WHERE ended_at IS NULL;
+CREATE INDEX idx_vouchers_active_expires ON public.vouchers(expires_at) WHERE status = 'active';
