@@ -64,7 +64,7 @@ export default function LoginPage() {
             />
           </div>
           <button type="submit" className="btn btn-primary btn-block" disabled={isSubmitting}>
-            {isSubmitting ? 'Logging in...' : 'Log In'}
+            {isSubmitting ? 'Logging in...' : 'Login'}
           </button>
         </form>
       </div>

@@ -30,7 +30,7 @@ export default function LoginPage() {
     <div className="auth-page">
       <div className="auth-card">
         <p className="auth-brand">Oswagolink</p>
-        <h1 className="auth-title">Business Login</h1>
+        <h1 className="auth-title">Login</h1>
         <p className="auth-sub">Log in to manage your WiFi hotspot.</p>
 
         {error && <div className="alert alert-danger">{error}</div>}
@@ -61,7 +61,7 @@ export default function LoginPage() {
             />
           </div>
           <button type="submit" className="btn btn-primary btn-block" disabled={isSubmitting}>
-            {isSubmitting ? 'Logging in...' : 'Log In'}
+            {isSubmitting ? 'Logging in...' : 'Login'}
           </button>
         </form>
       </div>
