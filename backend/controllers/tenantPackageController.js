@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { getRouter } = require('../services/routers/routerFactory');
 const { isValidUUID, isSafeText } = require('../utils/validators');
 
 // Every router is set up with speed profiles for 1 to 20 Mbps (see provisionController),
@@ -9,11 +10,21 @@ const isAllowedSpeed = (kbps) => Number.isInteger(kbps) && kbps % 1024 === 0 && 
 
 const listPackages = async (req, res) => {
   try {
-    // Include the router name for the frontend
+    // Include the router name, and the vouchers a delete would take away (shown in the delete dialog)
     const { rows } = await db.query(`
-      SELECT p.*, r.name as router_name
+      SELECT p.*, r.name as router_name,
+             COALESCE(vc.unused_vouchers, 0) AS unused_vouchers,
+             COALESCE(vc.active_vouchers, 0) AS active_vouchers
       FROM packages p
       LEFT JOIN routers r ON p.router_id = r.id
+      LEFT JOIN (
+        SELECT package_id,
+               COUNT(*) FILTER (WHERE status = 'unused')::int AS unused_vouchers,
+               COUNT(*) FILTER (WHERE status = 'active')::int AS active_vouchers
+        FROM vouchers
+        WHERE tenant_id = $1 AND status IN ('unused', 'active')
+        GROUP BY package_id
+      ) vc ON vc.package_id = p.id
       WHERE p.tenant_id = $1
       ORDER BY p.created_at DESC
     `, [req.tenantId]);
@@ -92,22 +103,68 @@ const deletePackage = async (req, res) => {
     const { id } = req.params;
     if (!isValidUUID(id)) return res.status(400).json({ success: false, error: 'Invalid package ID' });
 
-    // Deleting a package also deletes its vouchers. Refuse while customers may still
-    // hold a sold code (unused) or are using one (active), so nobody loses paid time.
-    const inUse = await db.query(
-      "SELECT COUNT(*) FROM vouchers WHERE package_id = $1 AND tenant_id = $2 AND status IN ('unused', 'active')",
+    // The package and its router (only what the router connection needs)
+    const pkgRes = await db.query(
+      `SELECT p.name, r.id AS router_id, r.ip_address, r.api_port, r.api_username, r.api_password_encrypted
+       FROM packages p
+       LEFT JOIN routers r ON r.id = p.router_id AND r.tenant_id = p.tenant_id
+       WHERE p.id = $1 AND p.tenant_id = $2`,
       [id, req.tenantId]
     );
-    const inUseCount = parseInt(inUse.rows[0].count, 10);
-    if (inUseCount > 0) {
-      return res.status(409).json({
-        success: false,
-        error: `This package still has ${inUseCount} unused or active voucher(s). Revoke them, or wait until they are used and expired, then delete the package.`
-      });
+    if (pkgRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Package not found' });
+    const pkg = pkgRes.rows[0];
+
+    // Deleting a package deletes ALL its vouchers, unused and active ones too.
+    // Cancel them first, so nobody can start using one while we talk to the router.
+    const { rows: cancelled } = await db.query(
+      `UPDATE vouchers v SET status = 'cancelled'
+       FROM (SELECT id, status FROM vouchers
+             WHERE package_id = $1 AND tenant_id = $2 AND status IN ('unused', 'active')
+             FOR UPDATE) old
+       WHERE v.id = old.id
+       RETURNING v.id, v.code, old.status AS previous_status`,
+      [id, req.tenantId]
+    );
+
+    // Only an active voucher has a user on the router: take every one off, so nobody
+    // keeps internet from a voucher that no longer exists
+    const active = cancelled.filter((v) => v.previous_status === 'active');
+    if (active.length > 0 && pkg.router_id && pkg.ip_address && pkg.ip_address !== '0.0.0.0') {
+      for (const v of active) {
+        let result;
+        try {
+          result = await getRouter(pkg).removeVoucher(v.code);
+        } catch (err) {
+          console.error('Delete package: router could not be used:', err.message);
+          result = { ok: false };
+        }
+        if (!result || !result.ok) {
+          // Undo, so the tenant can try again when the router is reachable
+          await db.query(
+            `UPDATE vouchers v SET status = old.status
+             FROM unnest($1::uuid[], $2::text[]) AS old(id, status)
+             WHERE v.id = old.id AND v.status = 'cancelled'`,
+            [cancelled.map((c) => c.id), cancelled.map((c) => c.previous_status)]
+          );
+          return res.status(503).json({
+            success: false,
+            error: 'The router could not be reached, so the customers using this package could not be disconnected. The package was NOT deleted. Please try again when the router is online.'
+          });
+        }
+      }
     }
 
-    await db.query('DELETE FROM packages WHERE id = $1 AND tenant_id = $2', [id, req.tenantId]);
-    return res.status(200).json({ success: true, message: 'Package deleted' });
+    // Close the open sessions and delete the package (its vouchers go with it): both or neither
+    await db.transaction(async (client) => {
+      await client.query(
+        `UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'Package deleted'
+         WHERE ended_at IS NULL AND voucher_id IN (SELECT id FROM vouchers WHERE package_id = $1 AND tenant_id = $2)`,
+        [id, req.tenantId]
+      );
+      await client.query('DELETE FROM packages WHERE id = $1 AND tenant_id = $2', [id, req.tenantId]);
+    });
+
+    return res.status(200).json({ success: true, message: `Package "${pkg.name}" and its vouchers deleted` });
   } catch (error) {
     console.error('Delete package error:', error);
     return res.status(500).json({ success: false, error: 'Failed to delete package' });

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
-import ConfirmDialog from '../shared/components/ConfirmDialog';
 import { useToast } from '../shared/components/Toast';
 
 // Speeds the router setup prepares (1 to 20 Mbps, whole numbers only)
@@ -28,6 +27,7 @@ export default function PackagesPage() {
   });
 
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteInput, setDeleteInput] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
@@ -99,14 +99,17 @@ export default function PackagesPage() {
     }
   };
 
+  const openDelete = (pkg) => { setDeleteTarget(pkg); setDeleteInput(''); setDeleteError(''); };
+  const closeDelete = () => { setDeleteTarget(null); setDeleteInput(''); setDeleteError(''); };
+
   const confirmDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deleteInput !== 'DELETE') return;
     setIsDeleting(true);
     setDeleteError('');
     try {
-      await apiClient.delete(`/tenant/packages/${deleteTarget.id}`);
-      setDeleteTarget(null);
-      toast('Package deleted');
+      const res = await apiClient.delete(`/tenant/packages/${deleteTarget.id}`);
+      toast(res.data.message || 'Package deleted');
+      closeDelete();
       fetchPackages();
     } catch (error) {
       setDeleteError(error.response?.data?.error || 'Failed to delete package.');
@@ -159,7 +162,7 @@ export default function PackagesPage() {
                   <td>{formatDuration(pkg.duration_minutes)}</td>
                   <td>{pkg.speed_down_kbps / 1024} Mbps</td>
                   <td className="col-actions">
-                    <button onClick={() => setDeleteTarget(pkg)} className="btn btn-sm btn-danger">
+                    <button onClick={() => openDelete(pkg)} className="btn btn-sm btn-danger">
                       Delete
                     </button>
                   </td>
@@ -252,17 +255,38 @@ export default function PackagesPage() {
         </div>
       )}
 
-      <ConfirmDialog
-        open={!!deleteTarget}
-        title="Delete Package"
-        message={deleteError || `Are you sure you want to delete "${deleteTarget?.name}"? This is only possible when it has no unused or active vouchers. Its old (used, expired or revoked) vouchers are deleted with it.`}
-        confirmLabel={deleteError ? 'Try Again' : 'Delete'}
-        cancelLabel={deleteError ? 'Close' : 'Cancel'}
-        variant="danger"
-        loading={isDeleting}
-        onConfirm={confirmDelete}
-        onCancel={() => { setDeleteTarget(null); setDeleteError(''); }}
-      />
+      {deleteTarget && (
+        <div className="modal-overlay">
+          <div className="modal-content modal-narrow">
+            <h2 className="modal-title danger">Delete Package</h2>
+            <p className="modal-sub">
+              Are you sure you want to delete <strong>{deleteTarget.name}</strong>? ALL its vouchers are deleted with it.
+            </p>
+            {(deleteTarget.unused_vouchers > 0 || deleteTarget.active_vouchers > 0) && (
+              <ul className="modal-sub">
+                {deleteTarget.unused_vouchers > 0 && (
+                  <li><strong>{deleteTarget.unused_vouchers}</strong> unused voucher(s) will stop working, even ones already sold.</li>
+                )}
+                {deleteTarget.active_vouchers > 0 && (
+                  <li><strong>{deleteTarget.active_vouchers}</strong> voucher(s) in use now: those customers are disconnected.</li>
+                )}
+              </ul>
+            )}
+            <p className="modal-sub">This cannot be undone.</p>
+            {deleteError && <div className="alert alert-danger">{deleteError}</div>}
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Type DELETE to confirm</label>
+              <input className="form-control" type="text" placeholder="DELETE" value={deleteInput} onChange={e => setDeleteInput(e.target.value)} disabled={isDeleting} />
+            </div>
+            <div className="modal-actions">
+              <button onClick={closeDelete} disabled={isDeleting} className="btn btn-secondary">Cancel</button>
+              <button onClick={confirmDelete} disabled={deleteInput !== 'DELETE' || isDeleting} className="btn btn-solid-danger">
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
