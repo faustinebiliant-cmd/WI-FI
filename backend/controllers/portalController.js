@@ -106,7 +106,9 @@ const redeemVoucher = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid device IP address' });
     }
 
-    const cleanCode = code.toUpperCase().trim();
+    // Codes are made of 0-9 and A-F only (tenantVoucherController generateCode), so the
+    // letters O, I and L are always typing mistakes for 0 and 1 (D0FADF typed as DOFADF)
+    const cleanCode = code.toUpperCase().trim().replace(/O/g, '0').replace(/[IL]/g, '1');
     if (!isValidVoucherCode(cleanCode)) {
       return res.status(400).json({ success: false, error: 'Invalid voucher format' });
     }
