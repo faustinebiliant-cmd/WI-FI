@@ -3,10 +3,14 @@ const env = require('../config/env');
 const { getRouter } = require('./routers/routerFactory');
 const MikroTikRouter = require('./routers/MikroTikRouter');
 
-let running = false;
+let running = false;  // router round (every minute)
+let expiring = false; // voucher expiry (every 15 seconds)
 
 const EXPIRE_BATCH = 200;
-const SYNC_CONCURRENCY = 10; // routers handled at the same time
+const SYNC_CONCURRENCY = 25;       // routers handled at the same time
+const EXPIRE_EVERY_MS = 15 * 1000; // a voucher ends at most about 15 seconds late
+const SYNC_EVERY_MS = 60 * 1000;
+const SLOW_ROUND_MS = 45 * 1000;   // a round this long means the minute is getting full
 
 // Runs work(item) for every item, at most `limit` at the same time
 const runAtSameTime = async (items, limit, work) => {
@@ -33,7 +37,7 @@ const removeFromRouter = async (router, code) => {
 // then mark them expired. The router counts only online time, so without this
 // a customer could keep using a voucher long after it should have ended.
 // If the router cannot be reached, the voucher stays active and is tried again
-// next minute. Routers already known to be offline are skipped until they return.
+// on the next check. Routers already known to be offline are skipped until they return.
 const expireVouchers = async () => {
   const { rows } = await db.query(`
     SELECT v.id, v.code, p.router_id,
@@ -62,7 +66,7 @@ const expireVouchers = async () => {
     for (const v of vouchers) {
       if (v.hasRouter) {
         const result = await removeFromRouter(v, v.code);
-        // Router not reachable: its other vouchers wait for the next minute too
+        // Router not reachable: its other vouchers wait for the next check too
         if (!result || !result.ok) return;
       }
 
@@ -137,8 +141,9 @@ const syncRouterSessions = async (router) => {
     // Router offline for several minutes, OR the router answered and this device is not online
     if (routerOffline || !routerMacs.has(dbMac)) {
       const reason = routerOffline ? 'Router Offline' : 'Left Network';
+      // ended_at IS NULL: the voucher expiry (its own timer) may have closed it a moment ago
       await db.query(
-        "UPDATE sessions SET ended_at = NOW(), disconnect_reason = $1 WHERE id = $2",
+        "UPDATE sessions SET ended_at = NOW(), disconnect_reason = $1 WHERE id = $2 AND ended_at IS NULL",
         [reason, session.id]
       );
       console.log(`[Cleaner] Closed session for ${dbMac} (${reason})`);
@@ -183,13 +188,8 @@ const syncRouterSessions = async (router) => {
 const cleanExpiredSessions = async () => {
   if (running) return;
   running = true;
+  const startedAt = Date.now();
   try {
-    try {
-      await expireVouchers();
-    } catch (error) {
-      console.error('[Cleaner] Voucher expiry error:', error.message);
-    }
-
     // Comparing sessions with the router only makes sense with real routers.
     // In mock mode there are no real customers to compare with.
     if (env.ROUTER_MODE !== 'real') return;
@@ -213,6 +213,11 @@ const cleanExpiredSessions = async () => {
         console.error(`[Cleaner] Session sync failed for router ${router.id}:`, err.message);
       }
     });
+
+    const tookMs = Date.now() - startedAt;
+    if (tookMs > SLOW_ROUND_MS) {
+      console.warn(`[Cleaner] Slow round: ${routers.length} routers took ${Math.round(tookMs / 1000)} s (limit 60 s)`);
+    }
   } catch (error) {
     console.error('[Cleaner] Database error:', error);
   } finally {
@@ -220,9 +225,24 @@ const cleanExpiredSessions = async () => {
   }
 };
 
+// Voucher expiry has its own, faster timer: it must not wait behind the router round
+const runVoucherExpiry = async () => {
+  if (expiring) return;
+  expiring = true;
+  try {
+    await expireVouchers();
+  } catch (error) {
+    console.error('[Cleaner] Voucher expiry error:', error.message);
+  } finally {
+    expiring = false;
+  }
+};
+
 const startSessionCleaner = () => {
+  runVoucherExpiry();
+  setInterval(runVoucherExpiry, EXPIRE_EVERY_MS);
   cleanExpiredSessions();
-  setInterval(cleanExpiredSessions, 60 * 1000);
+  setInterval(cleanExpiredSessions, SYNC_EVERY_MS);
   console.log('[Cleaner] Session sync and expiration checker started.');
 };
 
