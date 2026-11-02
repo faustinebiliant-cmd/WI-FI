@@ -16,11 +16,14 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// If we get a 401 (Unauthorized), clear the token and kick back to login
+// A 401 means the login expired: clear it and go back to the login page.
+// Not for the login itself: "Invalid credentials" must stay on screen, and
+// reloading the page would wipe that message straight away.
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isLoginAttempt = (error.config?.url || '').endsWith('/auth/platform/login');
+    if (!isLoginAttempt && error.response?.status === 401) {
       localStorage.removeItem('adminToken');
       localStorage.removeItem('admin');
       window.location.href = '/login';
