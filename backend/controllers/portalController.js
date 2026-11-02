@@ -215,6 +215,8 @@ const redeemVoucher = async (req, res) => {
       message: resumed ? 'Welcome back, reconnecting' : 'Connected successfully',
       data: {
         resumed,
+        // The code as the router knows it (DOFADF typed -> D0FADF): the portal logs in with this
+        code: cleanCode,
         duration_minutes: pkg.duration_minutes,
         // Minutes left on the server's clock: a returning customer sees the time left,
         // not the full package time, and a phone with a wrong clock cannot change it

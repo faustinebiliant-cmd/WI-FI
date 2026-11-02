@@ -18,6 +18,8 @@ export default function App() {
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [lockoutTimeLeft, setLockoutTimeLeft] = useState(0);
+  // "No internet?" on the connected screen: show the voucher form again
+  const [enterAgain, setEnterAgain] = useState(false);
 
   const queryParams = new URLSearchParams(window.location.search);
   const routerToken = queryParams.get('router');
@@ -128,9 +130,11 @@ export default function App() {
       setSuccessData(res.data.data);
       setStatus('success');
 
-      // NEW: If we have the MikroTik login URL, submit it to actually unlock the internet!
+      // If we have the MikroTik login URL, submit it to actually unlock the internet
       if (loginUrl) {
-        // MikroTik expects the username and password to be the voucher code
+        // MikroTik expects the username and password to be the voucher code, written exactly
+        // as the router knows it: the server's corrected code (DOFADF typed -> D0FADF)
+        const routerCode = res.data.data.code || voucherCode.trim().toUpperCase();
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = loginUrl;
@@ -138,13 +142,13 @@ export default function App() {
         const usernameInput = document.createElement('input');
         usernameInput.type = 'hidden';
         usernameInput.name = 'username';
-        usernameInput.value = voucherCode.toUpperCase();
+        usernameInput.value = routerCode;
         form.appendChild(usernameInput);
 
         const passwordInput = document.createElement('input');
         passwordInput.type = 'hidden';
         passwordInput.name = 'password';
-        passwordInput.value = voucherCode.toUpperCase();
+        passwordInput.value = routerCode;
         form.appendChild(passwordInput);
 
         // After login the router opens this portal again (without "orig"): it then shows
@@ -254,7 +258,7 @@ export default function App() {
   }
 
   // This device still has time: show "You're connected" with a live countdown
-  if (activeUntil && now < activeUntil.getTime()) {
+  if (activeUntil && now < activeUntil.getTime() && !enterAgain) {
     const minutesLeft = Math.ceil((activeUntil.getTime() - now) / 60000);
     return (
       <div className="portal-page">
@@ -272,6 +276,13 @@ export default function App() {
           </div>
 
           <p className="price-note">You can close this page. When your time is over, your phone will bring you back here.</p>
+          {/* The router only sends a phone here when it is not logged in: entering the
+              voucher again logs it in, and the time already running continues */}
+          {loginUrl && (
+            <button onClick={() => setEnterAgain(true)} className="btn btn-secondary btn-block">
+              No internet? Enter your voucher again
+            </button>
+          )}
           <p className="portal-footer">
             Powered by{' '}
             <a href="https://oswagolink.co.tz/" target="_blank" rel="noopener noreferrer">Oswagolink</a>
