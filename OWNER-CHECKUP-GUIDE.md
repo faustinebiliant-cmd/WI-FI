@@ -128,6 +128,8 @@ with the date and time (UTC, so 3 hours behind Tanzania).
 
 **Tell Claude if:** the same error repeats many times today while routers are
 online, or you see words like `Database error`, `ECONNREFUSED`, or `FATAL`.
+Not sure what a line means? Look it up in **section 13** (every message the
+backend can write, and whether it matters).
 
 ### 4d. Did the history clean-up run?
 ```
@@ -137,7 +139,45 @@ pm2 logs wifi-backend --lines 300 --nostream | grep History
 `[History] Deleted history older than 30 days: sessions=… vouchers=…`
 from last night. The numbers can be 0 (nothing was old enough).
 
-### 4e. Is anyone attacking the VPS login?
+### 4e. The three other logs (backup, database, website)
+The backend log (4c) is not the only one. These three show problems the
+backend cannot see.
+
+**Backup log** (did any nightly backup fail?):
+```
+sudo journalctl -t wifi-db-backup --since "8 days ago" --no-pager
+```
+**Good looks like:** one `OK: /var/backups/wifi-db/wifi_app_…dump (…K)` line
+per night. **Tell Claude if:** any line says `FAILED`.
+
+**Database log** (real database errors only):
+```
+sudo sh -c 'grep -hE "ERROR|FATAL|PANIC" /var/log/postgresql/postgresql-*-main.log | tail -20'
+```
+**Normal, no action:**
+- `FATAL: terminating connection due to administrator command`: the database
+  was restarted (an update or a VPS reboot).
+- `ERROR: duplicate key value violates unique constraint` now and then: two
+  clicks at the same moment; the system already handles it.
+
+**Tell Claude if:** you see `PANIC`, `could not write`, `No space left on
+device`, `out of memory`, `too many clients`, or `deadlock detected` more than
+once a week.
+
+**Website log** (Nginx, the front door):
+```
+sudo tail -n 20 /var/log/nginx/error.log
+```
+**Normal, no action:** lines with `SSL_do_handshake() failed`, `client sent
+invalid`, `no "ssl_certificate"`, `client SSL certificate verify error` or
+`client sent no required SSL certificate`. Those are robots scanning the
+internet, and strangers being refused at the admin site (device passes working).
+
+**Tell Claude if:** many lines say `connect() failed (111: Connection refused)
+while connecting to upstream` (the backend was down, visitors saw "502"), or
+`No space left on device`.
+
+### 4f. Is anyone attacking the VPS login?
 ```
 sudo fail2ban-client status sshd
 ```
@@ -324,3 +364,63 @@ describes.
 | Project code | GitHub: `faustinebiliant-cmd/WI-FI` |
 | Old notes | `docs/archive/` (history only, do not follow) |
 | Your localhost vs VPS notes | `LOCALHOST-VS-VPS.md` |
+
+---
+
+## 13. Every backend message explained
+
+From `pm2 logs wifi-backend` (4c). Times in the log are UTC (Tanzania = UTC + 3).
+**Green** = normal, **Yellow** = watch it, **Red** = tell Claude the same day.
+
+### Router messages
+| Message starts with | Meaning | Level |
+|---|---|---|
+| `[MikroTik] connection error: Timed out` | A router did not answer in 5 seconds | Green when that router was off / without internet. Yellow if it repeats all day while the router is online |
+| `[MikroTik] Failed to fetch active users` | The 1-minute check could not ask a router who is online | Same as above |
+| `[MikroTik] Failed to remove voucher` | An ended voucher could not be taken off a router yet; tried again every 15 s until it works | Same as above |
+| `[MikroTik] Failed to create voucher` | A customer pressed Connect but the router did not answer; the customer saw "try again" and kept the voucher | Green now and then. Yellow if many customers report it |
+| `[MikroTik] Failed to disconnect device` | Disconnect button pressed, router did not answer; the panel said "NOT disconnected" | Green |
+| `[Cleaner] Router … did not answer 3 times in a row` | Router counted as offline; its open sessions closed | Green |
+| `[Pinger] Router … check failed` | The 5-minute status check could not reach one router | Green |
+| `Router connection error (server kept running)` | A router sent a strange reply; that one connection was dropped | Green now and then. Yellow if many per day |
+| `Revoke voucher: router could not be used` / `Disconnect: router could not be used` / `Delete package: router could not be used` | The button was pressed while the router was off; the panel said "NOT …, try again" | Green |
+| `Router adapter error` | The system could not prepare a router connection | Yellow (red if every router shows it) |
+| `Decryption failed` | A saved router password could not be unlocked | **Red**: usually means the secret key in `.env` was changed. Do not change `.env` |
+| `Failed to remove WireGuard peer` | A deleted router's VPN tunnel could not be removed; nothing was deleted | Yellow: try again in a minute; red if it keeps failing |
+| `provisioned_at update failed` / `Enrollment error` / `Bootstrap error` | A router setup step failed | Yellow during a router setup; tell Claude if a setup does not finish |
+
+### Background work
+| Message starts with | Meaning | Level |
+|---|---|---|
+| `[History] Deleted history older than 30 days` | Nightly clean-up done (in the normal log, not the error log) | Green |
+| `[History] Clean-up failed` | The nightly clean-up stopped | Yellow once (retried next night). Red two nights in a row |
+| `[Cleaner] Slow round: … routers took … s` | The 1-minute check needed more than 45 seconds | Yellow: with many businesses, time to talk about KVM 2 |
+| `[Cleaner] Voucher expiry error` / `Voucher expiry failed for one router` / `Session sync failed for router` | One round of the checks failed; the next round tries again | Yellow if it repeats for an hour |
+| `[Cleaner] Database error` / `[Pinger] Fatal error` | The checks could not use the database | **Red** if it repeats |
+| `Pinger error` / `History clean-up error` | A background program was stopped (took too long) | Yellow |
+
+### Database and server
+| Message starts with | Meaning | Level |
+|---|---|---|
+| `Unexpected error on idle PostgreSQL client: terminating connection due to administrator command` | The database was restarted; the backend reconnected by itself | Green |
+| `Unexpected error on idle PostgreSQL client` (other text) | A database connection broke; reconnected by itself | Yellow if many per day |
+| `Health check failed` | The backend could not reach the database | **Red** if it repeats |
+| `Unhandled error (server kept running)` | Something failed that our code did not expect; the server kept going | Yellow: send Claude a screenshot when you see it |
+| `Unexpected crash, restarting` | A real bug; PM2 restarted the backend within a second | **Red**: send Claude the lines around it |
+| `Could not close connections in time, forcefully shutting down` | During a restart something was slow to finish | Green now and then |
+| `FATAL:` (at start-up) | The backend refused to start: a setting in `.env` is wrong or missing | **Red**: the backend is down. Send Claude the line (it never prints secrets) |
+| `WARNING: ADMIN_HOST is empty` | The admin protection setting is missing in `.env` | **Red** |
+| `CORS blocked origin` | Only on a programmer's computer, never on the VPS | Green |
+| `Server error:` | A request failed in an unexpected way; the visitor got "server error" | Yellow once. Red if it repeats |
+
+### Button and page errors
+Lines like `Login error`, `Redeem error`, `Create package error`, `Generate
+vouchers error`, `List vouchers error`, `Dashboard stats error`, `Delete tenant
+error`, `Payment error` and similar mean: **one button or page failed for one
+person** (they saw "Failed to …").
+- **Green** if it happened once while the database was being restarted.
+- **Red** if the same one repeats: that button is broken for everybody. Send
+  Claude a screenshot of the line **and the 5 lines under it** (the reason).
+
+`Payment … AzamPay is not connected yet` is expected until mobile payments are
+switched on.
