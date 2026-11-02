@@ -5,20 +5,16 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [tenantStatus, setTenantStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('tenantToken');
     const savedUser = localStorage.getItem('tenantUser');
-    
+
     if (token && savedUser) {
       setUser(JSON.parse(savedUser));
-    } else if (token && localStorage.getItem('is_impersonating') === 'true') {
-      // Fallback: If we have a token and we are impersonating, let them in even if user data is missing
-      setUser({ full_name: 'Impersonated User' });
     }
-    
+
     setLoading(false);
   }, []);
 
@@ -33,9 +29,9 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('is_impersonating');
 
         setUser(loggedInUser);
-        setTenantStatus(res.data.tenant_status);
         return { success: true };
       }
+      return { success: false, error: res.data.error || 'Login failed' };
     } catch (error) {
       return { success: false, error: error.response?.data?.error || 'Login failed' };
     }
@@ -59,7 +55,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, tenantStatus, login, logout, markPasswordChanged, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, markPasswordChanged, loading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -7,14 +7,13 @@ import '../styles/variables.css';
 import '../styles/base.css';
 import '../styles/components.css';
 
-export default function DashboardLayout({ 
-  user, 
-  onLogout, 
-  menuItems, 
-  title = "Oswagolink", 
+export default function DashboardLayout({
+  user,
+  onLogout,
+  menuItems,
+  title = "Oswagolink",
   subtitle = "Dashboard",
-  banner = null,
-  children 
+  children
 }) {
   const location = useLocation();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -29,14 +28,14 @@ export default function DashboardLayout({
   return (
     <ToastProvider>
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--light)' }}>
-      
+
       {/* MOBILE TOP BAR WITH HAMBURGER */}
       <div className="mobile-topbar">
         <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: 'var(--primary)' }}>
           {title}
         </h2>
-        <button 
-          onClick={() => setIsMobileMenuOpen(true)} 
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
           className="hamburger-btn"
         >
           <FiMenu size={28} />
@@ -64,8 +63,8 @@ export default function DashboardLayout({
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
             return (
-              <Link 
-                key={item.path} 
+              <Link
+                key={item.path}
                 to={item.path}
                 onClick={() => setIsMobileMenuOpen(false)}
                 style={{
@@ -114,7 +113,6 @@ export default function DashboardLayout({
 
       {/* MAIN CONTENT AREA */}
       <div className="main-content">
-        {banner}
         <main className="page-content">
           {children}
         </main>

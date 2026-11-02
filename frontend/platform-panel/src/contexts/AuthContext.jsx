@@ -26,6 +26,7 @@ export const AuthProvider = ({ children }) => {
         setAdmin(res.data.admin);
         return { success: true };
       }
+      return { success: false, error: res.data.error || 'Login failed' };
     } catch (error) {
       return { success: false, error: error.response?.data?.error || 'Login failed' };
     }

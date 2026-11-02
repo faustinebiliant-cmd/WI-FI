@@ -12,12 +12,13 @@ export default function App() {
   const [status, setStatus] = useState('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [successData, setSuccessData] = useState(null);
-  
+
   const [activeTab, setActiveTab] = useState(PAYMENTS_ENABLED ? 'buy' : 'voucher');
   const [voucherCode, setVoucherCode] = useState('');
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [lockoutTimeLeft, setLockoutTimeLeft] = useState(0);
+  const [paymentNotice, setPaymentNotice] = useState('');
   // "No internet?" on the connected screen: show the voucher form again
   const [enterAgain, setEnterAgain] = useState(false);
 
@@ -27,10 +28,9 @@ export default function App() {
   // Without it a voucher cannot be tied to the device, so the form stays locked.
   const macAddress = queryParams.get('mac') || null;
   const ipAddress = queryParams.get('ip') || null;
-  
-  // NEW: Capture the MikroTik login URLs
+
+  // The router's login address: after a redeem the portal logs the phone in there
   const loginUrl = queryParams.get('login') || null;
-  const origUrl = queryParams.get('orig') || null;
 
   // The page info includes this device's state (time left, or when its time ended)
   const loadInfo = () => {
@@ -112,7 +112,7 @@ export default function App() {
   const handleRedeem = async (e) => {
     e.preventDefault();
     if (!voucherCode || lockoutTimeLeft > 0) return;
-    
+
     setStatus('loading');
     setErrorMessage('');
 
@@ -121,16 +121,14 @@ export default function App() {
         router_token: routerToken,
         code: voucherCode,
         mac_address: macAddress,
-        ip_address: ipAddress,
-        login_url: loginUrl, // Send to backend
-        orig_url: origUrl    // Send to backend
+        ip_address: ipAddress
       });
-      
+
       localStorage.removeItem('portal_fail_count');
       setSuccessData(res.data.data);
       setStatus('success');
 
-      // If we have the MikroTik login URL, submit it to actually unlock the internet
+      // Log the phone in on the router: that is what actually unlocks the internet
       if (loginUrl) {
         // MikroTik expects the username and password to be the voucher code, written exactly
         // as the router knows it: the server's corrected code (DOFADF typed -> D0FADF)
@@ -163,7 +161,7 @@ export default function App() {
         form.appendChild(dstInput);
 
         document.body.appendChild(form);
-        
+
         // Wait 4 seconds so they can read the "Connected!" screen, then unlock the internet.
         // (Android closes its "Sign in to network" window by itself once the internet works.)
         setTimeout(() => {
@@ -199,6 +197,7 @@ export default function App() {
     if (!phoneNumber) return;
     setStatus('loading');
     setErrorMessage('');
+    setPaymentNotice('');
 
     try {
       await apiClient.post('/portal/pay', {
@@ -206,14 +205,12 @@ export default function App() {
         package_id: selectedPackage.id,
         phone_number: phoneNumber
       });
-      
-      setSuccessData({ 
-        duration_minutes: selectedPackage.duration_minutes, 
-        speed_down_mbps: selectedPackage.speed_down_kbps / 1024 
-      });
-      setStatus('success');
+      // The payment is only requested here: the customer approves it on the phone, and the
+      // WiFi starts when the gateway confirms it (AzamPay, next step). Never show "Connected" here.
+      setPaymentNotice('Approve the payment on your phone. Your WiFi starts as soon as the payment is confirmed.');
+      setStatus('idle');
     } catch (error) {
-      setErrorMessage('Payment failed. Please try again.');
+      setErrorMessage(error.response?.data?.error || 'Payment failed. Please try again.');
       setStatus('error');
     }
   };
@@ -317,6 +314,7 @@ export default function App() {
         )}
 
         {errorMessage && <div className="alert alert-danger">{errorMessage}</div>}
+        {paymentNotice && <div className="alert alert-warning">{paymentNotice}</div>}
 
         {PAYMENTS_ENABLED && (
         <div className="tabs">

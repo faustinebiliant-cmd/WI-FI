@@ -16,7 +16,7 @@ const login = async (req, res) => {
     const cleanEmail = email.toLowerCase().trim();
 
     const { rows } = await db.query(`
-      SELECT u.*, t.subscription_status, ${TENANT_BLOCKED_SQL} AS tenant_blocked
+      SELECT u.*, ${TENANT_BLOCKED_SQL} AS tenant_blocked
       FROM tenant_users u
       JOIN tenants t ON u.tenant_id = t.id
       WHERE u.email = $1
@@ -53,7 +53,6 @@ const login = async (req, res) => {
       success: true,
       token,
       user: { id: user.id, full_name: user.full_name, email: user.email, role: user.role },
-      tenant_status: user.subscription_status,
       must_change_password: mustChangePassword
     });
   } catch (error) {

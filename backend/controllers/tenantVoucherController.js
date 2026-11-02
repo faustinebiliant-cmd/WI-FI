@@ -79,9 +79,9 @@ const listVouchers = async (req, res) => {
     const offset = (page - 1) * limit;
 
     let query = `
-      SELECT v.*, p.name as package_name, r.name as router_name 
-      FROM vouchers v 
-      LEFT JOIN packages p ON v.package_id = p.id 
+      SELECT v.*, p.name as package_name, r.name as router_name
+      FROM vouchers v
+      LEFT JOIN packages p ON v.package_id = p.id
       LEFT JOIN routers r ON p.router_id = r.id
       WHERE v.tenant_id = $1
     `;
@@ -126,11 +126,7 @@ const listVouchers = async (req, res) => {
       ...r,
       // expires_at stays the exact moment (with time zone), so a countdown is right on any device.
       // expires_at_eat is the same moment written as Tanzania time, for display.
-      expires_at_eat: r.expires_at ? formatDateTimeEAT(r.expires_at) : null,
-      packages: {
-        name: r.package_name,
-        router_name: r.router_name
-      }
+      expires_at_eat: r.expires_at ? formatDateTimeEAT(r.expires_at) : null
     }));
 
     return res.status(200).json({

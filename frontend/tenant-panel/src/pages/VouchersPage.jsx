@@ -11,7 +11,6 @@ export default function VouchersPage() {
   const toast = useToast();
   const [vouchers, setVouchers] = useState([]);
   const [packages, setPackages] = useState([]);
-  const [routers, setRouters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -59,17 +58,13 @@ export default function VouchersPage() {
 
   const isFiltered = todayOnly || search || statusFilter;
 
-  // Packages and routers: load once
+  // Packages: load once
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      apiClient.get('/tenant/packages'),
-      apiClient.get('/tenant/routers')
-    ])
-      .then(([pkgRes, routerRes]) => {
+    apiClient.get('/tenant/packages')
+      .then((pkgRes) => {
         if (cancelled) return;
         setPackages(pkgRes.data.data);
-        setRouters(routerRes.data.data);
         if (pkgRes.data.data.length > 0) setSelectedPackage(pkgRes.data.data[0].id);
       })
       .catch((error) => {
@@ -148,7 +143,8 @@ export default function VouchersPage() {
     return `${mins}m left`;
   };
 
-  const hasMultipleRouters = routers.length > 1;
+  // Packages (and so vouchers) on more than one router: show which router each is for
+  const hasMultipleRouters = new Set(packages.map((p) => p.router_id)).size > 1;
 
   return (
     <div className="page-wrapper">
@@ -231,11 +227,11 @@ export default function VouchersPage() {
 
                   {hasMultipleRouters && (
                     <td className="cell-strong">
-                      {v.packages?.router_name || 'Any'}
+                      {v.router_name || 'Any'}
                     </td>
                   )}
 
-                  <td>{v.packages?.name}</td>
+                  <td>{v.package_name}</td>
                   <td>
                     <span className={`badge ${v.status === 'unused' ? 'badge-success' :
                       v.status === 'active' ? 'badge-warning' :
