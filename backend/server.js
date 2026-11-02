@@ -154,10 +154,19 @@ app.use((req, res) => {
 // Do not log req.body or req.params here. Portal requests
 // carry MAC and IP in the body. Those are personal data.
 app.use((err, req, res, next) => {
-  console.error('Server error:', err.message);
-
   // If a reply has already started, let Express close the connection
   if (res.headersSent) return next(err);
+
+  // The visitor's mistake, not ours (broken JSON, a body over 1 MB): say so, and
+  // keep it out of the error log
+  if (err.status >= 400 && err.status < 500) {
+    return res.status(err.status).json({
+      success: false,
+      error: err.status === 413 ? 'Request too large' : 'Bad request'
+    });
+  }
+
+  console.error('Server error:', err.message);
 
   if (env.IS_PROD) {
     return res.status(500).json({
@@ -271,4 +280,19 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // it must never take the whole server down for every business
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled error (server kept running):', reason && reason.message ? reason.message : reason);
+});
+
+// The router library can throw from inside its network code, where no try/catch
+// reaches (like the old "!empty" crash). That only breaks one router connection, and
+// our time limits close it, so the server keeps running for everybody else.
+// Any other unexpected error: logged, then a clean exit, and PM2 starts a fresh copy.
+process.on('uncaughtException', (err) => {
+  const fromRouterLibrary =
+    (err && err.name === 'RosException') || String((err && err.stack) || '').includes('node-routeros');
+  if (fromRouterLibrary) {
+    console.error('Router connection error (server kept running):', err.message || err);
+    return;
+  }
+  console.error('Unexpected crash, restarting:', (err && err.stack) || err);
+  process.exit(1);
 });

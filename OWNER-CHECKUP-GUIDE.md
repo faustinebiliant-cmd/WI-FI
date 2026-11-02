@@ -249,6 +249,13 @@ itself; this only confirms it.
 | One business: customers cannot connect | Is their router online in the admin panel? Is it switched on with internet? | Send Claude the router name and the time it started |
 | VPS does not answer at all | Log in to Hostinger (hPanel) and check the VPS is running | Contact Hostinger support |
 | Data deleted or database broken | **Stop. Do not try fixes from the internet.** | Message Claude: we choose the right backup together and restore it safely |
+| `Unexpected crash, restarting` in the logs | Nothing: PM2 already started a fresh copy within a second | Send Claude the lines just above and below it: it is a bug to fix |
+| Did the backend crash? | Run the command just below this table | `code [0] via signal [SIGINT]` = a normal update restart. `code [1]` = a crash: send Claude a screenshot |
+
+Crash check (last 20 restarts):
+```
+grep -E "exited with code" ~/.pm2/pm2.log | tail -20
+```
 
 ---
 
@@ -276,6 +283,7 @@ describes.
 | `LF will be replaced by CRLF` | Windows/Linux line-ending notice, harmless |
 | `Swap: 2.0Gi … 0B used` | The memory safety net is ready and not needed: good |
 | Router `offline` at night | Router switched off or without internet; it comes back by itself |
+| `Router connection error (server kept running)` | A router sent a strange reply; only that one connection was dropped. Now and then is fine. Many per day: tell Claude |
 
 ---
 
