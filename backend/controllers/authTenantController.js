@@ -10,8 +10,10 @@ const LEGACY_DEFAULT_PASSWORD = 'Welcome123!';
 
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ success: false, error: 'Email and password required' });
+    const { email, password } = req.body || {};
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
+      return res.status(400).json({ success: false, error: 'Email and password required' });
+    }
 
     const cleanEmail = email.toLowerCase().trim();
 
@@ -108,11 +110,11 @@ const endImpersonationSelf = async (req, res) => {
     if (!req.tenantUser.is_impersonation) {
       return res.status(400).json({ success: false, error: 'Not in an impersonation session' });
     }
-    await db.query(`
-      UPDATE impersonation_sessions
-      SET ended_at = NOW(), ended_by = 'tenant'
-      WHERE tenant_user_id = $1 AND ended_at IS NULL
-    `, [req.tenantUser.id]);
+    // Only this session: another admin may be helping the same owner at the same time
+    await db.query(
+      "UPDATE impersonation_sessions SET ended_at = NOW(), ended_by = 'tenant' WHERE token_id = $1 AND ended_at IS NULL",
+      [req.tenantUser.impersonation_token_id]
+    );
 
     return res.status(200).json({ success: true, message: 'Impersonation ended' });
   } catch (error) {

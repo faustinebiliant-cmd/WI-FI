@@ -67,10 +67,42 @@ const tenantGlobalLimiter = rateLimit({
   message: limitMessage('Too many requests. Please slow down.')
 });
 
+// Mobile payment requests: generous on purpose, all customers of one business
+// often share one public address
+const payLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: limitMessage('Too many payment requests. Please wait a few minutes and try again.')
+});
+
+// Router setup links (they carry secrets): all requests, 60 per 15 minutes per address
+const provisionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests. Please try again later.'
+});
+
+// Router setup links: only failed requests (wrong or used token), 10 per 15 minutes per address
+const provisionFailureLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many failed attempts. Please try again later.'
+});
+
 module.exports = {
   platformLoginLimiter,
   tenantLoginLimiter,
   redeemPerAddressLimiter,
   redeemPerRouterLimiter,
-  tenantGlobalLimiter
+  tenantGlobalLimiter,
+  payLimiter,
+  provisionLimiter,
+  provisionFailureLimiter
 };

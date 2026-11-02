@@ -7,9 +7,9 @@ const { signAdminToken } = require('../services/jwt');
 
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
 
-    if (!email || !password) {
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
       return res.status(400).json({ success: false, error: 'Email and password are required' });
     }
 

@@ -166,7 +166,7 @@ CREATE TABLE public.platform_audit_logs (
 );
 
 -- ==========================================
--- ATOMIC FUNCTIONS (RPCs)
+-- DATABASE FUNCTIONS (all-or-nothing)
 -- ==========================================
 
 -- Function to safely create a Tenant and their first Login

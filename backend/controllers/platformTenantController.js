@@ -5,6 +5,17 @@ const { signTenantToken } = require('../services/jwt');
 const { issueImpersonationCode } = require('../services/impersonationCodes');
 const { isValidEmail, isValidPhone, isSafeText, isValidUUID } = require('../utils/validators');
 
+// A new business may use the system this many days, then it is blocked
+// automatically (see TENANT_BLOCKED_SQL) until it is activated in the admin panel
+const TRIAL_DAYS = 14;
+
+// Suspend / unsuspend / activate: the new status and the Audit Logs wording
+const STATUS_ACTIONS = {
+  suspend: { status: 'suspended', log: 'Tenant Suspended', message: 'Business suspended' },
+  unsuspend: { status: 'active', log: 'Tenant Unsuspended', message: 'Business unsuspended' },
+  activate: { status: 'active', log: 'Tenant Activated', message: 'Business activated' }
+};
+
 // Easy to read out over the phone: no 0/O, 1/l/I
 const TEMP_PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 const makeTempPassword = () =>
@@ -27,20 +38,24 @@ const createTenant = async (req, res) => {
     }
 
     const cleanEmail = owner_email.toLowerCase().trim();
-    const existing = await db.query('SELECT id FROM tenant_users WHERE email = $1', [cleanEmail]);
-    if (existing.rows.length > 0) return res.status(400).json({ success: false, error: 'Email is already registered to another tenant' });
 
     // A different password for every tenant; the owner must replace it at first login
     const tempPassword = makeTempPassword();
     const passwordHash = await hashPassword(tempPassword);
 
-    // Business, owner login and "must change password" together, or none of them
+    // Business, owner login, "must change password" and the trial end date together,
+    // or none of them. An email already in use is refused by the database (23505 below).
     const result = await db.transaction(async (client) => {
       const { rows } = await client.query(
         `SELECT create_tenant_with_owner($1, $2, $3, $4, $5, $6) as result`,
         [business_name.trim(), owner_name.trim(), cleanEmail, owner_phone.trim(), passwordHash, monthly_fee || 0]
       );
       await client.query('UPDATE tenant_users SET must_change_password = true WHERE id = $1', [rows[0].result.user_id]);
+      // Last trial day = today + TRIAL_DAYS, counted in Tanzania time
+      await client.query(
+        "UPDATE tenants SET trial_ends_at = (NOW() AT TIME ZONE 'Africa/Dar_es_Salaam')::date + $2::int WHERE id = $1",
+        [rows[0].result.tenant_id, TRIAL_DAYS]
+      );
       return rows[0].result;
     });
     return res.status(201).json({
@@ -102,35 +117,34 @@ const toggleTenantStatus = async (req, res) => {
     const { id } = req.params;
     const { action } = req.body || {};
     const reason = String((req.body || {}).reason || '').trim();
-    // Only these two: anything else (a typo) must not silently re-activate a business
-    if (action !== 'suspend' && action !== 'unsuspend') {
-      return res.status(400).json({ success: false, error: 'Action must be suspend or unsuspend' });
+    // Only known actions: anything else (a typo) must not silently change a business
+    const change = Object.prototype.hasOwnProperty.call(STATUS_ACTIONS, action) ? STATUS_ACTIONS[action] : null;
+    if (!change) {
+      return res.status(400).json({ success: false, error: 'Action must be suspend, unsuspend or activate' });
     }
     if (reason.length < 5 || reason.length > 500) {
       return res.status(400).json({ success: false, error: 'Write a reason (5 to 500 characters).' });
     }
-    const newStatus = action === 'suspend' ? 'suspended' : 'active';
-
     if (!isValidUUID(id)) return res.status(404).json({ success: false, error: 'Tenant not found' });
 
     // The change and its audit log line together: no change without a record
     const tenant = await db.transaction(async (client) => {
       const { rows } = await client.query(
         'UPDATE tenants SET subscription_status = $1 WHERE id = $2 RETURNING *',
-        [newStatus, id]
+        [change.status, id]
       );
       if (rows.length === 0) return null;
 
       await client.query(
         `INSERT INTO platform_audit_logs (admin_id, admin_email, action, target_type, target_id, target_label, details)
          VALUES ($1, $2, $3, 'tenant', $4, $5, $6)`,
-        [req.admin.id, req.admin.email, action === 'suspend' ? 'Tenant Suspended' : 'Tenant Unsuspended', id, rows[0].business_name, JSON.stringify({ reason })]
+        [req.admin.id, req.admin.email, change.log, id, rows[0].business_name, JSON.stringify({ reason })]
       );
       return rows[0];
     });
     if (!tenant) return res.status(404).json({ success: false, error: 'Tenant not found' });
 
-    return res.status(200).json({ success: true, message: action === 'suspend' ? 'Business suspended' : 'Business unsuspended', data: tenant });
+    return res.status(200).json({ success: true, message: change.message, data: tenant });
   } catch (error) {
     console.error('Update tenant status error:', error);
     return res.status(500).json({ success: false, error: 'Failed to update tenant status' });

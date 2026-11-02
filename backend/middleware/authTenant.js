@@ -33,7 +33,7 @@ const authTenant = async (req, res, next) => {
         return res.status(401).json({ success: false, error: 'Impersonation session expired or ended' });
       }
 
-      req.tenantUser = { id: session.tenant_user_id, role: 'owner', is_impersonation: true };
+      req.tenantUser = { id: session.tenant_user_id, role: 'owner', is_impersonation: true, impersonation_token_id: session.token_id };
       req.tenantId = session.tenant_id;
       return next();
     }

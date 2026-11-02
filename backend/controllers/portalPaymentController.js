@@ -17,38 +17,25 @@ const normalizePhone = (value) => {
 };
 
 // Checks the limit and saves the payment as one step, one request per phone number at a time
-const recordPayment = async ({ tenantId, routerId, packageId, amount, phone }) => {
-  const client = await db.pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [phone]);
+const recordPayment = ({ tenantId, routerId, packageId, amount, phone }) => db.transaction(async (client) => {
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [phone]);
 
-    const recent = await client.query(
-      `SELECT COUNT(*) FROM payments
-       WHERE guest_phone = $1 AND created_at > NOW() - INTERVAL '10 minutes'`,
-      [phone]
-    );
-    if (parseInt(recent.rows[0].count, 10) >= 3) {
-      await client.query('ROLLBACK');
-      return { limited: true };
-    }
+  const recent = await client.query(
+    `SELECT COUNT(*) FROM payments
+     WHERE guest_phone = $1 AND created_at > NOW() - INTERVAL '10 minutes'`,
+    [phone]
+  );
+  if (parseInt(recent.rows[0].count, 10) >= 3) return { limited: true };
 
-    const reference = crypto.randomUUID();
-    const inserted = await client.query(
-      `INSERT INTO payments (tenant_id, router_id, package_id, amount_tzs, guest_phone, status, gateway_reference)
-       VALUES ($1, $2, $3, $4, $5, 'pending', $6)
-       RETURNING id`,
-      [tenantId, routerId, packageId, amount, phone, reference]
-    );
-    await client.query('COMMIT');
-    return { limited: false, id: inserted.rows[0].id, reference };
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw err;
-  } finally {
-    client.release();
-  }
-};
+  const reference = crypto.randomUUID();
+  const inserted = await client.query(
+    `INSERT INTO payments (tenant_id, router_id, package_id, amount_tzs, guest_phone, status, gateway_reference)
+     VALUES ($1, $2, $3, $4, $5, 'pending', $6)
+     RETURNING id`,
+    [tenantId, routerId, packageId, amount, phone, reference]
+  );
+  return { limited: false, id: inserted.rows[0].id, reference };
+});
 
 // POST /api/portal/pay
 const initiatePayment = async (req, res) => {

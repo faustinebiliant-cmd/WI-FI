@@ -32,47 +32,35 @@ const isClientTunnelIp = (ip) => {
 };
 
 // Gives a router its tunnel address: the lowest free one, one router at a time
-const assignTunnelIp = async (routerId) => {
-  const client = await db.pool.connect();
-  try {
-    await client.query('BEGIN');
-    await client.query('SELECT pg_advisory_xact_lock(727001)');
+// (727001: a fixed lock number for "handing out tunnel addresses")
+const assignTunnelIp = (routerId) => db.transaction(async (client) => {
+  await client.query('SELECT pg_advisory_xact_lock(727001)');
 
-    const cur = await client.query('SELECT tunnel_ip FROM routers WHERE id = $1', [routerId]);
-    if (cur.rows[0] && cur.rows[0].tunnel_ip) {
-      await client.query('COMMIT');
-      return String(cur.rows[0].tunnel_ip);
+  const cur = await client.query('SELECT tunnel_ip FROM routers WHERE id = $1', [routerId]);
+  if (cur.rows[0] && cur.rows[0].tunnel_ip) return String(cur.rows[0].tunnel_ip);
+
+  // An address counts as taken if any router has it as tunnel_ip OR ip_address:
+  // routers set up by hand before automation only have ip_address filled in
+  const used = await client.query('SELECT tunnel_ip, ip_address FROM routers');
+  const taken = new Set();
+  for (const row of used.rows) {
+    for (const addr of [row.tunnel_ip, row.ip_address]) {
+      const n = tunnelIndex(addr);
+      if (n !== null) taken.add(n);
     }
-
-    // An address counts as taken if any router has it as tunnel_ip OR ip_address:
-    // routers set up by hand before automation only have ip_address filled in
-    const used = await client.query('SELECT tunnel_ip, ip_address FROM routers');
-    const taken = new Set();
-    for (const row of used.rows) {
-      for (const addr of [row.tunnel_ip, row.ip_address]) {
-        const n = tunnelIndex(addr);
-        if (n !== null) taken.add(n);
-      }
-    }
-
-    let next = null;
-    for (let n = TUNNEL_FIRST; n <= TUNNEL_LAST; n++) {
-      if (n % 256 === 0 || n % 256 === 255) continue;
-      if (!taken.has(n)) { next = n; break; }
-    }
-    if (next === null) throw new Error('No free tunnel addresses left');
-
-    const ip = tunnelIpFromIndex(next);
-    await client.query('UPDATE routers SET tunnel_ip = $1, ip_address = $2 WHERE id = $3', [ip, ip, routerId]);
-    await client.query('COMMIT');
-    return ip;
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw err;
-  } finally {
-    client.release();
   }
-};
+
+  let next = null;
+  for (let n = TUNNEL_FIRST; n <= TUNNEL_LAST; n++) {
+    if (n % 256 === 0 || n % 256 === 255) continue;
+    if (!taken.has(n)) { next = n; break; }
+  }
+  if (next === null) throw new Error('No free tunnel addresses left');
+
+  const ip = tunnelIpFromIndex(next);
+  await client.query('UPDATE routers SET tunnel_ip = $1, ip_address = $2 WHERE id = $3', [ip, ip, routerId]);
+  return ip;
+});
 
 const getBootstrapScript = async (req, res) => {
   try {
@@ -117,7 +105,7 @@ const getBootstrapScript = async (req, res) => {
 # ===== OSWAGOLINK AUTO-PROVISIONING =====
 # Run ONLY on a factory-fresh router, after setting the admin password.
 :if ([:len [/interface wireguard find name=wg-vps]] > 0) do={ :error "ALREADY PROVISIONED - this router is already set up. Nothing was changed." }
-:if (![/system device-mode get scheduler]) do={ :error "SCHEDULER IS OFF - paste step 2 from the Business Panel again: it switches the scheduler on (you will be asked to unplug the power once). Nothing was changed." }
+:if (![/system device-mode get scheduler]) do={ :error "SCHEDULER IS OFF - paste step 1 from the Business Panel again: it switches the scheduler on (you will be asked to unplug the power once). Nothing was changed." }
 
 /system identity set name=oswagolink-${assignedIp.replace(/\./g, '-')}
 /system clock set time-zone-autodetect=no time-zone-name=Africa/Dar_es_Salaam

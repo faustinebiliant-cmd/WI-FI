@@ -129,6 +129,9 @@ const ADMIN_HOST = (trimmed(process.env.ADMIN_HOST) || '').toLowerCase();
 if (ADMIN_HOST && !/^[a-z0-9.-]{1,253}$/.test(ADMIN_HOST)) {
   fail('ADMIN_HOST must be a plain host name such as admin.oswagolink.co.tz (no https://, no slash).');
 }
+if (IS_PROD && !ADMIN_HOST) {
+  console.warn('WARNING: ADMIN_HOST is empty: the admin API answers on every address, not only on the admin site. Set ADMIN_HOST=admin.oswagolink.co.tz in .env.');
+}
 
 // ------------------------------------------------------------
 // Frozen export. Nothing downstream reads process.env.

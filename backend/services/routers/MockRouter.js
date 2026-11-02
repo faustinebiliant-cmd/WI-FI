@@ -6,7 +6,7 @@
 class MockRouter {
   async createVoucher(code, durationMinutes, speedDownKbps, speedUpKbps) {
     console.log(`[MockRouter] Created voucher for ${durationMinutes} mins`);
-    return { ok: true, expiresAt: new Date(Date.now() + durationMinutes * 60000) };
+    return { ok: true };
   }
 
   async removeVoucher(code) {

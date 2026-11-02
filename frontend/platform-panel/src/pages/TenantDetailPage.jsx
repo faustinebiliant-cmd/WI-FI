@@ -15,8 +15,8 @@ export default function TenantDetailPage() {
   const [error, setError] = useState('');
   const [working, setWorking] = useState(false);
 
-  // Suspend / unsuspend (with a reason, saved in the Audit Logs)
-  const [showStatus, setShowStatus] = useState(false);
+  // Suspend / unsuspend / activate (with a reason, saved in the Audit Logs)
+  const [statusAction, setStatusAction] = useState(null); // 'suspend' | 'unsuspend' | 'activate'
   const [statusReason, setStatusReason] = useState('');
   const [statusError, setStatusError] = useState('');
   const [statusSaving, setStatusSaving] = useState(false);
@@ -52,9 +52,20 @@ export default function TenantDetailPage() {
     }
   };
 
-  const isSuspended = tenant?.subscription_status === 'suspended';
+  const status = tenant?.subscription_status;
+  // Last trial day as YYYY-MM-DD (the business is blocked from the next day)
+  const trialEnds = status === 'trial' && tenant?.trial_ends_at ? String(tenant.trial_ends_at).slice(0, 10) : null;
 
-  const openStatus = () => { setStatusReason(''); setStatusError(''); setShowStatus(true); };
+  const STATUS_TEXT = {
+    suspend: { title: 'Suspend', button: 'Suspend', style: 'btn-solid-danger', placeholder: 'e.g. Monthly fee not paid',
+      note: 'The owner cannot log in and the WiFi portal tells customers the service is not available. Customers already online keep their time.' },
+    unsuspend: { title: 'Unsuspend', button: 'Unsuspend', style: 'btn-primary', placeholder: 'e.g. Payment received for November',
+      note: 'The owner can log in again and customers can buy and use vouchers again.' },
+    activate: { title: 'Activate', button: 'Activate', style: 'btn-primary', placeholder: 'e.g. First monthly fee paid',
+      note: 'The trial ends: the business becomes a paying customer and is no longer blocked when the trial date passes.' }
+  };
+
+  const openStatus = (action) => { setStatusReason(''); setStatusError(''); setStatusAction(action); };
 
   const handleStatus = async (e) => {
     e.preventDefault();
@@ -66,11 +77,11 @@ export default function TenantDetailPage() {
     setStatusError('');
     try {
       const res = await apiClient.patch(`/platform/tenants/${id}/status`, {
-        action: isSuspended ? 'unsuspend' : 'suspend',
+        action: statusAction,
         reason: statusReason.trim()
       });
       setTenant((current) => ({ ...current, subscription_status: res.data.data.subscription_status }));
-      setShowStatus(false);
+      setStatusAction(null);
     } catch (err) {
       setStatusError(err.response?.data?.error || 'Failed to change the status.');
     } finally {
@@ -96,9 +107,16 @@ export default function TenantDetailPage() {
           <button onClick={() => setShowImpersonate(true)} className="btn btn-warning">
             Impersonate Owner
           </button>
-          <button onClick={openStatus} className={`btn ${isSuspended ? 'btn-primary' : 'btn-solid-danger'}`}>
-            {isSuspended ? 'Unsuspend Business' : 'Suspend Business'}
-          </button>
+          {status === 'suspended' ? (
+            <button onClick={() => openStatus('unsuspend')} className="btn btn-primary">Unsuspend Business</button>
+          ) : (
+            <>
+              {status === 'trial' && (
+                <button onClick={() => openStatus('activate')} className="btn btn-primary">Activate Business</button>
+              )}
+              <button onClick={() => openStatus('suspend')} className="btn btn-solid-danger">Suspend Business</button>
+            </>
+          )}
         </div>
       </div>
 
@@ -111,6 +129,7 @@ export default function TenantDetailPage() {
             <dt>Phone</dt><dd>{tenant.owner_phone}</dd>
             <dt>Status</dt>
             <dd><span className={`badge ${tenant.subscription_status === 'active' ? 'badge-success' : 'badge-warning'}`}>{tenant.subscription_status}</span></dd>
+            {trialEnds && (<><dt>Trial ends</dt><dd>{trialEnds} (last day)</dd></>)}
           </dl>
         </div>
 
@@ -123,14 +142,12 @@ export default function TenantDetailPage() {
         </div>
       </div>
 
-      {showStatus && (
+      {statusAction && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 className="modal-title">{isSuspended ? 'Unsuspend' : 'Suspend'} {tenant.business_name}</h2>
+            <h2 className="modal-title">{STATUS_TEXT[statusAction].title} {tenant.business_name}</h2>
             <p className="modal-sub">
-              {isSuspended
-                ? 'The owner can log in again and customers can buy and use vouchers again.'
-                : 'The owner cannot log in and the WiFi portal tells customers the service is not available. Customers already online keep their time.'}
+              {STATUS_TEXT[statusAction].note}
               {' '}The reason is saved in the Audit Logs.
             </p>
 
@@ -141,7 +158,7 @@ export default function TenantDetailPage() {
                 <label>Reason</label>
                 <textarea
                   required
-                  placeholder={isSuspended ? 'e.g. Payment received for November' : 'e.g. Monthly fee not paid'}
+                  placeholder={STATUS_TEXT[statusAction].placeholder}
                   value={statusReason}
                   onChange={e => setStatusReason(e.target.value)}
                   className="form-control"
@@ -151,9 +168,9 @@ export default function TenantDetailPage() {
                 />
               </div>
               <div className="modal-actions">
-                <button type="button" onClick={() => setShowStatus(false)} className="btn btn-secondary" disabled={statusSaving}>Cancel</button>
-                <button type="submit" disabled={statusSaving} className={`btn ${isSuspended ? 'btn-primary' : 'btn-solid-danger'}`}>
-                  {statusSaving ? 'Saving...' : (isSuspended ? 'Unsuspend' : 'Suspend')}
+                <button type="button" onClick={() => setStatusAction(null)} className="btn btn-secondary" disabled={statusSaving}>Cancel</button>
+                <button type="submit" disabled={statusSaving} className={`btn ${STATUS_TEXT[statusAction].style}`}>
+                  {statusSaving ? 'Saving...' : STATUS_TEXT[statusAction].button}
                 </button>
               </div>
             </form>

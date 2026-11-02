@@ -18,7 +18,7 @@ const verifyAdminToken = (token) => {
 };
 
 // ------------------------------------------------------------
-// Tenant Tokens (We will use this later)
+// Business (tenant) tokens, also used for impersonation
 // ------------------------------------------------------------
 const signTenantToken = (payload) => {
   return jwt.sign(payload, env.JWT_SECRET, {

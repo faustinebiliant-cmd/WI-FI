@@ -1,5 +1,5 @@
 const db = require('../config/db');
-const { isValidUUID } = require('../utils/validators');
+const { isValidUUID, isSafeText } = require('../utils/validators');
 
 // Every router is set up with speed profiles for 1 to 20 Mbps (see provisionController),
 // so a package speed must be one of those: a whole number of Mbps from 1 to 20.
@@ -27,9 +27,14 @@ const listPackages = async (req, res) => {
 const createPackage = async (req, res) => {
   try {
     const { name, price_tzs, duration_minutes, speed_down_kbps, speed_up_kbps, router_id } = req.body;
-    
+
     if (!name || price_tzs === undefined || duration_minutes === undefined || speed_down_kbps === undefined || speed_up_kbps === undefined || !router_id) {
       return res.status(400).json({ success: false, error: 'All fields, including Router, are required' });
+    }
+
+    const packageName = String(name).trim();
+    if (!packageName || packageName.length > 100 || !isSafeText(packageName)) {
+      return res.status(400).json({ success: false, error: 'Package name: 1 to 100 characters, no HTML.' });
     }
 
     if (!isValidUUID(router_id)) {
@@ -56,7 +61,7 @@ const createPackage = async (req, res) => {
     if (!isAllowedSpeed(down) || !isAllowedSpeed(up)) {
       return res.status(400).json({ success: false, error: 'Speed must be a whole number from 1 to 20 Mbps.' });
     }
-    
+
     // Limit: max 20 packages per tenant. Count and add under one lock per business,
     // so two quick clicks cannot pass the limit.
     const created = await db.transaction(async (client) => {
@@ -67,7 +72,7 @@ const createPackage = async (req, res) => {
       const { rows } = await client.query(
         `INSERT INTO packages (tenant_id, router_id, name, price_tzs, duration_minutes, speed_down_kbps, speed_up_kbps)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [req.tenantId, router_id, name.trim(), price, duration, down, up]
+        [req.tenantId, router_id, packageName, price, duration, down, up]
       );
       return rows[0];
     });
@@ -77,7 +82,7 @@ const createPackage = async (req, res) => {
 
     return res.status(201).json({ success: true, data: created });
   } catch (error) {
-    console.error(error);
+    console.error('Create package error:', error);
     return res.status(500).json({ success: false, error: 'Failed to create package' });
   }
 };

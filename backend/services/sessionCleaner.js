@@ -236,12 +236,17 @@ const runVoucherExpiry = async () => {
   }
 };
 
+// Returns a function that stops both timers (used when the server shuts down)
 const startSessionCleaner = () => {
   runVoucherExpiry();
-  setInterval(runVoucherExpiry, EXPIRE_EVERY_MS);
+  const expiryTimer = setInterval(runVoucherExpiry, EXPIRE_EVERY_MS);
   cleanExpiredSessions();
-  setInterval(cleanExpiredSessions, SYNC_EVERY_MS);
+  const syncTimer = setInterval(cleanExpiredSessions, SYNC_EVERY_MS);
   console.log('[Cleaner] Session sync and expiration checker started.');
+  return () => {
+    clearInterval(expiryTimer);
+    clearInterval(syncTimer);
+  };
 };
 
 module.exports = { startSessionCleaner };

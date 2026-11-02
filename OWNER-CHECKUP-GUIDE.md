@@ -192,6 +192,13 @@ rm ~/backup.dump
 In the admin panel: which businesses are on trial, whose trial is ending, who
 has not paid. (Business task, not technical, but easy to forget.)
 
+**New businesses get a 14-day free trial.** The business page shows
+"Trial ends: YYYY-MM-DD (last day)". The day after, the business is blocked
+automatically (owner cannot log in, portal says the service is not available).
+- **They paid?** Business page → **Activate Business** → reason ("First monthly
+  fee paid"). The trial ends and they are a paying customer.
+- Watch the trial end dates each month, so nobody is blocked by surprise.
+
 **Business has not paid?** Admin panel → Businesses → click the business →
 **Suspend Business** → write the reason (for example "November fee not paid").
 - The owner can no longer log in, and the WiFi portal tells customers the

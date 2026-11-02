@@ -221,7 +221,7 @@ class MikroTikRouter {
         }
       });
 
-      return { ok: true, expiresAt: new Date(Date.now() + minutes * 60000) };
+      return { ok: true };
     } catch (error) {
       console.error('[MikroTik] Failed to create voucher:', error.message);
       return { ok: false, error: error.message };
@@ -284,9 +284,7 @@ class MikroTikRouter {
       return active.map((user) => ({
         mac: user['mac-address'],
         ip: user.address,
-        voucherCode: user.user,
-        uptime: user.uptime,
-        expiresAt: null
+        voucherCode: user.user
       }));
     } catch (error) {
       console.error('[MikroTik] Failed to fetch active users:', error.message);

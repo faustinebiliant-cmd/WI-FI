@@ -89,11 +89,7 @@ const listVouchers = async (req, res) => {
 
     if (req.query.today === 'true') {
       const { start, end } = getTodayRangeEAT();
-      if (req.query.scope === 'used') {
-        query += ` AND v.used_at >= $2 AND v.used_at <= $3`;
-      } else {
-        query += ` AND v.created_at >= $2 AND v.created_at <= $3`;
-      }
+      query += ` AND v.created_at >= $2 AND v.created_at <= $3`;
       params.push(start.toISOString(), end.toISOString());
     }
 
@@ -105,13 +101,14 @@ const listVouchers = async (req, res) => {
     }
 
     // Search by code: letters and digits only, so the text is safe inside LIKE
+    // (codes are always stored in capitals)
     const search = String(req.query.search || '').trim().toUpperCase();
     if (search) {
       if (!/^[A-Z0-9]{1,32}$/.test(search)) {
         return res.status(400).json({ success: false, error: 'Search with letters and numbers only.' });
       }
       params.push(`%${search}%`);
-      query += ` AND upper(v.code) LIKE $${params.length}`;
+      query += ` AND v.code LIKE $${params.length}`;
     }
 
     // The total and the page itself at the same time
@@ -148,9 +145,12 @@ const revokeVoucher = async (req, res) => {
     }
 
     const vRes = await db.query(
-      `SELECT v.id, v.code, v.status, p.router_id
+      // The voucher and its router (only what the router connection needs) in one trip
+      `SELECT v.id, v.code, v.status, r.id AS router_id,
+              r.ip_address, r.api_port, r.api_username, r.api_password_encrypted
        FROM vouchers v
        LEFT JOIN packages p ON p.id = v.package_id
+       LEFT JOIN routers r ON r.id = p.router_id AND r.tenant_id = v.tenant_id
        WHERE v.id = $1 AND v.tenant_id = $2`,
       [id, req.tenantId]
     );
@@ -169,29 +169,23 @@ const revokeVoucher = async (req, res) => {
 
     // Only an active voucher has a user on the router
     if (previousStatus === 'active' && v.router_id) {
-      const rRes = await db.query(
-        'SELECT * FROM routers WHERE id = $1 AND tenant_id = $2',
-        [v.router_id, req.tenantId]
-      );
-      if (rRes.rows[0]) {
-        let result;
-        try {
-          result = await getRouter(rRes.rows[0]).removeVoucher(v.code);
-        } catch (err) {
-          console.error('Revoke voucher: router could not be used:', err.message);
-          result = { ok: false };
-        }
-        if (!result || !result.ok) {
-          // Undo, so the tenant can try again when the router is reachable
-          await db.query(
-            "UPDATE vouchers SET status = $1 WHERE id = $2 AND status = 'cancelled'",
-            [previousStatus, v.id]
-          );
-          return res.status(503).json({
-            success: false,
-            error: 'The router could not be reached, so the customer could not be disconnected. The voucher was NOT revoked. Please try again when the router is online.'
-          });
-        }
+      let result;
+      try {
+        result = await getRouter(v).removeVoucher(v.code);
+      } catch (err) {
+        console.error('Revoke voucher: router could not be used:', err.message);
+        result = { ok: false };
+      }
+      if (!result || !result.ok) {
+        // Undo, so the tenant can try again when the router is reachable
+        await db.query(
+          "UPDATE vouchers SET status = $1 WHERE id = $2 AND status = 'cancelled'",
+          [previousStatus, v.id]
+        );
+        return res.status(503).json({
+          success: false,
+          error: 'The router could not be reached, so the customer could not be disconnected. The voucher was NOT revoked. Please try again when the router is online.'
+        });
       }
     }
 

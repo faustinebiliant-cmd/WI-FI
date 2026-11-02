@@ -49,7 +49,8 @@ const isValidUUID = (uuid) => {
   return uuidRegex.test(uuid);
 };
 
-// Prevents SQL injection and XSS in string inputs
+// Rejects names with HTML or script in them (a simple filter for names and labels).
+// SQL injection is prevented elsewhere: every query passes values as $1, $2, ...
 const isSafeText = (text) => {
   if (!text) return true;
   if (typeof text !== 'string') return false;

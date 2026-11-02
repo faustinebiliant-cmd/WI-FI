@@ -13,7 +13,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const db = require('./config/db'); // Import DB directly
+const db = require('./config/db');
 
 // ------------------------------------------------------------
 // App
@@ -58,9 +58,9 @@ app.use(cors({
     }
     return callback(new Error('Not allowed by CORS'));
   },
-  credentials: true,
+  // The panels send their login as a token (Authorization header), never as a cookie
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   maxAge: 86400
 }));
 
@@ -78,15 +78,13 @@ const accessLogFormat = env.IS_PROD
   : ':method :safe-url :status :response-time ms';
 app.use(morgan(accessLogFormat));
 app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // ------------------------------------------------------------
-// Health Check (Updated for Postgres)
+// Health check (public): is the database reachable?
 // ------------------------------------------------------------
 app.get('/api/health', async (req, res) => {
   try {
-    // A tiny query to prove the DB connection works
-    await db.query('SELECT id FROM tenants LIMIT 1');
+    await db.query('SELECT 1');
 
     res.json({
       status: 'ok',
@@ -175,50 +173,36 @@ app.use((err, req, res, next) => {
 });
 
 // ------------------------------------------------------------
-// Router pinger: runs once at start-up, then every 5 minutes.
-// It never starts a second copy while one is still running.
+// Background scripts: each runs as its own small process, and a
+// second copy never starts while one is still running.
 // ------------------------------------------------------------
-let pingerRunning = false;
-const runPinger = () => {
-  if (pingerRunning) return;
-  pingerRunning = true;
+const runningScripts = new Set();
+const runScript = (file, timeoutMs, label) => {
+  if (runningScripts.has(file)) return;
+  runningScripts.add(file);
   execFile(
     process.execPath,
-    [path.join(__dirname, 'scripts', 'pingRouters.js')],
-    // 4.5 minutes: enough for hundreds of routers, and still finished before the next 5-minute run
-    { timeout: 270000, cwd: __dirname },
+    [path.join(__dirname, 'scripts', file)],
+    { timeout: timeoutMs, cwd: __dirname },
     (err, stdout, stderr) => {
-      pingerRunning = false;
-      if (err) console.error('Pinger error:', err.message);
+      runningScripts.delete(file);
+      if (err) console.error(`${label} error:`, err.message);
       if (stdout) console.log(stdout.trim());
       if (stderr) console.error(stderr.trim());
     }
   );
 };
+
+// Router pinger: at start-up, then every 5 minutes. 4.5 minutes is enough for
+// hundreds of routers, and still finished before the next run.
+const runPinger = () => runScript('pingRouters.js', 270000, 'Pinger');
 runPinger();
 const pingerInterval = setInterval(runPinger, 5 * 60 * 1000);
 
-// ------------------------------------------------------------
-// History clean-up: deletes history older than 1 month.
-// Every night at 02:00 Tanzania time (23:00 UTC), one hour before
-// the database backup, and once 2 minutes after start-up.
-// ------------------------------------------------------------
-let historyRunning = false;
-const runHistoryCleanup = () => {
-  if (historyRunning) return;
-  historyRunning = true;
-  execFile(
-    process.execPath,
-    [path.join(__dirname, 'scripts', 'deleteOldHistory.js')],
-    { timeout: 30 * 60 * 1000, cwd: __dirname },
-    (err, stdout, stderr) => {
-      historyRunning = false;
-      if (err) console.error('History clean-up error:', err.message);
-      if (stdout) console.log(stdout.trim());
-      if (stderr) console.error(stderr.trim());
-    }
-  );
-};
+// History clean-up: deletes history older than 1 month. Every night at 02:00
+// Tanzania time (23:00 UTC), one hour before the database backup, and once
+// 2 minutes after start-up.
+const runHistoryCleanup = () => runScript('deleteOldHistory.js', 30 * 60 * 1000, 'History clean-up');
 const historyStartTimer = setTimeout(runHistoryCleanup, 2 * 60 * 1000);
 // Checked every hour, so it runs exactly once during the 23:00 UTC hour
 const historyInterval = setInterval(() => {
@@ -245,10 +229,10 @@ const server = app.listen(env.PORT, LISTEN_HOST, () => {
 });
 
 // Start the cleaner now that the server is running
-startSessionCleaner();
+const stopSessionCleaner = startSessionCleaner();
 
 // ------------------------------------------------------------
-// C5: Graceful Shutdown
+// Graceful shutdown
 // ------------------------------------------------------------
 const gracefulShutdown = (signal) => {
   console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
@@ -261,6 +245,7 @@ const gracefulShutdown = (signal) => {
     clearInterval(pingerInterval);
     clearInterval(historyInterval);
     clearTimeout(historyStartTimer);
+    stopSessionCleaner();
     console.log('Background tasks stopped.');
 
     // 3. Close database connection
