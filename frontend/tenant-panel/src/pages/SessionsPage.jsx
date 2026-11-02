@@ -70,8 +70,8 @@ export default function SessionsPage() {
             <tbody>
               {sessions.map((s) => (
                 <tr key={s.id}>
-                  <td className="cell-strong">{s.vouchers?.code}</td>
-                  <td>{s.routers?.name}</td>
+                  <td className="cell-strong">{s.voucher_code}</td>
+                  <td>{s.router_name}</td>
                   <td className="cell-mono">{s.mac_address}</td>
                   <td>{s.started_at_eat}</td>
                   <td className="col-actions">

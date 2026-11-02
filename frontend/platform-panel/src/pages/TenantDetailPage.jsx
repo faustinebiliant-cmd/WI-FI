@@ -6,14 +6,20 @@ import Loader from '../shared/components/Loader';
 export default function TenantDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+
   const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+
   const [showImpersonate, setShowImpersonate] = useState(false);
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [working, setWorking] = useState(false);
+
+  // Suspend / unsuspend (with a reason, saved in the Audit Logs)
+  const [showStatus, setShowStatus] = useState(false);
+  const [statusReason, setStatusReason] = useState('');
+  const [statusError, setStatusError] = useState('');
+  const [statusSaving, setStatusSaving] = useState(false);
 
   useEffect(() => {
     apiClient.get(`/platform/tenants/${id}`)
@@ -39,10 +45,36 @@ export default function TenantDetailPage() {
       // It gets a one-time code (60 seconds) and swaps it for the login itself.
       // The code goes after "#", so it is never sent to or logged by the web server.
       window.location.href = `${import.meta.env.VITE_TENANT_BASE}/impersonate#code=${encodeURIComponent(res.data.code)}`;
-      
+
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to start impersonation');
       setWorking(false);
+    }
+  };
+
+  const isSuspended = tenant?.subscription_status === 'suspended';
+
+  const openStatus = () => { setStatusReason(''); setStatusError(''); setShowStatus(true); };
+
+  const handleStatus = async (e) => {
+    e.preventDefault();
+    if (statusReason.trim().length < 5) {
+      setStatusError('Write a reason (at least 5 characters).');
+      return;
+    }
+    setStatusSaving(true);
+    setStatusError('');
+    try {
+      const res = await apiClient.patch(`/platform/tenants/${id}/status`, {
+        action: isSuspended ? 'unsuspend' : 'suspend',
+        reason: statusReason.trim()
+      });
+      setTenant((current) => ({ ...current, subscription_status: res.data.data.subscription_status }));
+      setShowStatus(false);
+    } catch (err) {
+      setStatusError(err.response?.data?.error || 'Failed to change the status.');
+    } finally {
+      setStatusSaving(false);
     }
   };
 
@@ -60,9 +92,14 @@ export default function TenantDetailPage() {
           <h1>{tenant.business_name}</h1>
           <p>Business ID: {tenant.id}</p>
         </div>
-        <button onClick={() => setShowImpersonate(true)} className="btn btn-warning">
-          Impersonate Owner
-        </button>
+        <div className="header-actions">
+          <button onClick={() => setShowImpersonate(true)} className="btn btn-warning">
+            Impersonate Owner
+          </button>
+          <button onClick={openStatus} className={`btn ${isSuspended ? 'btn-primary' : 'btn-solid-danger'}`}>
+            {isSuspended ? 'Unsuspend Business' : 'Suspend Business'}
+          </button>
+        </div>
       </div>
 
       <div className="detail-grid">
@@ -85,6 +122,44 @@ export default function TenantDetailPage() {
           </dl>
         </div>
       </div>
+
+      {showStatus && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 className="modal-title">{isSuspended ? 'Unsuspend' : 'Suspend'} {tenant.business_name}</h2>
+            <p className="modal-sub">
+              {isSuspended
+                ? 'The owner can log in again and customers can buy and use vouchers again.'
+                : 'The owner cannot log in and the WiFi portal tells customers the service is not available. Customers already online keep their time.'}
+              {' '}The reason is saved in the Audit Logs.
+            </p>
+
+            {statusError && <div className="alert alert-danger">{statusError}</div>}
+
+            <form onSubmit={handleStatus}>
+              <div className="form-group">
+                <label>Reason</label>
+                <textarea
+                  required
+                  placeholder={isSuspended ? 'e.g. Payment received for November' : 'e.g. Monthly fee not paid'}
+                  value={statusReason}
+                  onChange={e => setStatusReason(e.target.value)}
+                  className="form-control"
+                  rows={3}
+                  maxLength={500}
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setShowStatus(false)} className="btn btn-secondary" disabled={statusSaving}>Cancel</button>
+                <button type="submit" disabled={statusSaving} className={`btn ${isSuspended ? 'btn-primary' : 'btn-solid-danger'}`}>
+                  {statusSaving ? 'Saving...' : (isSuspended ? 'Unsuspend' : 'Suspend')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showImpersonate && (
         <div className="modal-overlay">

@@ -192,6 +192,13 @@ rm ~/backup.dump
 In the admin panel: which businesses are on trial, whose trial is ending, who
 has not paid. (Business task, not technical, but easy to forget.)
 
+**Business has not paid?** Admin panel → Businesses → click the business →
+**Suspend Business** → write the reason (for example "November fee not paid").
+- The owner can no longer log in, and the WiFi portal tells customers the
+  service is not available. Customers already online keep their time.
+- When they pay: same page → **Unsuspend Business** → reason ("Payment received").
+- Both actions, with your reason, are saved in **Audit Logs**.
+
 ---
 
 ## 6. EVERY 3 MONTHS (10 minutes)

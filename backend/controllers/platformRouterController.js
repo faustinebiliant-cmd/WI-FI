@@ -10,13 +10,8 @@ const listAllRouters = async (req, res) => {
       JOIN tenants t ON r.tenant_id = t.id
       ORDER BY r.created_at DESC
     `);
-    
-    const formattedData = rows.map(r => ({
-      ...r,
-      tenants: { business_name: r.tenant_name }
-    }));
 
-    return res.status(200).json({ success: true, data: formattedData });
+    return res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error('List all routers error:', error);
     return res.status(500).json({ success: false, error: 'Failed to list routers' });

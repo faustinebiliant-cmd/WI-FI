@@ -100,7 +100,15 @@ const getTenant = async (req, res) => {
 const toggleTenantStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { action, reason } = req.body;
+    const { action } = req.body || {};
+    const reason = String((req.body || {}).reason || '').trim();
+    // Only these two: anything else (a typo) must not silently re-activate a business
+    if (action !== 'suspend' && action !== 'unsuspend') {
+      return res.status(400).json({ success: false, error: 'Action must be suspend or unsuspend' });
+    }
+    if (reason.length < 5 || reason.length > 500) {
+      return res.status(400).json({ success: false, error: 'Write a reason (5 to 500 characters).' });
+    }
     const newStatus = action === 'suspend' ? 'suspended' : 'active';
 
     if (!isValidUUID(id)) return res.status(404).json({ success: false, error: 'Tenant not found' });
@@ -116,13 +124,13 @@ const toggleTenantStatus = async (req, res) => {
       await client.query(
         `INSERT INTO platform_audit_logs (admin_id, admin_email, action, target_type, target_id, target_label, details)
          VALUES ($1, $2, $3, 'tenant', $4, $5, $6)`,
-        [req.admin.id, req.admin.email, action === 'suspend' ? 'Tenant Suspended' : 'Tenant Unsuspended', id, rows[0].business_name, JSON.stringify({ reason: reason || 'No reason provided' })]
+        [req.admin.id, req.admin.email, action === 'suspend' ? 'Tenant Suspended' : 'Tenant Unsuspended', id, rows[0].business_name, JSON.stringify({ reason })]
       );
       return rows[0];
     });
     if (!tenant) return res.status(404).json({ success: false, error: 'Tenant not found' });
 
-    return res.status(200).json({ success: true, message: `Tenant ${action}ed successfully`, data: tenant });
+    return res.status(200).json({ success: true, message: action === 'suspend' ? 'Business suspended' : 'Business unsuspended', data: tenant });
   } catch (error) {
     console.error('Update tenant status error:', error);
     return res.status(500).json({ success: false, error: 'Failed to update tenant status' });

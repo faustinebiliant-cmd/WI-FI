@@ -171,7 +171,7 @@ export default function VouchersPage() {
             placeholder="Search code"
             aria-label="Search voucher code"
             value={searchInput}
-            onChange={e => setSearchInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 32))}
+            onChange={e => setSearchInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1').slice(0, 32))}
           />
         </div>
         <select className="form-control" aria-label="Status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
@@ -302,7 +302,7 @@ export default function VouchersPage() {
                     <select className="form-control" required value={selectedPackage} onChange={e => setSelectedPackage(e.target.value)}>
                       {packages.map(p => (
                         <option key={p.id} value={p.id}>
-                          {hasMultipleRouters ? `${p.name} - TZS ${p.price_tzs} (${p.router_name || 'No Router'})` : `${p.name} - TZS ${p.price_tzs}`}
+                          {hasMultipleRouters ? `${p.name} - TZS ${p.price_tzs.toLocaleString()} (${p.router_name || 'No Router'})` : `${p.name} - TZS ${p.price_tzs.toLocaleString()}`}
                         </option>
                       ))}
                     </select>

@@ -82,9 +82,11 @@ export default function App() {
     };
 
     checkLockout();
+    // Count down every second only while locked (5 wrong codes); otherwise no timer runs
+    if (lockoutTimeLeft <= 0 && !localStorage.getItem('portal_lockout_until')) return;
     const interval = setInterval(checkLockout, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [lockoutTimeLeft > 0]);
 
   const formatDuration = (mins) => {
     if (mins >= 1440 && mins % 1440 === 0) return `${mins / 1440} Day${mins / 1440 > 1 ? 's' : ''}`;

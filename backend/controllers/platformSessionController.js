@@ -23,9 +23,7 @@ const listAllSessions = async (req, res) => {
 
     const enriched = rows.map((s) => ({
       ...s,
-      started_at_eat: formatDateTimeEAT(s.started_at),
-      tenants: { business_name: s.tenant_name },
-      routers: { name: s.router_name }
+      started_at_eat: formatDateTimeEAT(s.started_at)
     }));
 
     return res.status(200).json({ success: true, data: enriched, total: parseInt(countRes.rows[0].count, 10) });

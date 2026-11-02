@@ -1,8 +1,13 @@
 // ============================================================
 // Oswagolink - Database Connection (Raw PostgreSQL)
 // ============================================================
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 const env = require('./env');
+
+// PostgreSQL "numeric" columns (prices, fees) arrive as numbers, not text, so the
+// screens can format them ("TZS 15,000"). Our amounts are far below float precision limits.
+const NUMERIC_TYPE_ID = 1700;
+types.setTypeParser(NUMERIC_TYPE_ID, (value) => (value === null ? null : parseFloat(value)));
 
 const pool = new Pool({
   host: env.DB_HOST,

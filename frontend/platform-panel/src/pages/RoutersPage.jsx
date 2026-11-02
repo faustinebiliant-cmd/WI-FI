@@ -40,7 +40,7 @@ export default function RoutersPage() {
             <tbody>
               {routers.map((router) => (
                 <tr key={router.id}>
-                  <td className="cell-strong">{router.tenants?.business_name || 'Unknown'}</td>
+                  <td className="cell-strong">{router.tenant_name || 'Unknown'}</td>
                   <td>{router.name}</td>
                   <td>{router.location_label || '-'}</td>
                   <td>

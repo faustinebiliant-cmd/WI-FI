@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -8,7 +8,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { login } = useAuth();
+  const { user, login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -25,6 +25,9 @@ export default function LoginPage() {
       setIsSubmitting(false); // Unlock on failure
     }
   };
+
+  // Already logged in: straight to the dashboard
+  if (user) return <Navigate to="/" replace />;
 
   return (
     <div className="auth-page">

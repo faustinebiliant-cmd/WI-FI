@@ -9,7 +9,7 @@ export default function SessionsPage() {
   const [sessions, setSessions] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  
+
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [disconnectError, setDisconnectError] = useState('');
@@ -20,7 +20,7 @@ export default function SessionsPage() {
     try {
       const res = await apiClient.get('/platform/sessions');
       setSessions(res.data.data);
-      setTotal(res.data.total ?? res.data.data.length);
+      setTotal(res.data.total);
     } catch (error) {
       console.error(error);
     } finally {
@@ -44,16 +44,13 @@ export default function SessionsPage() {
     }
   };
 
-  // This page lives in the admin panel only (it used to guess that from the address)
-  const isPlatform = true;
-
   return (
     <div className="page-wrapper">
       <div className="page-header">
         <div>
           <h1>Active Sessions</h1>
           <p>
-            Customers currently connected{isPlatform ? ' across all routers' : ' to your WiFi'}
+            Customers currently connected across all routers
             {total > sessions.length ? `: showing the newest ${sessions.length} of ${total}.` : '.'}
           </p>
         </div>
@@ -68,8 +65,7 @@ export default function SessionsPage() {
           <table>
             <thead>
               <tr>
-                {isPlatform && <th>Business</th>}
-                {!isPlatform && <th>Voucher Code</th>}
+                <th>Business</th>
                 <th>Router</th>
                 <th>MAC Address</th>
                 <th>Started (EAT)</th>
@@ -79,12 +75,8 @@ export default function SessionsPage() {
             <tbody>
               {sessions.map((s) => (
                 <tr key={s.id}>
-                  {isPlatform ? (
-                    <td className="cell-strong">{s.tenants?.business_name}</td>
-                  ) : (
-                    <td className="cell-strong">{s.vouchers?.code}</td>
-                  )}
-                  <td>{s.routers?.name}</td>
+                  <td className="cell-strong">{s.tenant_name}</td>
+                  <td>{s.router_name}</td>
                   <td className="cell-mono">{s.mac_address}</td>
                   <td>{s.started_at_eat}</td>
                   <td className="col-actions">

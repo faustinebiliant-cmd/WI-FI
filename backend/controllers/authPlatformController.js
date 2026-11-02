@@ -17,7 +17,7 @@ const login = async (req, res) => {
 
     // 1. Find the admin using Raw SQL
     const { rows } = await db.query(
-      'SELECT * FROM platform_admins WHERE email = $1', 
+      'SELECT * FROM platform_admins WHERE email = $1',
       [cleanEmail]
     );
     const admin = rows[0];
@@ -61,9 +61,4 @@ const login = async (req, res) => {
   }
 };
 
-const getMe = async (req, res) => {
-  // req.admin was attached by the authPlatform middleware
-  return res.status(200).json({ success: true, admin: req.admin });
-};
-
-module.exports = { login, getMe };
+module.exports = { login };

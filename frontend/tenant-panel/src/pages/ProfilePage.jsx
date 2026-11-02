@@ -7,7 +7,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState({ business_name: '', lipa_namba: '', payout_provider: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(null); // { ok, text }
 
   useEffect(() => {
     apiClient.get('/tenant/profile')
@@ -19,15 +19,15 @@ export default function ProfilePage() {
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
-    setMessage('');
+    setMessage(null);
     try {
       await apiClient.put('/tenant/profile', {
         lipa_namba: profile.lipa_namba,
         payout_provider: profile.payout_provider
       });
-      setMessage('Payment details saved successfully!');
+      setMessage({ ok: true, text: 'Payment details saved.' });
     } catch (error) {
-      setMessage('Failed to save details.');
+      setMessage({ ok: false, text: error.response?.data?.error || 'Failed to save details.' });
     } finally {
       setSaving(false);
     }
@@ -46,7 +46,7 @@ export default function ProfilePage() {
 
       <div className="card">
         <h2 className="section-title">Payment Details</h2>
-        {message && <div className={`alert ${message.includes('success') ? 'alert-success' : 'alert-danger'}`}>{message}</div>}
+        {message && <div className={`alert ${message.ok ? 'alert-success' : 'alert-danger'}`}>{message.text}</div>}
 
         <form onSubmit={handleSave}>
           <div className="form-group">
@@ -68,7 +68,7 @@ export default function ProfilePage() {
 
           <div className="form-group">
             <label>Lipa Namba (Payment Number)</label>
-            <input className="form-control" type="text" placeholder="e.g. 123456" value={profile.lipa_namba || ''} onChange={e => setProfile({...profile, lipa_namba: e.target.value})} required />
+            <input className="form-control" type="text" placeholder="e.g. 123456" inputMode="numeric" value={profile.lipa_namba || ''} onChange={e => setProfile({...profile, lipa_namba: e.target.value})} required />
             <p className="form-hint">This is where the money will be sent when customers buy WiFi.</p>
           </div>
 
