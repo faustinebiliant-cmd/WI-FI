@@ -1,0 +1,26 @@
+# ============================================================
+# Oswagolink - SSH robot-blocker (fail2ban)
+# Install: sudo apt install -y fail2ban
+#          sudo install -o root -g root -m 644 vps/fail2ban-oswagolink-sshd.local /etc/fail2ban/jail.d/oswagolink-sshd.local
+#          sudo systemctl enable --now fail2ban && sudo systemctl restart fail2ban
+# Check:   sudo fail2ban-client status sshd
+# Unban:   sudo fail2ban-client set sshd unbanip ADDRESS
+# Undo:    sudo apt remove -y fail2ban
+#
+# 5 wrong tries within 10 minutes -> that internet address is banned for 1 hour.
+# A robot that keeps coming back gets double the ban each time, up to 1 week.
+# Only SSH (port 22) is blocked: websites and routers keep working for that address.
+# backend = systemd: Ubuntu 26.04 logs SSH (sshd-session) in the journal under ssh.service.
+# ============================================================
+[DEFAULT]
+bantime = 1h
+findtime = 10m
+maxretry = 5
+bantime.increment = true
+bantime.maxtime = 1w
+ignoreip = 127.0.0.1/8 ::1
+
+[sshd]
+enabled = true
+backend = systemd
+port = ssh

@@ -20,8 +20,12 @@ cd ~/WI-FI
 
 - `sudo` asks for **your VPS password**. The screen stays blank while you
   type it; that is normal. Press Enter.
-- The line must start with `biliant@srv2076152`. If it starts with `root@`,
-  type `su - biliant` first. (PM2 commands only show your backend as biliant.)
+- The line must start with `biliant@srv2076152`. Your PC logs in with its key
+  (no password asked). Logging in as `root` over SSH is switched off on purpose:
+  use `biliant` and `sudo` (same power).
+- Typing your password wrong 5 times within 10 minutes bans **your internet
+  address** from SSH for 1 hour (websites and routers keep working). See
+  section 7, "Locked out of SSH".
 
 ---
 
@@ -58,6 +62,7 @@ cd ~/WI-FI
 | SSL certificate renewal check | 06:17 and 18:17 daily | Renews the website's padlock certificate before it expires |
 | Ubuntu security updates | daily | Installs urgent security fixes automatically |
 | Log rotation | automatic | Stops log files from filling the disk |
+| fail2ban (SSH guard) | all the time | 5 wrong SSH passwords within 10 minutes → that internet address banned for 1 hour; robots that return get double, up to 1 week |
 
 ---
 
@@ -181,9 +186,20 @@ while connecting to upstream` (the backend was down, visitors saw "502"), or
 ```
 sudo fail2ban-client status sshd
 ```
-**Good looks like:** the report shows. `Currently banned` with some numbers is
-normal: those are robots on the internet that tried to log in and were blocked
-automatically.
+**Good looks like:** the report shows `Status for the jail: sshd`. `Currently
+banned` with some numbers is normal: those are robots on the internet that
+tried to log in and were blocked automatically.
+
+**Tell Claude if:** it says `Failed to access socket` or `command not found`
+(the guard is not running). First try `sudo systemctl restart fail2ban`, wait
+10 seconds, and check again.
+
+Also confirm the SSH rules are still in place (an Ubuntu update could change them):
+```
+sudo sshd -T | grep -Ei "^(permitrootlogin|maxauthtries|x11forwarding|allowusers) "
+```
+**Good looks like:** `permitrootlogin no`, `maxauthtries 3`, `x11forwarding no`,
+`allowusers biliant`. The rules live in `/etc/ssh/sshd_config.d/00-oswagolink.conf`.
 
 ---
 
@@ -288,6 +304,8 @@ itself; this only confirms it.
 | "502 Bad Gateway" | The backend is down: `pm2 restart wifi-backend` | Send Claude `pm2 logs wifi-backend --err --lines 50 --nostream` |
 | One business: customers cannot connect | Is their router online in the admin panel? Is it switched on with internet? | Send Claude the router name and the time it started |
 | VPS does not answer at all | Log in to Hostinger (hPanel) and check the VPS is running | Contact Hostinger support |
+| Locked out of SSH (the websites still work, but `ssh` hangs or is refused) | Probably fail2ban banned your home address after wrong passwords. Wait 1 hour, **or** connect the PC to your phone's mobile data and log in | Then free your home address: `sudo fail2ban-client set sshd unbanip YOUR.HOME.IP` (find it with `sudo fail2ban-client status sshd`) |
+| SSH fully broken (not a ban) | hPanel → your VPS → **VNC / emergency console** (works without SSH). Log in as `biliant` | Undo the SSH rules: `sudo rm /etc/ssh/sshd_config.d/00-oswagolink.conf && sudo systemctl reload ssh`, then message Claude |
 | Data deleted or database broken | **Stop. Do not try fixes from the internet.** | Message Claude: we choose the right backup together and restore it safely |
 | `Unexpected crash, restarting` in the logs | Nothing: PM2 already started a fresh copy within a second | Send Claude the lines just above and below it: it is a bug to fix |
 | Did the backend crash? | Run the command just below this table | `code [0] via signal [SIGINT]` = a normal update restart. `code [1]` = a crash: send Claude a screenshot |

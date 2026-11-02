@@ -7,6 +7,27 @@ import './shared/styles/components.css';
 // Switch to true only when the real mobile payment (AzamPay) is connected
 const PAYMENTS_ENABLED = false;
 
+// The router login address from the link, or null when it is not a router on the
+// local network: http(s) only, no user name or password in it, and a private address
+// (10.x.x.x, 172.16-31.x.x or 192.168.x.x).
+const routerLoginUrl = (value) => {
+  if (!value) return null;
+  let url;
+  try {
+    url = new URL(value);
+  } catch (e) {
+    return null;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+  if (url.username || url.password) return null;
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(url.hostname);
+  if (!m) return null;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  if (m.slice(1).some((part) => Number(part) > 255)) return null;
+  const isPrivate = a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  return isPrivate ? url.href : null;
+};
+
 export default function App() {
   const [businessInfo, setBusinessInfo] = useState(null);
   const [status, setStatus] = useState('idle');
@@ -29,8 +50,10 @@ export default function App() {
   const macAddress = queryParams.get('mac') || null;
   const ipAddress = queryParams.get('ip') || null;
 
-  // The router's login address: after a redeem the portal logs the phone in there
-  const loginUrl = queryParams.get('login') || null;
+  // The router's login address: after a redeem the portal logs the phone in there.
+  // Only a router on the local network is accepted (e.g. http://192.168.88.1/login), so a
+  // fake link cannot send the voucher code to another website, or run a script here.
+  const loginUrl = routerLoginUrl(queryParams.get('login'));
 
   // The page info includes this device's state (time left, or when its time ended)
   const loadInfo = () => {
