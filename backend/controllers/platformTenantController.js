@@ -3,6 +3,7 @@ const db = require('../config/db');
 const { hashPassword } = require('../services/password');
 const { signTenantToken } = require('../services/jwt');
 const { issueImpersonationCode } = require('../services/impersonationCodes');
+const { removeWireGuardPeer } = require('../services/wireguard');
 const { isValidEmail, isValidPhone, isSafeText, isValidUUID } = require('../utils/validators');
 
 // A new business may use the system this many days, then it is blocked
@@ -199,4 +200,65 @@ const impersonateTenant = async (req, res) => {
   }
 };
 
-module.exports = { createTenant, listTenants, getTenant, toggleTenantStatus, impersonateTenant };
+// DELETE /api/platform/tenants/:id
+// Deletes a business and everything that belongs to it: owner login, routers,
+// packages, vouchers, sessions, payments and impersonation records (the database
+// removes them with the business). Every router's VPN tunnel is removed from the VPS
+// FIRST, because its address is handed to the next new router; if one cannot be
+// removed, nothing is deleted. Removing a tunnel twice is harmless, so trying again
+// after a failure is safe. The Audit Logs keep a line about the deletion.
+const deleteTenant = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isValidUUID(id)) return res.status(404).json({ success: false, error: 'Business not found' });
+
+    const tenantRes = await db.query('SELECT business_name FROM tenants WHERE id = $1', [id]);
+    if (tenantRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Business not found' });
+    const businessName = tenantRes.rows[0].business_name;
+
+    const { rows: routers } = await db.query(
+      'SELECT name, public_key, provisioned_at FROM routers WHERE tenant_id = $1',
+      [id]
+    );
+
+    // Set up by an older version that did not save the key: its tunnel cannot be found automatically
+    const unknownTunnel = routers.find((r) => !r.public_key && r.provisioned_at);
+    if (unknownTunnel) {
+      return res.status(409).json({
+        success: false,
+        error: `Router "${unknownTunnel.name}" was set up with an older version: its VPN tunnel must be removed by hand first. Nothing was deleted.`
+      });
+    }
+
+    for (const r of routers.filter((x) => x.public_key)) {
+      if (!(await removeWireGuardPeer(r.public_key))) {
+        return res.status(503).json({
+          success: false,
+          error: `The VPN tunnel of router "${r.name}" could not be removed from the server, so the business was NOT deleted. Please try again in a minute.`
+        });
+      }
+    }
+
+    // The record and the deletion together: no deletion without a line in the Audit Logs
+    await db.transaction(async (client) => {
+      const { rows: [counts] } = await client.query(
+        `SELECT (SELECT COUNT(*) FROM routers WHERE tenant_id = $1)::int AS routers,
+                (SELECT COUNT(*) FROM vouchers WHERE tenant_id = $1)::int AS vouchers`,
+        [id]
+      );
+      await client.query(
+        `INSERT INTO platform_audit_logs (admin_id, admin_email, action, target_type, target_id, target_label, details)
+         VALUES ($1, $2, 'Tenant Deleted', 'tenant', $3, $4, $5)`,
+        [req.admin.id, req.admin.email, id, businessName, JSON.stringify(counts)]
+      );
+      await client.query('DELETE FROM tenants WHERE id = $1', [id]);
+    });
+
+    return res.status(200).json({ success: true, message: `Business "${businessName}" deleted` });
+  } catch (error) {
+    console.error('Delete tenant error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to delete the business' });
+  }
+};
+
+module.exports = { createTenant, listTenants, getTenant, toggleTenantStatus, impersonateTenant, deleteTenant };

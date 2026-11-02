@@ -206,6 +206,16 @@ automatically (owner cannot log in, portal says the service is not available).
 - When they pay: same page → **Unsuspend Business** → reason ("Payment received").
 - Both actions, with your reason, are saved in **Audit Logs**.
 
+**Business leaving for good?** Business page → **Danger zone** → **Delete Business**
+→ type DELETE. Everything of that business is removed: owner login, routers and
+their VPN tunnels, packages, vouchers, sessions and payment records. It cannot be
+undone (only from a backup). Prefer **Suspend** if they might come back.
+- If it says a VPN tunnel could not be removed, nothing was deleted: try again
+  in a minute.
+- Afterwards, ask the business to **reset their router to factory settings**
+  (or reuse it for another business with a fresh setup).
+- The Audit Logs keep a line: who deleted which business, and when.
+
 ---
 
 ## 6. EVERY 3 MONTHS (10 minutes)

@@ -10,7 +10,8 @@ const {
   listTenants,
   getTenant,
   toggleTenantStatus,
-  impersonateTenant
+  impersonateTenant,
+  deleteTenant
 } = require('../controllers/platformTenantController');
 
 router.use(authPlatform);
@@ -20,5 +21,6 @@ router.post('/', createTenant);
 router.get('/:id', getTenant);
 router.patch('/:id/status', toggleTenantStatus);
 router.post('/:id/impersonate', impersonateTenant);
+router.delete('/:id', deleteTenant);
 
 module.exports = router;

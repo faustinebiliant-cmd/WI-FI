@@ -2,33 +2,14 @@
 // Oswagolink - Tenant Router Controller
 // ============================================================
 const crypto = require('crypto');
-const { execFile } = require('child_process');
 const db = require('../config/db');
 const { isSafeText, isValidUUID } = require('../utils/validators');
 const { encrypt } = require('../utils/encryption');
+const { removeWireGuardPeer } = require('../services/wireguard');
 
-const PUBKEY_RE = /^[A-Za-z0-9+/]{43}=$/;
 const MAX_ROUTERS_PER_TENANT = 10;
 // A setup link (provision token) works this long, then a new one must be made
 const SETUP_LINK_HOURS = 12;
-
-// Removes the router's WireGuard peer on the VPS through the root-owned helper.
-// Same lock as enrollment, so two changes to wg0.conf never run at the same time.
-// No shell is used. Resolves true only if the helper reported success.
-const removeWireGuardPeer = (publicKey) => new Promise((resolve) => {
-  execFile(
-    'flock',
-    ['-w', '10', '/var/lock/wg-enroll.lock', 'sudo', '-n', '/usr/local/sbin/wifi-wireguard-remove-peer', publicKey],
-    { timeout: 30000 },
-    (err, stdout, stderr) => {
-      if (err) {
-        console.error('Failed to remove WireGuard peer:', (stderr && stderr.trim()) || err.message);
-        return resolve(false);
-      }
-      resolve(true);
-    }
-  );
-});
 
 // Only what the page needs. Tokens and passwords are never sent to the browser.
 const listRouters = async (req, res) => {
@@ -154,7 +135,7 @@ const deleteRouter = async (req, res) => {
     //    reused by the next new router, so if the old peer stayed, two routers
     //    would share one address. If removal fails, nothing is deleted.
     if (router.public_key) {
-      const removed = PUBKEY_RE.test(router.public_key) && await removeWireGuardPeer(router.public_key);
+      const removed = await removeWireGuardPeer(router.public_key);
       if (!removed) {
         return res.status(503).json({
           success: false,

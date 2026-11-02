@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
+import { useToast } from '../shared/components/Toast';
 
 export default function TenantDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,6 +22,12 @@ export default function TenantDetailPage() {
   const [statusReason, setStatusReason] = useState('');
   const [statusError, setStatusError] = useState('');
   const [statusSaving, setStatusSaving] = useState(false);
+
+  // Delete the business (type DELETE to confirm)
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteInput, setDeleteInput] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     apiClient.get(`/platform/tenants/${id}`)
@@ -89,6 +97,22 @@ export default function TenantDetailPage() {
     }
   };
 
+  const openDelete = () => { setDeleteInput(''); setDeleteError(''); setShowDelete(true); };
+
+  const handleDelete = async () => {
+    if (deleteInput !== 'DELETE') return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const res = await apiClient.delete(`/platform/tenants/${id}`);
+      toast(res.data.message || 'Business deleted');
+      navigate('/');
+    } catch (err) {
+      setDeleteError(err.response?.data?.error || 'Failed to delete the business.');
+      setDeleting(false);
+    }
+  };
+
   if (loading) return <Loader message="Loading business details..." />;
   if (!tenant) return <div className="alert alert-danger">Business not found.</div>;
 
@@ -141,6 +165,39 @@ export default function TenantDetailPage() {
           </dl>
         </div>
       </div>
+
+      <div className="card">
+        <h2 className="section-title">Danger zone</h2>
+        <p className="modal-sub">
+          Deleting a business removes it completely: its owner login, routers (and their VPN tunnels),
+          packages, vouchers, sessions and payment records. This cannot be undone.
+        </p>
+        <button onClick={openDelete} className="btn btn-solid-danger">Delete Business</button>
+      </div>
+
+      {showDelete && (
+        <div className="modal-overlay">
+          <div className="modal-content modal-narrow">
+            <h2 className="modal-title danger">Delete Business</h2>
+            <p className="modal-sub">
+              Are you sure you want to delete <strong>{tenant.business_name}</strong>? This deletes its owner login,
+              its {tenant.router_count} router(s) and their VPN tunnels, and all its packages, vouchers, sessions and
+              payment records. The owner can no longer log in. This cannot be undone.
+            </p>
+            {deleteError && <div className="alert alert-danger">{deleteError}</div>}
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Type DELETE to confirm</label>
+              <input className="form-control" type="text" placeholder="DELETE" value={deleteInput} onChange={e => setDeleteInput(e.target.value)} disabled={deleting} />
+            </div>
+            <div className="modal-actions">
+              <button onClick={() => setShowDelete(false)} disabled={deleting} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleDelete} disabled={deleteInput !== 'DELETE' || deleting} className="btn btn-solid-danger">
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {statusAction && (
         <div className="modal-overlay">
