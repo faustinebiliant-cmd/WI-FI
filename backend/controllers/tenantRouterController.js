@@ -4,10 +4,9 @@
 const crypto = require('crypto');
 const { execFile } = require('child_process');
 const db = require('../config/db');
-const { isSafeText } = require('../utils/validators');
+const { isSafeText, isValidUUID } = require('../utils/validators');
 const { encrypt } = require('../utils/encryption');
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PUBKEY_RE = /^[A-Za-z0-9+/]{43}=$/;
 const MAX_ROUTERS_PER_TENANT = 10;
 // A setup link (provision token) works this long, then a new one must be made
@@ -110,7 +109,7 @@ const createRouter = async (req, res) => {
 const newSetupToken = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!UUID_RE.test(String(id))) {
+    if (!isValidUUID(String(id))) {
       return res.status(404).json({ success: false, error: 'Router not found' });
     }
 
@@ -136,7 +135,7 @@ const newSetupToken = async (req, res) => {
 const deleteRouter = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!UUID_RE.test(String(id))) {
+    if (!isValidUUID(String(id))) {
       return res.status(404).json({ success: false, error: 'Router not found or unauthorized' });
     }
 

@@ -3,7 +3,7 @@ const { execFile } = require('child_process');
 const db = require('../config/db');
 const { encrypt, decrypt } = require('../utils/encryption');
 
-const TOKEN_RE = /^[A-Za-z0-9_-]{8,128}$/;
+const { isValidRouterToken } = require('../utils/validators');
 const PUBKEY_RE = /^[A-Za-z0-9+/]{43}=$/;
 // Tunnel network 10.20.0.0/16 (about 65,000 addresses).
 // 10.20.0.1 is the VPS and 10.20.0.2 the owner's own router; client routers
@@ -77,7 +77,7 @@ const assignTunnelIp = async (routerId) => {
 const getBootstrapScript = async (req, res) => {
   try {
     const { token } = req.params;
-    if (!TOKEN_RE.test(token)) return res.status(404).type('text/plain').send('# Invalid Token');
+    if (!isValidRouterToken(token)) return res.status(404).type('text/plain').send('# Invalid Token');
 
     const routerRes = await db.query(
       'SELECT *, (provision_token_expires_at > NOW()) AS token_valid FROM routers WHERE provision_token = $1',
@@ -222,11 +222,11 @@ ${speedProfiles}
 const getLoginPage = async (req, res) => {
   try {
     const { token } = req.params;
-    if (!TOKEN_RE.test(token)) return res.status(404).type('text/plain').send('Not found');
+    if (!isValidRouterToken(token)) return res.status(404).type('text/plain').send('Not found');
 
     const routerRes = await db.query('SELECT router_token FROM routers WHERE provision_token = $1', [token]);
     const router = routerRes.rows[0];
-    if (!router || !TOKEN_RE.test(String(router.router_token))) {
+    if (!router || !isValidRouterToken(String(router.router_token))) {
       return res.status(404).type('text/plain').send('Not found');
     }
 
@@ -265,7 +265,7 @@ const getLoginPage = async (req, res) => {
 const registerRouterKey = async (req, res) => {
   try {
     const { token } = req.params;
-    if (!TOKEN_RE.test(token)) return res.status(404).send('Invalid token');
+    if (!isValidRouterToken(token)) return res.status(404).send('Invalid token');
 
     const pubkey = String((req.body && req.body.pubkey) || '');
     if (!PUBKEY_RE.test(pubkey)) return res.status(400).send('Invalid key');

@@ -1,5 +1,6 @@
 const rateLimit = require('express-rate-limit');
 const env = require('../config/env');
+const { isValidRouterToken } = require('../utils/validators');
 
 const devMax = (n) => (env.IS_DEV ? n * 10 : n);
 
@@ -42,13 +43,12 @@ const redeemFailureOptions = {
 // Mobile networks often put many different businesses behind ONE public address.
 // Counting per address AND router means wrong codes typed at one business do not
 // lock out the customers of another business on the same mobile network.
-const ROUTER_TOKEN_RE = /^[A-Za-z0-9_-]{8,128}$/;
 const redeemPerRouterLimiter = rateLimit({
   ...redeemFailureOptions,
   max: devMax(30),
   keyGenerator: (req) => {
     const token = req.body && req.body.router_token;
-    return `${req.ip}|${typeof token === 'string' && ROUTER_TOKEN_RE.test(token) ? token : 'invalid'}`;
+    return `${req.ip}|${isValidRouterToken(token) ? token : 'invalid'}`;
   }
 });
 

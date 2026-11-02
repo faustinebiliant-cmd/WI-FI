@@ -1,0 +1,294 @@
+# Oswagolink: Owner's Check-up Guide
+
+Your guide for keeping Oswagolink healthy. No programming knowledge needed:
+copy each command, paste it into the VPS window, and compare what you see
+with **"Good looks like"**. When something does not match, take a screenshot
+and send it to Claude (check the safety rules first).
+
+Last updated: 2 November 2026
+
+---
+
+## 0. Before every check-up: connect to the VPS
+
+In Windows PowerShell on your PC:
+
+```
+ssh biliant@69.62.105.119
+cd ~/WI-FI
+```
+
+- `sudo` asks for **your VPS password**. The screen stays blank while you
+  type it; that is normal. Press Enter.
+- The line must start with `biliant@srv2076152`. If it starts with `root@`,
+  type `su - biliant` first. (PM2 commands only show your backend as biliant.)
+
+---
+
+## 1. Safety rules (always)
+
+1. **Never send these to anyone, including Claude:**
+   - the file `backend/.env`
+   - any backup file (`.dump`)
+   - the result of `SELECT *` on `tenant_users` or `routers` (these hold
+     password hashes, router passwords and tokens)
+   - private keys (WireGuard, SSH) or the admin device passes
+2. **Never run `npm audit fix --force`.** It breaks the build. The "2
+   vulnerabilities" warning after `npm run build` is known and harmless for the
+   live site (see section 9).
+3. **Commands from other AIs or websites:** ask Claude before running anything
+   that deletes, restores, or changes settings. Reading commands (`ls`, `cat`,
+   `status`, `free`, `df`, `SELECT`) are safe.
+4. **Restoring a backup replaces the live database.** Always message Claude
+   first (section 7).
+5. Keep backup copies on your PC in `Documents`, **never inside the WI-FI
+   project folder** (that folder goes to GitHub).
+
+---
+
+## 2. What runs by itself (you do nothing)
+
+| What | When (Tanzania time) | What it does |
+|---|---|---|
+| Voucher expiry check | every 15 seconds | Ends vouchers whose time is up and removes them from the router |
+| Session sync (cleaner) | every minute | Compares who the database thinks is online with who the router says is online |
+| Router status check (pinger) | every 5 minutes | Marks routers online/offline (offline after 8 minutes of silence) |
+| History clean-up | every night 02:00 | Deletes ended sessions and finished vouchers older than 1 month |
+| Database backup | every night 03:00 | Saves a full copy in `/var/backups/wifi-db/`, keeps the last 14 |
+| SSL certificate renewal check | 06:17 and 18:17 daily | Renews the website's padlock certificate before it expires |
+| Ubuntu security updates | daily | Installs urgent security fixes automatically |
+| Log rotation | automatic | Stops log files from filling the disk |
+
+---
+
+## 3. DAILY (1 minute): is everything running?
+
+### 3a. Is the backend running?
+```
+pm2 status
+```
+**Good looks like:**
+- `wifi-backend` and `pm2-logrotate` both show `online`.
+- The `↺` number (restarts) stays the same from day to day. It goes up by 1
+  every time you deploy an update; that is normal.
+
+**Tell Claude if:** status is `errored` or `stopped`, or `↺` keeps climbing
+on days you did not deploy anything (it means the backend keeps crashing).
+
+### 3b. Are routers online?
+Open the admin panel (`admin.oswagolink.co.tz`) → **Routers**.
+
+**Good looks like:** routers are `online`.
+**If one is offline:** first ask the business whether the router is switched
+on and has internet. A router that is turned off at night shows offline; that
+is normal and fixes itself when it comes back.
+
+---
+
+## 4. WEEKLY (5 minutes): backups, space, errors
+
+### 4a. Did the nightly backups run?
+```
+sudo ls -l /var/backups/wifi-db/
+```
+**Good looks like:**
+- One file per night, named like `wifi_app_2026-11-09_0000.dump`, with the
+  newest one from last night.
+- Up to 14 files (older ones are deleted automatically).
+- Sizes are similar or slowly growing.
+
+**Tell Claude if:** last night's file is missing, or a file is much smaller
+than the others.
+
+### 4b. Memory, disk and load
+```
+free -h
+df -h /
+uptime
+```
+**Good looks like:**
+
+| Number | Where | Good | Tell Claude if |
+|---|---|---|---|
+| `available` | `free -h`, line `Mem:` | above 1 GB | under 1 GB most of the time |
+| `used` | `free -h`, line `Swap:` | `0B` or small and not growing | grows week after week |
+| `Use%` | `df -h /` | under 70% | above 80% |
+| load average (first number) | `uptime` | under 0.7 | above 0.7 most of the day (time to upgrade to KVM 2) |
+
+### 4c. Recent errors
+```
+pm2 logs wifi-backend --err --lines 30 --nostream
+```
+**Good looks like:** few or no new lines since last week. Each line starts
+with the date and time (UTC, so 3 hours behind Tanzania).
+
+**Normal, no action:**
+- `Failed to fetch active users: Timed out` / `Failed to remove voucher: Timed
+  out` around a time a router was off or had no internet.
+
+**Tell Claude if:** the same error repeats many times today while routers are
+online, or you see words like `Database error`, `ECONNREFUSED`, or `FATAL`.
+
+### 4d. Did the history clean-up run?
+```
+pm2 logs wifi-backend --lines 300 --nostream | grep History
+```
+**Good looks like:** a line like
+`[History] Deleted history older than 30 days: sessions=… vouchers=…`
+from last night. The numbers can be 0 (nothing was old enough).
+
+### 4e. Is anyone attacking the VPS login?
+```
+sudo fail2ban-client status sshd
+```
+**Good looks like:** the report shows. `Currently banned` with some numbers is
+normal: those are robots on the internet that tried to log in and were blocked
+automatically.
+
+---
+
+## 5. MONTHLY (15 minutes)
+
+### 5a. Database speed report
+```
+sudo -u postgres psql -d wifi_app < vps/wifi-db-slow-report.sql
+```
+**How to read it:**
+- **Ignore** lines that mention `pg_catalog`, `tableoid`, `attrelid`,
+  `pg_rewrite`, `pg_collation`, `pg_description`: those are the nightly backup
+  reading the database layout.
+- **Ignore** `CREATE EXTENSION` and the report's own lines
+  (`SELECT relname AS table_name…`, `SELECT round(…`).
+- **Look at** the other lines (`avg_ms` column). Your own system's work is
+  around 0.0–0.5 ms today.
+
+**Tell Claude if:** one of your system's lines has an `avg_ms` above 50, or the
+"Table sizes" show `sessions` or `vouchers` above a few million rows. Send the
+whole report (it is safe to share: it shows request shapes, never real values).
+
+### 5b. Ubuntu updates
+```
+sudo apt update && sudo apt upgrade
+```
+Type `y` when asked. If the end says **"System restart required"**, choose a
+quiet time (late night, few customers) and run `sudo reboot`. Wait 2 minutes,
+connect again, and run `pm2 status` (both `online`).
+
+### 5c. Copy one backup to your PC (until the automatic off-VPS copy exists)
+On the VPS (change the date to last night's file from step 4a):
+```
+sudo install -o biliant -m 600 /var/backups/wifi-db/wifi_app_YYYY-MM-DD_0000.dump ~/backup.dump
+```
+On your PC, in a **new** PowerShell window:
+```
+scp biliant@69.62.105.119:~/backup.dump C:\Users\Dell\Documents\oswagolink-backup.dump
+```
+Back on the VPS:
+```
+rm ~/backup.dump
+```
+
+### 5d. Check business subscriptions
+In the admin panel: which businesses are on trial, whose trial is ending, who
+has not paid. (Business task, not technical, but easy to forget.)
+
+---
+
+## 6. EVERY 3 MONTHS (10 minutes)
+
+### 6a. Prove the backups really work (practice restore)
+This uses a separate practice copy; the live system is not touched.
+```
+sudo -u postgres createdb wifi_app_check
+sudo cat /var/backups/wifi-db/wifi_app_YYYY-MM-DD_0000.dump | sudo -u postgres pg_restore --no-owner -d wifi_app_check
+sudo -u postgres psql -d wifi_app_check -c "SELECT code, status FROM vouchers ORDER BY created_at DESC LIMIT 10;"
+sudo -u postgres dropdb wifi_app_check
+```
+**Good looks like:** the third command lists your recent vouchers. Always run
+the last line (deletes the practice copy).
+
+### 6b. Website certificate (the padlock)
+```
+sudo certbot certificates
+```
+**Good looks like:** `VALID: … days` with more than 30 days. It renews by
+itself; this only confirms it.
+
+---
+
+## 7. Emergencies
+
+| What you see | First thing to do | Then |
+|---|---|---|
+| Portal or panels do not open | `pm2 status` → if not `online`: `pm2 restart wifi-backend` | Still broken: `sudo systemctl status nginx postgresql --no-pager` and send Claude a screenshot |
+| "502 Bad Gateway" | The backend is down: `pm2 restart wifi-backend` | Send Claude `pm2 logs wifi-backend --err --lines 50 --nostream` |
+| One business: customers cannot connect | Is their router online in the admin panel? Is it switched on with internet? | Send Claude the router name and the time it started |
+| VPS does not answer at all | Log in to Hostinger (hPanel) and check the VPS is running | Contact Hostinger support |
+| Data deleted or database broken | **Stop. Do not try fixes from the internet.** | Message Claude: we choose the right backup together and restore it safely |
+
+---
+
+## 8. Updating the system (when Claude has pushed a change)
+
+Claude always gives the exact commands for each update. The usual pattern:
+```
+cd ~/WI-FI && git pull
+pm2 restart wifi-backend
+```
+Plus, only when Claude says so: a database migration (`sudo -u postgres psql -d
+wifi_app < Database/migrations/…`) and/or rebuilding a panel (`npm run build`
+and `sudo cp …`). Afterwards: `pm2 status` → `online`, and do the test Claude
+describes.
+
+---
+
+## 9. Known messages that are NOT problems
+
+| Message | Why it is fine |
+|---|---|
+| `2 vulnerabilities (1 moderate, 1 high)` after `npm run build` | Only affects the build tool's preview server on a programmer's computer, never the live site. A careful upgrade is planned. Do **not** run `npm audit fix --force`. |
+| `Use --update-env to update environment variables` after `pm2 restart` | Just a PM2 tip |
+| `4 additional security updates can be applied with ESM Apps` at login | Optional extra updates from Ubuntu Pro (free for personal use); can be enabled later |
+| `LF will be replaced by CRLF` | Windows/Linux line-ending notice, harmless |
+| `Swap: 2.0Gi … 0B used` | The memory safety net is ready and not needed: good |
+| Router `offline` at night | Router switched off or without internet; it comes back by itself |
+
+---
+
+## 10. Important dates
+
+| Date | What | Action |
+|---|---|---|
+| Every 3 months | Practice restore (6a), certificate check (6b) | See section 6 |
+| **Domain `oswagolink.co.tz`** | Expiry date: **write it here: ____________** | Check with your domain seller; renew before it expires or the whole system goes offline |
+| 19 Oct 2028 | Hostinger VPS plan paid until here (auto-renew is on) | Make sure the payment card is still valid |
+| **Before 31 Oct 2028** | Admin device passes (laptop + phone) expire | Ask Claude to renew them, otherwise the admin panel locks you out |
+
+---
+
+## 11. Plan ahead (not urgent)
+
+- **Off-VPS backups:** today backups live on the VPS itself. If the whole VPS
+  were lost, you would depend on Hostinger's weekly backup. Set up an automatic
+  nightly copy to a second place; until then, do step 5c every month.
+- **Upgrade to KVM 2** when the load average (4b) stays above 0.7, or available
+  memory stays under 1 GB.
+- **Before each new business:** test a new router's setup once.
+
+---
+
+## 12. Quick facts (no secrets)
+
+| Item | Value |
+|---|---|
+| VPS | Hostinger KVM 1: 1 CPU, 3.8 GB memory, 2 GB swap, 48 GB disk, Ubuntu |
+| VPS address | 69.62.105.119 (login user: `biliant`) |
+| VPS clock | UTC (Tanzania = UTC + 3 hours) |
+| Database | PostgreSQL, database name `wifi_app` |
+| Backend | `wifi-backend`, managed by PM2 |
+| Websites | `oswagolink.co.tz` (portal, business panel), `admin.oswagolink.co.tz` (your admin panel, needs a device pass) |
+| Backups | `/var/backups/wifi-db/` (root only), 14 nights |
+| History kept | 1 month |
+| Project code | GitHub: `faustinebiliant-cmd/WI-FI` |
+| Old notes | `docs/archive/` (history only, do not follow) |
+| Your localhost vs VPS notes | `LOCALHOST-VS-VPS.md` |

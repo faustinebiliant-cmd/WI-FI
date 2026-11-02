@@ -1,6 +1,6 @@
 const db = require('../config/db');
 const { isValidUUID } = require('../utils/validators');
-const { getRouter } = require('../services/routers/routerFactory');
+const { disconnectSession: disconnectOne } = require('../services/disconnectSession');
 const { formatDateTimeEAT } = require('../utils/tz');
 
 const getActiveSessions = async (req, res) => {
@@ -34,31 +34,11 @@ const disconnectSession = async (req, res) => {
     const { id } = req.params;
     if (!isValidUUID(id)) return res.status(400).json({ success: false, error: 'Invalid session ID' });
 
-    const { rows } = await db.query(`
-      SELECT s.*, r.* FROM sessions s
-      JOIN routers r ON s.router_id = r.id
-      WHERE s.id = $1 AND s.tenant_id = $2
-    `, [id, req.tenantId]);
-    
-    const session = rows[0];
-    if (!session) return res.status(404).json({ success: false, error: 'Session not found' });
-
-    // Only mark the session ended if the router really kicked the customer off
-    let result;
-    try {
-      result = await getRouter(session).disconnectUser(session.mac_address);
-    } catch (err) {
-      console.error('Disconnect: router could not be used:', err.message);
-      result = { ok: false };
-    }
-    if (!result || !result.ok) {
+    const outcome = await disconnectOne(id, req.tenantId, 'Disconnected by Tenant Admin');
+    if (outcome === 'not_found') return res.status(404).json({ success: false, error: 'Session not found' });
+    if (outcome === 'router_unreachable') {
       return res.status(503).json({ success: false, error: 'The router could not be reached, so the customer was NOT disconnected. Please try again when the router is online.' });
     }
-
-    await db.query(
-      `UPDATE sessions SET ended_at = NOW(), disconnect_reason = 'Disconnected by Tenant Admin' WHERE id = $1`,
-      [id]
-    );
 
     return res.status(200).json({ success: true, message: 'Customer disconnected' });
   } catch (error) {

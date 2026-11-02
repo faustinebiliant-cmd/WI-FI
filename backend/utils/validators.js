@@ -39,6 +39,10 @@ const isValidVoucherCode = (code) => {
   return codeRegex.test(code);
 };
 
+// Router tokens (portal links and setup links): letters, digits, - and _
+const isValidRouterToken = (token) =>
+  typeof token === 'string' && /^[A-Za-z0-9_-]{8,128}$/.test(token);
+
 const isValidUUID = (uuid) => {
   if (typeof uuid !== 'string') return false;
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -70,5 +74,6 @@ module.exports = {
   isValidIPAddress,
   isValidVoucherCode,
   isValidUUID,
+  isValidRouterToken,
   isSafeText
 };

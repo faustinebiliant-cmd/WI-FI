@@ -2,8 +2,8 @@ const crypto = require('crypto');
 const db = require('../config/db');
 const { getTodayRangeEAT, formatDateTimeEAT } = require('../utils/tz');
 const { getRouter } = require('../services/routers/routerFactory');
+const { isValidUUID } = require('../utils/validators');
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VOUCHER_STATUSES = ['unused', 'active', 'expired', 'cancelled'];
 
 const generateCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();
@@ -17,7 +17,7 @@ const generateVouchers = async (req, res) => {
       return res.status(400).json({ success: false, error: 'You can generate between 1 and 50 vouchers at a time.' });
     }
 
-    if (!package_id || !UUID_RE.test(String(package_id))) {
+    if (!package_id || !isValidUUID(String(package_id))) {
       return res.status(400).json({ success: false, error: 'Please choose a package.' });
     }
 
@@ -147,7 +147,7 @@ const listVouchers = async (req, res) => {
 const revokeVoucher = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!UUID_RE.test(String(id))) {
+    if (!isValidUUID(String(id))) {
       return res.status(404).json({ success: false, error: 'Voucher not found' });
     }
 

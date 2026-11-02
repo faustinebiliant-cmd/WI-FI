@@ -61,7 +61,7 @@ if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
 }
 
 // ------------------------------------------------------------
-// Raw PostgreSQL Credentials (Replaces Supabase)
+// PostgreSQL connection (the database on this VPS)
 // ------------------------------------------------------------
 const DB_HOST = requireString('DB_HOST');
 const DB_PORT = trimmed(process.env.DB_PORT) || '5432';

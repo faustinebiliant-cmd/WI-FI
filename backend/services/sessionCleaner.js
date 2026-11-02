@@ -1,7 +1,6 @@
 const db = require('../config/db');
 const env = require('../config/env');
 const { getRouter } = require('./routers/routerFactory');
-const MikroTikRouter = require('./routers/MikroTikRouter');
 
 let running = false;  // router round (every minute)
 let expiring = false; // voucher expiry (every 15 seconds)
@@ -23,11 +22,10 @@ const runAtSameTime = async (items, limit, work) => {
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 };
 
-// Takes a voucher's user off its router. In mock mode there is no router to talk to.
+// Takes a voucher's user off its router (in mock mode the mock router answers ok)
 const removeFromRouter = async (router, code) => {
-  if (env.ROUTER_MODE !== 'real') return { ok: true };
   try {
-    return await new MikroTikRouter(router).removeVoucher(code);
+    return await getRouter(router).removeVoucher(code);
   } catch (err) {
     return { ok: false, error: err.message };
   }

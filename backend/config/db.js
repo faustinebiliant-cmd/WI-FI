@@ -5,14 +5,15 @@ const { Pool } = require('pg');
 const env = require('./env');
 
 const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host: env.DB_HOST,
+  port: Number(env.DB_PORT),
+  user: env.DB_USER,
+  password: env.DB_PASSWORD,
+  database: env.DB_NAME,
   ssl: false, // Local server connection, no SSL needed
-  // Up to 20 queries at the same time (the backend and the router pinger each
-  // have their own pool: 40 together, well below PostgreSQL's 100)
+  // Up to 20 queries at the same time. The backend, the router pinger and the
+  // nightly history clean-up each have their own pool: at most 60 together,
+  // below PostgreSQL's 100.
   max: 20,
   idleTimeoutMillis: 30000,
   // All connections busy: wait at most 5 seconds instead of forever

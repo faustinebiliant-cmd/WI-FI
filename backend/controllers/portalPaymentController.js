@@ -1,12 +1,10 @@
 const crypto = require('crypto');
 const db = require('../config/db');
 
-// Switched off until the real gateway (AzamPay) is connected. The mock below
-// answered "payment successful" without giving the customer any WiFi.
-const PAYMENTS_ENABLED = false;
+const { isValidRouterToken, isValidUUID } = require('../utils/validators');
 
-const TOKEN_RE = /^[A-Za-z0-9_-]{8,128}$/;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Switched off until the real gateway (AzamPay) is connected
+const PAYMENTS_ENABLED = false;
 
 // Tanzanian mobile numbers, written any usual way, become 255XXXXXXXXX
 const normalizePhone = (value) => {
@@ -38,7 +36,7 @@ const recordPayment = async ({ tenantId, routerId, packageId, amount, phone }) =
     const reference = crypto.randomUUID();
     const inserted = await client.query(
       `INSERT INTO payments (tenant_id, router_id, package_id, amount_tzs, guest_phone, status, gateway_reference)
-       VALUES ($1, $2, $3, $4, $5, 'mock', $6)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6)
        RETURNING id`,
       [tenantId, routerId, packageId, amount, phone, reference]
     );
@@ -66,10 +64,10 @@ const initiatePayment = async (req, res) => {
     if (typeof router_token !== 'string' || typeof package_id !== 'string' || typeof phone_number !== 'string') {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
-    if (!TOKEN_RE.test(router_token)) {
+    if (!isValidRouterToken(router_token)) {
       return res.status(404).json({ success: false, error: 'Router not found' });
     }
-    if (!UUID_RE.test(package_id)) {
+    if (!isValidUUID(package_id)) {
       return res.status(404).json({ success: false, error: 'Package not found' });
     }
 
@@ -106,18 +104,13 @@ const initiatePayment = async (req, res) => {
       });
     }
 
-    // --- MOCK LOGIC ---
-    // In the future, this is where we will call the AzamPay API.
-    console.log(`[MOCK PAYMENT] simulated payment ${payment.id}`);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    return res.status(200).json({
-      success: true,
-      message: 'Mock payment successful. Please check your phone.',
-      data: {
-        transaction_id: payment.reference,
-        status: 'success'
-      }
+    // NEXT STEP (AzamPay): send the checkout request for payment.reference here,
+    // and give the WiFi only when AzamPay's callback confirms the payment.
+    // Until then this point is never reached (PAYMENTS_ENABLED is false).
+    console.error(`Payment ${payment.id}: AzamPay is not connected yet`);
+    return res.status(503).json({
+      success: false,
+      error: 'Mobile payment is not available yet. Please ask the staff for a voucher.'
     });
   } catch (error) {
     console.error('Payment error:', error.message);

@@ -1,11 +1,8 @@
 const db = require('../config/db');
-const env = require('../config/env');
 const { getRouter } = require('../services/routers/routerFactory');
-const MikroTikRouter = require('../services/routers/MikroTikRouter');
-const { isValidMACAddress, isValidIPAddress, isValidVoucherCode } = require('../utils/validators');
+const { isValidMACAddress, isValidIPAddress, isValidVoucherCode, isValidRouterToken } = require('../utils/validators');
 const { TENANT_BLOCKED_SQL, PORTAL_BLOCKED_ERROR } = require('../middleware/subscriptionGuard');
 
-const TOKEN_RE = /^[A-Za-z0-9_-]{8,128}$/;
 const NOT_REACHABLE = 'The WiFi system is not reachable right now. Please try again in a moment.';
 
 // What the portal should tell this device on this router:
@@ -47,7 +44,7 @@ const getDeviceState = async (routerId, mac) => {
 const getPortalInfo = async (req, res) => {
   try {
     const { router_token } = req.params;
-    if (!TOKEN_RE.test(String(router_token))) {
+    if (!isValidRouterToken(String(router_token))) {
       return res.status(404).json({ success: false, error: 'Router not found' });
     }
 
@@ -96,7 +93,7 @@ const redeemVoucher = async (req, res) => {
     if (typeof router_token !== 'string' || typeof code !== 'string' || typeof mac_address !== 'string') {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
-    if (!TOKEN_RE.test(router_token)) {
+    if (!isValidRouterToken(router_token)) {
       return res.status(404).json({ success: false, error: 'Router not found' });
     }
     // One written form (AA:BB:CC:DD:EE:FF) so the router can find the device again later.
@@ -133,7 +130,7 @@ const redeemVoucher = async (req, res) => {
     // Create the router connection BEFORE touching the voucher
     let adapter;
     try {
-      adapter = env.ROUTER_MODE === 'real' ? new MikroTikRouter(router) : getRouter(router);
+      adapter = getRouter(router);
     } catch (err) {
       console.error('Router adapter error:', err.message);
       return res.status(503).json({ success: false, error: NOT_REACHABLE });

@@ -3,16 +3,11 @@
 // ------------------------------------------------------------
 // EAT = Africa/Dar_es_Salaam = UTC+3, no DST.
 //
-// Supabase stores all timestamptz columns in UTC. Business
-// logic ("today", "yesterday", "this day") is computed in
-// EAT, then the DB query uses the resulting UTC range.
-//
-// Only the exports the WiFi project actually uses are here.
-// Reporting helpers (weeks, months, custom ranges, Excel) are
-// added later when the WiFi project needs them.
+// PostgreSQL stores all timestamptz columns in UTC. "Today" is
+// computed in EAT, then the DB query uses the resulting UTC range.
+// Only the helpers the project uses are here.
 // ============================================================
 
-const TZ = 'Africa/Dar_es_Salaam';
 const EAT_OFFSET_MS = 3 * 60 * 60 * 1000; // EAT = UTC+3, no DST
 
 // ------------------------------------------------------------
@@ -51,40 +46,6 @@ const getTodayRangeEAT = (referenceDate = new Date()) => {
 };
 
 // ------------------------------------------------------------
-// getYesterdayRangeEAT()
-// ------------------------------------------------------------
-const getYesterdayRangeEAT = (referenceDate = new Date()) => {
-  const today = getTodayRangeEAT(referenceDate);
-  const oneDayMs = 24 * 60 * 60 * 1000;
-  return {
-    start: new Date(today.start.getTime() - oneDayMs),
-    end:   new Date(today.end.getTime()   - oneDayMs),
-  };
-};
-
-// ------------------------------------------------------------
-// getDayRangeEAT('YYYY-MM-DD')
-// A specific EAT calendar day as a UTC { start, end }.
-// ------------------------------------------------------------
-const getDayRangeEAT = (yyyyMmDd) => {
-  if (typeof yyyyMmDd !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(yyyyMmDd)) {
-    throw new Error('getDayRangeEAT expects a date string like "2025-01-31"');
-  }
-  const [y, m, d] = yyyyMmDd.split('-').map((n) => parseInt(n, 10));
-  return {
-    start: eatToUTC(y, m - 1, d, 0, 0, 0, 0),
-    end:   eatToUTC(y, m - 1, d, 23, 59, 59, 999),
-  };
-};
-
-// ------------------------------------------------------------
-// nowEAT()
-// Returns the current time as a Date (same instant as now()).
-// Included for symmetry; use Date for actual logic.
-// ------------------------------------------------------------
-const nowEAT = () => new Date();
-
-// ------------------------------------------------------------
 // formatDateEAT(input)
 // UTC Date/string → "YYYY-MM-DD" in EAT.
 // ------------------------------------------------------------
@@ -107,24 +68,8 @@ const formatDateTimeEAT = (input) => {
   );
 };
 
-// ------------------------------------------------------------
-// formatTimeEAT(input)
-// UTC Date/string → "HH:MM" (24h) in EAT.
-// ------------------------------------------------------------
-const formatTimeEAT = (input) => {
-  const utc = input instanceof Date ? input : new Date(input);
-  const p = eatParts(utc);
-  return `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`;
-};
-
 module.exports = {
-  TZ,
-  EAT_OFFSET_MS,
   getTodayRangeEAT,
-  getYesterdayRangeEAT,
-  getDayRangeEAT,
-  nowEAT,
   formatDateEAT,
   formatDateTimeEAT,
-  formatTimeEAT,
 };
