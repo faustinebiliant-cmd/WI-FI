@@ -384,6 +384,7 @@ describes.
 | Old notes | `docs/archive/` (history only, do not follow) |
 | Your localhost vs VPS notes | `LOCALHOST-VS-VPS.md` |
 | What protects the system, what is still open | `SECURITY-STATUS.md` |
+| How the VPS sets up and controls the routers | `HOW-VPS-CONTROLS-ROUTERS.md` |
 
 ---
 
