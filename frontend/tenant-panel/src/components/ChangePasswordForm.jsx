@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import apiClient from '../api/client';
+import PasswordInput from '../shared/components/PasswordInput';
 
 // Used on the forced "choose a new password" screen and on the Settings page
 export default function ChangePasswordForm({ onSuccess }) {
@@ -51,17 +52,17 @@ export default function ChangePasswordForm({ onSuccess }) {
 
       <div className="form-group">
         <label>Current Password</label>
-        <input className="form-control" type="password" autoComplete="current-password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required disabled={saving} />
+        <PasswordInput autoComplete="current-password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required disabled={saving} />
       </div>
 
       <div className="form-group">
         <label>New Password (at least 8 characters)</label>
-        <input className="form-control" type="password" autoComplete="new-password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required disabled={saving} />
+        <PasswordInput autoComplete="new-password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required disabled={saving} />
       </div>
 
       <div className="form-group">
         <label>Repeat New Password</label>
-        <input className="form-control" type="password" autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required disabled={saving} />
+        <PasswordInput autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required disabled={saving} />
       </div>
 
       <button type="submit" className="btn btn-primary btn-block" disabled={saving}>

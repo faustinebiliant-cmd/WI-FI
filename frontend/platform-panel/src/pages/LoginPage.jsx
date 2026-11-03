@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Navigate } from 'react-router-dom';
+import PasswordInput from '../shared/components/PasswordInput';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -53,9 +54,7 @@ export default function LoginPage() {
           </div>
           <div className="form-group">
             <label>Password</label>
-            <input
-              className="form-control"
-              type="password"
+            <PasswordInput
               autoComplete="current-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
