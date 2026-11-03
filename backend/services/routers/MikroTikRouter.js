@@ -314,6 +314,44 @@ class MikroTikRouter {
   }
 
   /**
+   * Emergency key for the staff door (the "ap-port-check" script made by the setup).
+   * open = true: pauses the check and unblocks Winbox on every LAN port at once.
+   * open = false: the check runs again and blocks access-point ports within a minute.
+   * Only interface lists are changed, which the backend's router user may do.
+   */
+  async setStaffDoorOpen(open) {
+    try {
+      await this._session(async (step) => {
+        const paused = await step((conn) =>
+          safePrint(conn, '/interface/list/print', ['=.proplist=.id,name', '?name=ap-check-paused'])
+        );
+        if (open) {
+          if (paused.length === 0) {
+            await step((conn) => conn.write('/interface/list/add', [
+              '=name=ap-check-paused',
+              '=comment=Oswagolink: access-point check paused by support (Winbox open on all LAN ports)'
+            ]));
+          }
+          const members = await step((conn) =>
+            safePrint(conn, '/interface/list/member/print', ['=.proplist=.id', '?list=ap-ports'])
+          );
+          for (const m of members) {
+            await removeIfThere(step, '/interface/list/member/remove', m['.id']);
+          }
+        } else {
+          for (const p of paused) {
+            await removeIfThere(step, '/interface/list/remove', p['.id']);
+          }
+        }
+      });
+      return { ok: true };
+    } catch (error) {
+      console.error('[MikroTik] Failed to change the staff door:', error.message);
+      return { ok: false, error: error.message };
+    }
+  }
+
+  /**
    * Checks whether the router is reachable.
    */
   async checkStatus() {

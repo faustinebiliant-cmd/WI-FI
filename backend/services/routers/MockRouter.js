@@ -23,6 +23,11 @@ class MockRouter {
     return { ok: true };
   }
 
+  async setStaffDoorOpen(open) {
+    console.log(`[MockRouter] Staff door ${open ? 'opened' : 'closed'}`);
+    return { ok: true };
+  }
+
   async checkStatus() {
     return { online: true, version: 'mock' };
   }

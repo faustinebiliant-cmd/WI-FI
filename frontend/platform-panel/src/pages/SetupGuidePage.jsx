@@ -31,7 +31,7 @@ export default function SetupGuidePage() {
       <Section title="Before you start">
         <ul className="guide-list">
           <li>A <strong>new or factory-reset</strong> MikroTik hEX, a laptop with Winbox, and network cables.</li>
-          <li><strong>Port 1 (ether1) = internet (WAN).</strong> Ports 2 to 5 (ether2 to ether5) = your laptop and the access point (LAN). Never plug the access point into port 1.</li>
+          <li><strong>Port 1 (ether1) = internet (WAN).</strong> Ports 2 to 5 (ether2 to ether5) = your laptop and the access points (LAN). Never plug an access point into port 1.</li>
           <li>The setup commands: open the business's Business Panel, go to <strong>Routers</strong>, press <strong>Add Router</strong> (or <strong>Setup Commands</strong> for a router that is not set up yet). They work for 12 hours.</li>
           <li>Winbox login on a factory router: user <strong>admin</strong>, password from the sticker on the router (empty if there is no password on the sticker).</li>
         </ul>
@@ -54,7 +54,8 @@ export default function SetupGuidePage() {
           </li>
           <li>Run the <strong>2 setup steps</strong> from the Business Panel, in order. Step 1 must end with <strong>SETUP COMPLETE</strong>.</li>
           <li>Wait up to 5 minutes: the router must show <strong>ONLINE</strong> on the Business Panel's Routers page.</li>
-          <li>Unplug your laptop. Plug the <strong>access point</strong> into port 2 (see "Access point" below) and test a voucher on a phone.</li>
+          <li>Unplug your laptop. Plug the <strong>access point</strong> into port 2 (see "Access points" below; for more than one, see "More than one access point") and test a voucher on a phone.</li>
+          <li>Within about a minute the router blocks Winbox on the access point's port (see "Staff door"). Your laptop works on any other free port.</li>
         </ol>
         <Note>
           If your laptop has <strong>two network ports</strong> and is the internet source: share its internet on one port into <strong>port 1</strong>,
@@ -105,7 +106,7 @@ export default function SetupGuidePage() {
 
         <h3 className="guide-step">6. Install at the business</h3>
         <p className="guide-text">
-          Plug the business's internet into <strong>port 1</strong> and the access point into <strong>port 2</strong>. The router gets its internet
+          Plug the business's internet into <strong>port 1</strong> and the access point(s) into <strong>port 2</strong> (and 3, 4, or a switch). The router gets its internet
           from the business's modem by itself, and must show <strong>ONLINE</strong> in the Business Panel within about 5 minutes.
         </p>
 
@@ -115,12 +116,81 @@ export default function SetupGuidePage() {
         </Note>
       </Section>
 
-      <Section title="Access point (TP-Link EAP225)">
+      <Section title="Access points (TP-Link EAP225)">
         <ul className="guide-list">
           <li>Wi-Fi name of your choice, <strong>open</strong> (no password), so the customer login page can appear.</li>
-          <li>DHCP <strong>off</strong>. Fixed address <strong>192.168.88.2</strong>, mask 255.255.255.0, gateway 192.168.88.1.</li>
+          <li>DHCP <strong>off</strong>: choose <strong>Static</strong> (fixed address) in the access point's network settings and enter:
+            <ul className="guide-list">
+              <li>IP address: <strong>192.168.88.2</strong> (the first access point; more access points: .3 to .9)</li>
+              <li>IP mask: <strong>255.255.255.0</strong></li>
+              <li>Gateway: <strong>192.168.88.1</strong> (the MikroTik)</li>
+              <li>Primary DNS: <strong>192.168.88.1</strong> (the MikroTik)</li>
+              <li>Secondary DNS: <strong>8.8.4.4</strong> (optional)</li>
+            </ul>
+            Then press <strong>Save</strong>.
+          </li>
+          <li>A new access point often comes with its own address (for example <strong>192.168.0.254</strong>). Never keep it: it is in a different network, so the router could not reach it. Always change it to an address from the list above.</li>
           <li>Plug it into <strong>port 2 to 5</strong> of the hEX, never port 1.</li>
         </ul>
+        <Note>
+          The fixed address matters twice: the access point's own traffic skips the customer login, and the router recognises
+          its port as an access-point port and keeps customers away from Winbox there (see "Staff door").
+        </Note>
+      </Section>
+
+      <Section title="More than one access point">
+        <p className="guide-text">One router can serve up to <strong>8 access points</strong>, for a bigger place or several rooms.</p>
+        <ol className="guide-list">
+          <li>Give every access point its <strong>own fixed address</strong>: the first <strong>192.168.88.2</strong>, the second <strong>192.168.88.3</strong>, then .4, .5 up to <strong>192.168.88.9</strong>. Never two with the same address. Write on each access point which address it has.</li>
+          <li>Same settings on each (see "Access points" above): Static, mask 255.255.255.0, gateway 192.168.88.1, primary DNS 192.168.88.1, secondary DNS 8.8.4.4 (optional), Wi-Fi <strong>open</strong>. Only the IP address is different.</li>
+          <li>Use the <strong>same Wi-Fi name</strong> on all of them: phones move from one to the next by themselves, and a customer logs in only once.</li>
+          <li>Give neighbouring access points <strong>different channels</strong> (on 2.4 GHz use 1, 6 and 11), so they do not disturb each other.</li>
+          <li>Plug each into a <strong>free port 2 to 5</strong>. More access points than free ports: plug a <strong>network switch</strong> into one port (a PoE switch also powers the access points) and the access points into the switch.</li>
+          <li>Leave <strong>one port free</strong> for staff, or use the switch for access points only: Winbox works on any port without an access point.</li>
+          <li>Test: connect a phone to each access point in turn and log in with a voucher.</li>
+        </ol>
+        <Note tone="amber">
+          An access point with a wrong address (outside 192.168.88.2 to .9) still gives Wi-Fi, but its own settings page may land on the
+          customer login, and its port is only recognised once 3 or more devices are behind it. Always use an address from the list.
+        </Note>
+      </Section>
+
+      <Section title="Staff door: Winbox after setup">
+        <p className="guide-text">
+          After setup, customers on the Wi-Fi <strong>cannot see the router</strong> in Winbox's Neighbors list and cannot log in to it.
+          Staff still can, from any LAN port <strong>without an access point</strong>.
+        </p>
+        <ul className="guide-list">
+          <li>Every minute the router checks ports 2 to 5. A port with an access point (a device at 192.168.88.2 to .9), or with 3 or more devices behind it (for example a switch), becomes an <strong>access-point port</strong>: Winbox and Neighbors are blocked there.</li>
+          <li>To work on the router: plug your laptop with a cable into a <strong>free port</strong> and open Winbox <strong>by MAC address</strong> (Neighbors list), as during setup. Same router password.</li>
+          <li>All ports in use by access points: unplug one access point, wait <strong>5 minutes</strong> (the router forgets the old devices), then use that port. Plug the access point back in afterwards.</li>
+          <li>Customers' Wi-Fi, vouchers and the connection to the Oswagolink server are not affected by any of this.</li>
+        </ul>
+      </Section>
+
+      <Section title="Emergency key: open a router's staff door from the VPS">
+        <p className="guide-text">
+          A remote unlock button for <strong>one</strong> router's Winbox, for when staff are locked out on every port (a broken port,
+          every port taken by access points, or the router's check judged a staff port wrongly). It works through the tunnel the VPS
+          already uses for vouchers: <strong>nobody has to go to the router</strong> and no reset is needed. Oswagolink support only.
+        </p>
+        <ol className="guide-list">
+          <li>First the normal way: the staff plug the laptop into a port <strong>without</strong> an access point and open Winbox by MAC address.</li>
+          <li>Still locked out: find the router's <strong>tunnel address</strong> in the admin panel's Routers page (it looks like 10.20.0.3; the router's name oswagolink-10-20-0-3 contains it too).</li>
+          <li>On the VPS, open the door:
+            <Code>{'cd ~/WI-FI/backend\nnode scripts/routerStaffDoor.js open 10.20.X.Y'}</Code>
+            It answers <strong>OPEN: Winbox now works on every LAN port of "…" (business name)</strong>. The staff can now get in from any port.
+          </li>
+          <li>When the staff are done, <strong>always close it again</strong> (while it is open, customers' ports are open too):
+            <Code>node scripts/routerStaffDoor.js close 10.20.X.Y</Code>
+            It answers <strong>CLOSED: … blocks Winbox on access-point ports again within 1 minute.</strong>
+          </li>
+        </ol>
+        <Note>
+          Safe to use: it changes only that one router's Winbox door. Wi-Fi, vouchers and customers keep working the whole time, and no other
+          router is touched. A wrong or unknown address, an address shared by two routers, a typo, or a router that is offline: it says so
+          and changes nothing.
+        </Note>
       </Section>
 
       <Section title="If something goes wrong">
@@ -131,6 +201,8 @@ export default function SetupGuidePage() {
           <li><strong>A download fails</strong> (step 1 or step 2): check in this order: the router can reach the internet and names (<strong>/ping 8.8.8.8 count=3</strong> and <strong>/ping oswagolink.co.tz count=3</strong>); the login page goes to <strong>flash/hotspot/login.html</strong> (not hotspot/…); and <strong>/file print where name~"flash/hotspot"</strong> shows a folder, not an empty file (step 2 part 1 removes such a file by itself).</li>
           <li><strong>ALREADY PROVISIONED</strong>: this router was set up before. Reset it to factory settings (<strong>/system reset-configuration</strong>, then confirm with y) and start again. Never repair a half-finished setup by hand.</li>
           <li><strong>The setup link has expired</strong>: press <strong>Setup Commands</strong> on the Business Panel's Routers page to get new commands.</li>
+          <li><strong>Staff cannot open Winbox</strong> after setup: use a port without an access point (see "Staff door"). Still nothing: support uses the "Emergency key" section above.</li>
+          <li><strong>The access point's own settings page shows the customer login</strong>: give it a fixed address from 192.168.88.2 to .9.</li>
           <li><strong>Router stays OFFLINE</strong> after 5 minutes: on the router run <strong>{'/log print where message~"wg-"'}</strong> and send the result to support.</li>
         </ul>
       </Section>

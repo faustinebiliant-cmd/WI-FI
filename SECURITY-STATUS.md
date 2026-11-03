@@ -65,7 +65,7 @@ Also fixed earlier the same day:
 
 | # | What | Why it matters | Status |
 |---|---|---|---|
-| 7 | **Routers: limit the Winbox admin tool, remove any `test`/`1234` user** | Paying customers on the WiFi can try to guess a router's admin password | Needs your router |
+| 7 | **Routers: customers could reach the Winbox admin login** | Paying customers on the WiFi could see the router and try to guess its admin password | **Built into the setup script, waiting for the test on a reset router**: Winbox and the Neighbors list are blocked on access-point ports (found automatically every minute); any other LAN port stays open for staff; up to 8 access points (192.168.88.2 to .9); emergency key `scripts/routerStaffDoor.js` on the VPS. A reset router has no old `test`/`1234` user |
 | 8 | **Backend runs as its own low-rights user** (today it runs as `biliant`) | If the backend were ever broken into, the intruder would not get your account | Plan for a calm day |
 | 9 | **VPS tidy-up**: old `.env` copies (contain secrets), Nginx default site, old script copies | Fewer old files with secrets lying around | From about 4 November |
 | Later | **SSH keys only** (switch off password login) | Removes password guessing completely | When you are ready: one line in `00-oswagolink.conf` |

@@ -127,7 +127,8 @@ const getBootstrapScript = async (req, res) => {
 /ip hotspot profile set [find default=yes] login-by=http-pap
 /ip hotspot profile add name=hsprof1 hotspot-address=192.168.88.1 html-directory=flash/hotspot login-by=http-pap,mac-cookie http-cookie-lifetime=30d
 /ip hotspot add name=hotspot1 interface=bridge address-pool=default-dhcp profile=hsprof1 disabled=no
-/ip hotspot ip-binding add address=192.168.88.2 type=bypassed comment="Access point"
+# Access points use the fixed addresses 192.168.88.2 to .9 (up to 8): their own traffic skips the customer login
+:for i from=2 to=9 do={ /ip hotspot ip-binding add address=("192.168.88." . $i) type=bypassed comment="Access point" }
 /ip hotspot walled-garden add dst-host=oswagolink.co.tz
 /ip hotspot walled-garden ip add dst-address=69.62.105.119 action=accept
 /ip hotspot user profile set default rate-limit=1M/1M
@@ -196,6 +197,45 @@ ${speedProfiles}
 # Created last: needs device-mode scheduler=yes
 /system scheduler add name=wg-boot start-time=startup interval=0 on-event="/system script run wg-boot"
 /system scheduler add name=wg-watchdog interval=2m on-event="/system script run wg-watchdog"
+
+# ---- Staff door: customers cannot see or log in to the router (added last) ----
+# LAN ports with a WiFi access point go in the list "ap-ports". On those ports Winbox
+# (by IP and by MAC) and the Neighbors list are blocked, so customers cannot even see the
+# router. Every other LAN port stays open for staff (Winbox by MAC, as during setup).
+# ap-port-check fills the list every minute: a port with a device at 192.168.88.2-.9
+# (an access point), or with 3 or more devices behind it, counts as an access-point port.
+# Blocked at the bridge, the only place that knows the port (also with the switch chip on).
+# Emergency key on the VPS: node scripts/routerStaffDoor.js open|close <tunnel address>.
+/interface list add name=ap-ports comment="Oswagolink: LAN ports with a WiFi access point (filled by ap-port-check)"
+/interface bridge filter add chain=input in-interface-list=ap-ports mac-protocol=ip ip-protocol=tcp dst-port=8291 action=drop comment="Oswagolink: no Winbox from access points"
+/interface bridge filter add chain=input in-interface-list=ap-ports mac-protocol=ip ip-protocol=udp dst-port=20561 action=drop comment="Oswagolink: no Winbox by MAC from access points"
+/interface bridge filter add chain=input in-interface-list=ap-ports mac-protocol=ip ip-protocol=udp dst-port=5678 action=drop comment="Oswagolink: customers cannot see the router in Neighbors"
+/system script add name=ap-port-check policy=read,write,policy,test source={
+    :local apPorts [:toarray ""]
+    :if ([:len [/interface list find name="ap-check-paused"]] = 0) do={
+        :foreach bp in=[/interface bridge port find where bridge="bridge"] do={
+            :local pname [/interface bridge port get $bp interface]
+            :local devices 0
+            :local isAp false
+            :foreach h in=[/interface bridge host find where on-interface=$pname and !local] do={
+                :set devices ($devices + 1)
+                :local mac [/interface bridge host get $h mac-address]
+                :foreach a in=[/ip arp find where mac-address=$mac] do={
+                    :local ip [/ip arp get $a address]
+                    :if (($ip in 192.168.88.2/31) || ($ip in 192.168.88.4/30) || ($ip in 192.168.88.8/31)) do={ :set isAp true }
+                }
+            }
+            :if ($isAp || ($devices >= 3)) do={ :set apPorts ($apPorts, $pname) }
+        }
+    }
+    :foreach m in=[/interface list member find where list="ap-ports"] do={
+        :if ([:typeof [:find $apPorts [/interface list member get $m interface]]] = "nil") do={ /interface list member remove $m }
+    }
+    :foreach p in=$apPorts do={
+        :if ([:len [/interface list member find where list="ap-ports" and interface=$p]] = 0) do={ /interface list member add list=ap-ports interface=$p }
+    }
+}
+/system scheduler add name=ap-port-check interval=1m on-event="/system script run ap-port-check"
 :put "SETUP COMPLETE"
 `;
     res.setHeader('Content-Type', 'text/plain');
