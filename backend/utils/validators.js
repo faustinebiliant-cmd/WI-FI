@@ -32,12 +32,13 @@ const isValidIPAddress = (ip) => {
   return ip.split('.').every(octet => parseInt(octet, 10) <= 255);
 };
 
-const isValidVoucherCode = (code) => {
-  if (typeof code !== 'string') return false;
-  // Exactly 6 uppercase alphanumeric characters
-  const codeRegex = /^[A-Z0-9]{6}$/;
-  return codeRegex.test(code);
-};
+// Voucher codes: 8 characters without look-alikes (no 0/O, no 1/I/L), e.g. K7MP4RQX.
+// 31^8 = about 850 billion codes, so guessing one is hopeless.
+const VOUCHER_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+const VOUCHER_CODE_LENGTH = 8;
+const VOUCHER_CODE_RE = /^[2-9A-HJKMNP-Z]{8}$/;
+
+const isValidVoucherCode = (code) => typeof code === 'string' && VOUCHER_CODE_RE.test(code);
 
 // Router tokens (portal links and setup links): letters, digits, - and _
 const isValidRouterToken = (token) =>
@@ -74,6 +75,8 @@ module.exports = {
   isValidMACAddress,
   isValidIPAddress,
   isValidVoucherCode,
+  VOUCHER_CODE_ALPHABET,
+  VOUCHER_CODE_LENGTH,
   isValidUUID,
   isValidRouterToken,
   isSafeText

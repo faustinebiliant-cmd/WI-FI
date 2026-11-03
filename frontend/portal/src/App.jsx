@@ -156,7 +156,7 @@ export default function App() {
       // Log the phone in on the router: that is what actually unlocks the internet
       if (loginUrl) {
         // MikroTik expects the username and password to be the voucher code, written exactly
-        // as the router knows it: the server's corrected code (DOFADF typed -> D0FADF)
+        // as the router knows it: the server's cleaned code (k7mp-4rqx typed -> K7MP4RQX)
         const routerCode = res.data.data.code || voucherCode.trim().toUpperCase();
         const form = document.createElement('form');
         form.method = 'POST';
@@ -403,9 +403,10 @@ export default function App() {
               placeholder="Voucher code"
               aria-label="Voucher code"
               value={voucherCode}
-              onChange={(e) => setVoucherCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+              // Letters and digits only, at most 8; cleaned before cutting, so a pasted
+              // "K7MP-4RQX" still gives all 8 characters
+              onChange={(e) => setVoucherCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
               disabled={status === 'loading' || isLocked}
-              maxLength={6}
               autoComplete="off"
               autoCapitalize="characters"
               autoCorrect="off"

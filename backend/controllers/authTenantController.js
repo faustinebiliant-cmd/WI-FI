@@ -92,13 +92,21 @@ const changePassword = async (req, res) => {
     const isValid = await verifyPassword(current_password, rows[0].password_hash);
     if (!isValid) return res.status(400).json({ success: false, error: 'Your current password is not correct.' });
 
+    // password_changed_at logs out every login issued before it (other devices, a stolen
+    // login). Whole seconds, like a token's issue time, so the new token below still works.
     const newHash = await hashPassword(new_password);
     await db.query(
-      'UPDATE tenant_users SET password_hash = $1, must_change_password = false WHERE id = $2',
+      `UPDATE tenant_users
+       SET password_hash = $1, must_change_password = false, password_changed_at = date_trunc('second', NOW())
+       WHERE id = $2`,
       [newHash, req.tenantUser.id]
     );
 
-    return res.status(200).json({ success: true, message: 'Password changed' });
+    // This device stays logged in with a fresh login
+    const { id, tenant_id, role, full_name } = req.tenantUser;
+    const token = signTenantToken({ id, tenant_id, role, full_name });
+
+    return res.status(200).json({ success: true, message: 'Password changed', token });
   } catch (error) {
     console.error('Change password error:', error);
     return res.status(500).json({ success: false, error: 'Failed to change password' });

@@ -1,0 +1,11 @@
+-- ============================================================
+-- Run this ONCE on every database (laptop and VPS).
+-- Safe to run twice: it does nothing where the column already exists.
+--
+-- tenant_users.password_changed_at: when the password was last changed.
+-- A business login (token) issued before that moment is refused, so
+-- changing the password logs out every other device (a stolen login stops
+-- working at once). Empty for existing users: nothing changes for them
+-- until they change their password.
+-- ============================================================
+ALTER TABLE public.tenant_users ADD COLUMN IF NOT EXISTS password_changed_at timestamptz;

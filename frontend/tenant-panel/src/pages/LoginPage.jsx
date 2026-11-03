@@ -5,7 +5,16 @@ import { useNavigate, Navigate } from 'react-router-dom';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  // Why the panel sent this device here (the password was changed on another device), shown once
+  const [error, setError] = useState(() => {
+    try {
+      const notice = sessionStorage.getItem('loginNotice') || '';
+      sessionStorage.removeItem('loginNotice');
+      return notice;
+    } catch (e) {
+      return '';
+    }
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { user, login } = useAuth();

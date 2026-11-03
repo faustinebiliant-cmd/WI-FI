@@ -382,6 +382,7 @@ describes.
 | Project code | GitHub: `faustinebiliant-cmd/WI-FI` |
 | Old notes | `docs/archive/` (history only, do not follow) |
 | Your localhost vs VPS notes | `LOCALHOST-VS-VPS.md` |
+| What protects the system, what is still open | `SECURITY-STATUS.md` |
 
 ---
 

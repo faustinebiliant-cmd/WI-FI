@@ -171,7 +171,7 @@ export default function VouchersPage() {
             placeholder="Search code"
             aria-label="Search voucher code"
             value={searchInput}
-            onChange={e => setSearchInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1').slice(0, 32))}
+            onChange={e => setSearchInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
           />
         </div>
         <select className="form-control" aria-label="Status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>

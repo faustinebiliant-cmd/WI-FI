@@ -26,14 +26,16 @@ export default function ChangePasswordForm({ onSuccess }) {
 
     setSaving(true);
     try {
-      await apiClient.post('/tenant/auth/change-password', {
+      const res = await apiClient.post('/tenant/auth/change-password', {
         current_password: currentPassword,
         new_password: newPassword
       });
+      // The old login stops working: this device continues with the new one
+      if (res.data.token) localStorage.setItem('tenantToken', res.data.token);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setMessage('Password changed successfully.');
+      setMessage('Password changed. Any other device logged in to this account has been logged out.');
       if (onSuccess) onSuccess();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to change password.');

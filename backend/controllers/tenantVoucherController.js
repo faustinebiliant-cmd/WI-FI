@@ -2,11 +2,13 @@ const crypto = require('crypto');
 const db = require('../config/db');
 const { getTodayRangeEAT, formatDateTimeEAT } = require('../utils/tz');
 const { getRouter } = require('../services/routers/routerFactory');
-const { isValidUUID } = require('../utils/validators');
+const { isValidUUID, VOUCHER_CODE_ALPHABET, VOUCHER_CODE_LENGTH } = require('../utils/validators');
 
 const VOUCHER_STATUSES = ['unused', 'active', 'expired', 'cancelled'];
 
-const generateCode = () => crypto.randomBytes(3).toString('hex').toUpperCase();
+// 8 characters without look-alikes (format: utils/validators.js)
+const generateCode = () =>
+  Array.from({ length: VOUCHER_CODE_LENGTH }, () => VOUCHER_CODE_ALPHABET[crypto.randomInt(VOUCHER_CODE_ALPHABET.length)]).join('');
 
 const generateVouchers = async (req, res) => {
   try {

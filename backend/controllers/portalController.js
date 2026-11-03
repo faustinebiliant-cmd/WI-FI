@@ -5,6 +5,9 @@ const { TENANT_BLOCKED_SQL, PORTAL_BLOCKED_ERROR } = require('../middleware/subs
 
 const NOT_REACHABLE = 'The WiFi system is not reachable right now. Please try again in a moment.';
 
+// One answer for every code that does not work here (wrong shape, unknown, or another router's)
+const INVALID_CODE = { success: false, error: 'Invalid voucher code. Please check the code and try again.' };
+
 // What the portal should tell this device on this router:
 //   { active_until, speed_mbps }  its voucher still runs (show the time left)
 //   { ended_at }                  its voucher ended in the last 24 hours ("your time is over")
@@ -106,11 +109,12 @@ const redeemVoucher = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid device IP address' });
     }
 
-    // Codes are made of 0-9 and A-F only (tenantVoucherController generateCode), so the
-    // letters O, I and L are always typing mistakes for 0 and 1 (D0FADF typed as DOFADF)
-    const cleanCode = code.toUpperCase().trim().replace(/O/g, '0').replace(/[IL]/g, '1');
+    // Small letters, spaces and dashes are fine (k7mp-4rqx -> K7MP4RQX).
+    // A code of the wrong shape gets exactly the same answer as an unknown code, so a
+    // stranger learns nothing about what a real code looks like.
+    const cleanCode = code.toUpperCase().replace(/[\s-]/g, '');
     if (!isValidVoucherCode(cleanCode)) {
-      return res.status(400).json({ success: false, error: 'Invalid voucher format' });
+      return res.status(404).json(INVALID_CODE);
     }
 
     const routerRes = await db.query(
@@ -164,7 +168,7 @@ const redeemVoucher = async (req, res) => {
 
       // Unknown code, or a code of another router: same answer
       if (!existing) {
-        return res.status(404).json({ success: false, error: 'Invalid voucher code' });
+        return res.status(404).json(INVALID_CODE);
       }
       if (existing.status === 'cancelled') {
         return res.status(400).json({ success: false, error: 'This voucher has been cancelled.' });
@@ -215,7 +219,7 @@ const redeemVoucher = async (req, res) => {
       message: resumed ? 'Welcome back, reconnecting' : 'Connected successfully',
       data: {
         resumed,
-        // The code as the router knows it (DOFADF typed -> D0FADF): the portal logs in with this
+        // The code as the router knows it (k7mp-4rqx typed -> K7MP4RQX): the portal logs in with this
         code: cleanCode,
         duration_minutes: pkg.duration_minutes,
         // Minutes left on the server's clock: a returning customer sees the time left,

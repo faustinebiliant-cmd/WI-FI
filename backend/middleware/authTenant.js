@@ -41,7 +41,7 @@ const authTenant = async (req, res, next) => {
     // Normal Tenant User Flow
     const { rows } = await db.query(`
       SELECT u.id, u.tenant_id, u.email, u.full_name, u.role, u.is_active, u.must_change_password,
-             ${TENANT_BLOCKED_SQL} AS tenant_blocked
+             u.password_changed_at, ${TENANT_BLOCKED_SQL} AS tenant_blocked
       FROM tenant_users u
       JOIN tenants t ON t.id = u.tenant_id
       WHERE u.id = $1
@@ -54,6 +54,12 @@ const authTenant = async (req, res, next) => {
 
     if (!user.is_active) {
       return res.status(403).json({ success: false, error: 'Account is deactivated' });
+    }
+
+    // A login from before the last password change no longer works (other devices,
+    // or a stolen login). Both times are whole seconds (see changePassword).
+    if (user.password_changed_at && decoded.iat < Math.floor(new Date(user.password_changed_at).getTime() / 1000)) {
+      return res.status(401).json({ success: false, code: 'PASSWORD_CHANGED', error: 'Your password was changed. Please log in again.' });
     }
 
     if (user.tenant_blocked) {
