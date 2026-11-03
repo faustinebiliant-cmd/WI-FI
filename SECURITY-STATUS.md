@@ -32,6 +32,51 @@ Think of the system as a building with four doors. Each door has its own lock:
 | 5 | **Voucher codes were short (6 characters, 0-9 and A-F: about 16.7 million codes)** | Someone patient, switching internet addresses, could guess a code a customer had paid for | New codes have **8 characters without look-alikes** (no 0/O, no 1/I/L), e.g. `K7MP4RQX`: about 850 billion codes, roughly 51,000 times harder to guess. The whole system now uses only 8-character codes (all old 6-character vouchers were deleted with their packages). The portal ignores small letters, spaces and dashes typed by customers. Any code that does not work gets the same short answer ("Invalid voucher code"), so strangers learn nothing about what a real code looks like |
 | 6 | **Changing a business password did not log out other devices** | A stolen business login kept working up to 1 day, even after the owner changed the password | Changing the password now logs out **every other device** at once (they see "Your password was changed. Please log in again."). The device used for the change stays logged in |
 
+Fixed in the second audit (3 November 2026, everything between users and the VPS):
+
+| What was wrong | What could have happened | What was done |
+|---|---|---|
+| **One router's answer could fill the server's memory** (proven in a test: +1.45 GB in 15 seconds) | A business owner, or anyone who takes over a router, could crash the server again and again: every business offline | A router may send at most **2 MB per connection**; beyond that the connection is cut and the router counts as "not answering" (test: +19 MB). A real busy router (1,000 customers online) sends about 0.1 MB |
+| **Router setup links worked for 12 hours** | A setup link copied or photographed by someone else stayed usable for half a day | Setup links now work for **30 minutes** (the router's last setup step gets 10 extra minutes) |
+| **New routers could not finish setup** (found by the tests): the router sends its registration as POST, the server only accepted GET since 31 October | Every new router setup would end with "REGISTRATION FAILED" | The server accepts the router's registration again |
+
+Fixed in the third audit (3 November 2026, every input of the portal and both panels):
+
+No injection was possible (every database query keeps typed text apart from the command, the
+screens show text safely, router commands are strictly checked). These rules were tightened:
+
+| Field | Now accepts only |
+|---|---|
+| Business name, owner name | 2 to 60 characters: letters, numbers, spaces and . , - ' & ( ) |
+| Package name, router name | 1 to 40 characters, same characters |
+| Router location | 0 to 60 characters, same characters |
+| Package price, monthly fee | Whole numbers from 0 to 1,000,000 TZS |
+| Email (new business) | An ordinary address (letters, numbers, . _ % + -), at most 50 characters |
+| Owner phone | Tanzanian number, saved as digits only |
+| Login and passwords | Email and password at most **50 characters** each (new passwords 8 to 50; admin account 12 to 50) |
+| Admin reasons | Real text only: impersonation 10 to 300, suspend/activate 5 to 500 characters |
+| Any request | At most 32 KB (the biggest real request is under 1 KB) |
+
+Refused: HTML, symbols, emoji, invisible and right-to-left characters, the "zero" character, text
+sent as a list or an object. Every refusal gives a clear message, never "server error". The forms
+use the same rules: characters that are not allowed cannot be typed, and fields stop at their limit.
+
+Login pages (both panels), also 3 November 2026:
+
+| Defence | What it does |
+|---|---|
+| Same answer, same time | A wrong password and an email nobody has get exactly the same answer after the same time (tested: 236 ms both), so nobody can find out which emails have accounts |
+| "Account deactivated" only with the right password | A stranger cannot learn that an account exists but is switched off |
+| Guessing limit per account | 10 wrong passwords per hour per account, from any number of internet addresses (a botnet included), on top of 5 per internet address. After that the account waits 1 hour; other accounts are not affected |
+
+What reaches the browser (also 3 November 2026): no passwords, password hashes, router passwords, setup tokens or tunnel keys are ever sent; built website files hold no secrets and no source maps.
+
+| Change | What it does |
+|---|---|
+| "Don't store" on every API answer | Browsers and proxies keep no copy of private data (customers, phone numbers, voucher codes), so the next person on a shared computer cannot see it |
+| "Log out of all devices" (business panel, Settings) | Every phone and computer logged in to that account is logged out at once (lost phone, borrowed laptop, copied login) |
+| Font served by our own site | The panels no longer load anything from Google: visitors' addresses go nowhere else, and the "only our own code" rule now allows nothing from outside |
+
 Also fixed earlier the same day:
 - **The server no longer stops** when a router sends a strange reply (it logs it and keeps running).
 - **Broken requests** get a clean "bad request" answer instead of looking like server errors.
@@ -102,3 +147,16 @@ Backups of the Nginx files from before the change: `~/nginx-backup-2026-11-02/`.
   login, remove fail2ban, open ports 5001/5432/8728, or run
   `npm audit fix --force`. Ask Claude first.
 - To repeat the audit later: `SECURITY-AUDIT-PROMPT.md`.
+
+---
+
+## 7. Warning signs in the logs (possible attack)
+
+These lines in `pm2 logs wifi-backend --err` mean someone may be attacking.
+Check for them in the weekly error check (guide step 4c).
+
+| Line in the log | What it means | What to do |
+|---|---|---|
+| `[MikroTik] A router sent more than 2 MB in one connection: connection cut (a real router never does this). Router: 10.20.X.Y` | A router tried to flood the server with an endless answer. A normal router never sends this much, so **someone has probably tampered with that router** (its owner, or someone who got its admin password). The server cut it off and kept running for everyone else | **Red: tell Claude the same day**, with the time of the line. The line ends with the router's tunnel address (10.20.X.Y): find that router in the admin panel's Routers page, contact that business, and if needed block its router (delete it in the panel, which also removes its tunnel) |
+| `Router connection error (server kept running)`, many per day | A router keeps sending strange replies | Yellow: tell Claude |
+| `[Cleaner] Slow round` together with the 2 MB line above | A tampered router is also slowing down the every-minute check | Red: tell Claude |

@@ -373,9 +373,11 @@ export default function App() {
                 <input
                   className="form-control"
                   type="tel"
+                  inputMode="tel"
                   placeholder="0712345678"
+                  maxLength={13}
                   value={phoneNumber}
-                  onChange={e => setPhoneNumber(e.target.value)}
+                  onChange={e => setPhoneNumber(e.target.value.replace(/[^0-9+]/g, ''))}
                   required
                 />
 

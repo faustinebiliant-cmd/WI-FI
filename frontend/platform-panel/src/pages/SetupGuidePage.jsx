@@ -1,18 +1,33 @@
 import React from 'react';
+import CopyButton from '../shared/components/CopyButton';
 
 // Technician guide: how to connect a new MikroTik and run the setup.
 // Only shown in the platform panel. The setup commands themselves come from the
 // business's Business Panel (Routers > Add Router, or "Setup Commands").
 
-const Code = ({ children }) => <pre className="guide-code">{children}</pre>;
+// A command box with a copy button in its corner
+const Code = ({ children }) => (
+  <div className="guide-code-box">
+    <pre className="guide-code">{children}</pre>
+    <CopyButton text={String(children)} toastMessage="Command copied" className="guide-code-copy" />
+  </div>
+);
+
+// A short command inside a sentence, with its own copy button
+const Cmd = ({ children }) => (
+  <span className="code-with-copy">
+    <code className="guide-inline-code">{children}</code>
+    <CopyButton text={String(children)} toastMessage="Command copied" />
+  </span>
+);
 
 const NOTE_CLASS = { blue: 'notice-info', amber: 'notice-warning', red: 'notice-danger' };
 const Note = ({ tone = 'blue', children }) => (
   <div className={`notice ${NOTE_CLASS[tone]}`} style={{ margin: '12px 0' }}>{children}</div>
 );
 
-const Section = ({ title, children }) => (
-  <div className="card">
+const Section = ({ id, title, children }) => (
+  <div className="card" id={id}>
     <h2 className="section-title">{title}</h2>
     {children}
   </div>
@@ -28,11 +43,25 @@ export default function SetupGuidePage() {
         </div>
       </div>
 
-      <Section title="Before you start">
+      <div className="card">
+        <h2 className="section-title">On this page</h2>
+        <ul className="guide-toc">
+          <li><a href="#before">Before you start</a></li>
+          <li><a href="#method-a">Method A (normal)</a></li>
+          <li><a href="#method-b">Method B (one laptop port)</a></li>
+          <li><a href="#setup-problems">If the setup goes wrong</a></li>
+          <li><a href="#access-points">Access points</a></li>
+          <li><a href="#more-access-points">More than one access point</a></li>
+          <li><a href="#staff-door">Staff door: Winbox after setup</a></li>
+          <li><a href="#emergency-key">Emergency key</a></li>
+        </ul>
+      </div>
+
+      <Section id="before" title="Before you start">
         <ul className="guide-list">
           <li>A <strong>new or factory-reset</strong> MikroTik hEX, a laptop with Winbox, and network cables.</li>
           <li><strong>Port 1 (ether1) = internet (WAN).</strong> Ports 2 to 5 (ether2 to ether5) = your laptop and the access points (LAN). Never plug an access point into port 1.</li>
-          <li>The setup commands: open the business's Business Panel, go to <strong>Routers</strong>, press <strong>Add Router</strong> (or <strong>Setup Commands</strong> for a router that is not set up yet). They work for 12 hours.</li>
+          <li>The setup commands: open the business's Business Panel, go to <strong>Routers</strong>, press <strong>Add Router</strong> (or <strong>Setup Commands</strong> for a router that is not set up yet). They work for <strong>30 minutes</strong>: get them when you are at the router, ready to start. Expired: press Setup Commands again for new ones.</li>
           <li>Winbox login on a factory router: user <strong>admin</strong>, password from the sticker on the router (empty if there is no password on the sticker).</li>
         </ul>
         <Note>
@@ -42,7 +71,7 @@ export default function SetupGuidePage() {
         </Note>
       </Section>
 
-      <Section title="Method A (normal): internet in port 1, laptop in port 2">
+      <Section id="method-a" title="Method A (normal): internet in port 1, laptop in port 2">
         <p className="guide-text">Use this whenever the business already has internet (a modem or another router).</p>
         <ol className="guide-list">
           <li>Plug the <strong>internet cable</strong> from the business's modem into <strong>port 1</strong>.</li>
@@ -63,7 +92,7 @@ export default function SetupGuidePage() {
         </Note>
       </Section>
 
-      <Section title="Method B (one laptop port): your laptop gives the internet and runs Winbox on one cable">
+      <Section id="method-b" title="Method B (one laptop port): your laptop gives the internet and runs Winbox on one cable">
         <p className="guide-text">
           Use this only when there is no other internet and your laptop has a single network port (for example the USB network adapter),
           while the laptop itself is on Wi-Fi. It opens the "MAC door" on port 1 for the time of the setup, and you close it again at the end.
@@ -93,7 +122,7 @@ export default function SetupGuidePage() {
           <li>Check the router has internet:
             <Code>{'/ip dhcp-client print\n/ping 8.8.8.8 count=3'}</Code>
             The first line must show ether1 as <strong>bound</strong> with an address starting 192.168.137. The ping must get replies.
-            If not: turn sharing off and on again on the laptop, then run <strong>/ip dhcp-client renew [find]</strong>.
+            If not: turn sharing off and on again on the laptop, then run <Cmd>/ip dhcp-client renew [find]</Cmd>.
           </li>
         </ol>
 
@@ -116,7 +145,19 @@ export default function SetupGuidePage() {
         </Note>
       </Section>
 
-      <Section title="Access points (TP-Link EAP225)">
+      <Section id="setup-problems" title="If the setup goes wrong">
+        <ul className="guide-list">
+          <li><strong>CLOCK NOT SET</strong>, or a <strong>failure</strong> line from step 1: the router has no internet. Check the cable in port 1 and run <Cmd>/ping 8.8.8.8 count=3</Cmd>, then paste step 1 again.</li>
+          <li><strong>ROUTEROS TOO OLD</strong>: the router's software is too old for the secure setup. Update it (System &gt; Packages &gt; Check For Updates, then Download &amp; Install; the router restarts), then paste step 1 again.</li>
+          <li><strong>SOME FEATURES ARE OFF</strong> (normal once on a new router): step 1 has already asked the router to switch them on. Unplug the router's power, plug it back in, log in again and paste step 1 again. If it then says <strong>THE POWER WAS NOT UNPLUGGED IN TIME</strong>, paste step 1 again and unplug within 5 minutes.</li>
+          <li><strong>A download fails</strong> (step 1 or step 2): check in this order: the router can reach the internet and names (<Cmd>/ping 8.8.8.8 count=3</Cmd> and <Cmd>/ping oswagolink.co.tz count=3</Cmd>); the login page goes to <strong>flash/hotspot/login.html</strong> (not hotspot/…); and <Cmd>{'/file print where name~"flash/hotspot"'}</Cmd> shows a folder, not an empty file (step 2 part 1 removes such a file by itself).</li>
+          <li><strong>ALREADY PROVISIONED</strong>: this router was set up before. Reset it to factory settings (<Cmd>/system reset-configuration</Cmd>, then confirm with y) and start again. Never repair a half-finished setup by hand.</li>
+          <li><strong>The setup link has expired</strong>: press <strong>Setup Commands</strong> on the Business Panel's Routers page to get new commands.</li>
+          <li><strong>Router stays OFFLINE</strong> after 5 minutes: on the router run <Cmd>{'/log print where message~"wg-"'}</Cmd> and send the result to support.</li>
+        </ul>
+      </Section>
+
+      <Section id="access-points" title="Access points (TP-Link EAP225)">
         <ul className="guide-list">
           <li>Wi-Fi name of your choice, <strong>open</strong> (no password), so the customer login page can appear.</li>
           <li>DHCP <strong>off</strong>: choose <strong>Static</strong> (fixed address) in the access point's network settings and enter:
@@ -131,6 +172,7 @@ export default function SetupGuidePage() {
           </li>
           <li>A new access point often comes with its own address (for example <strong>192.168.0.254</strong>). Never keep it: it is in a different network, so the router could not reach it. Always change it to an address from the list above.</li>
           <li>Plug it into <strong>port 2 to 5</strong> of the hEX, never port 1.</li>
+          <li><strong>Its own settings page shows the customer login</strong>: its address is not from 192.168.88.2 to .9. Give it one from the list.</li>
         </ul>
         <Note>
           The fixed address matters twice: the access point's own traffic skips the customer login, and the router recognises
@@ -138,7 +180,7 @@ export default function SetupGuidePage() {
         </Note>
       </Section>
 
-      <Section title="More than one access point">
+      <Section id="more-access-points" title="More than one access point">
         <p className="guide-text">One router can serve up to <strong>8 access points</strong>, for a bigger place or several rooms.</p>
         <ol className="guide-list">
           <li>Give every access point its <strong>own fixed address</strong>: the first <strong>192.168.88.2</strong>, the second <strong>192.168.88.3</strong>, then .4, .5 up to <strong>192.168.88.9</strong>. Never two with the same address. Write on each access point which address it has.</li>
@@ -155,7 +197,7 @@ export default function SetupGuidePage() {
         </Note>
       </Section>
 
-      <Section title="Staff door: Winbox after setup">
+      <Section id="staff-door" title="Staff door: Winbox after setup">
         <p className="guide-text">
           After setup, customers on the Wi-Fi <strong>cannot see the router</strong> in Winbox's Neighbors list and cannot log in to it.
           Staff still can, from any LAN port <strong>without an access point</strong>.
@@ -165,10 +207,11 @@ export default function SetupGuidePage() {
           <li>To work on the router: plug your laptop with a cable into a <strong>free port</strong> and open Winbox <strong>by MAC address</strong> (Neighbors list), as during setup. Same router password.</li>
           <li>All ports in use by access points: unplug one access point, wait <strong>5 minutes</strong> (the router forgets the old devices), then use that port. Plug the access point back in afterwards.</li>
           <li>Customers' Wi-Fi, vouchers and the connection to the Oswagolink server are not affected by any of this.</li>
+          <li><strong>Locked out on every port:</strong> support uses the <a href="#emergency-key">Emergency key</a>.</li>
         </ul>
       </Section>
 
-      <Section title="Emergency key: open a router's staff door from the VPS">
+      <Section id="emergency-key" title="Emergency key: open a router's staff door from the VPS">
         <p className="guide-text">
           A remote unlock button for <strong>one</strong> router's Winbox, for when staff are locked out on every port (a broken port,
           every port taken by access points, or the router's check judged a staff port wrongly). It works through the tunnel the VPS
@@ -193,19 +236,6 @@ export default function SetupGuidePage() {
         </Note>
       </Section>
 
-      <Section title="If something goes wrong">
-        <ul className="guide-list">
-          <li><strong>CLOCK NOT SET</strong>, or a <strong>failure</strong> line from step 1: the router has no internet. Check the cable in port 1 and run <strong>/ping 8.8.8.8 count=3</strong>, then paste step 1 again.</li>
-          <li><strong>ROUTEROS TOO OLD</strong>: the router's software is too old for the secure setup. Update it (System &gt; Packages &gt; Check For Updates, then Download &amp; Install; the router restarts), then paste step 1 again.</li>
-          <li><strong>SOME FEATURES ARE OFF</strong> (normal once on a new router): step 1 has already asked the router to switch them on. Unplug the router's power, plug it back in, log in again and paste step 1 again. If it then says <strong>THE POWER WAS NOT UNPLUGGED IN TIME</strong>, paste step 1 again and unplug within 5 minutes.</li>
-          <li><strong>A download fails</strong> (step 1 or step 2): check in this order: the router can reach the internet and names (<strong>/ping 8.8.8.8 count=3</strong> and <strong>/ping oswagolink.co.tz count=3</strong>); the login page goes to <strong>flash/hotspot/login.html</strong> (not hotspot/…); and <strong>/file print where name~"flash/hotspot"</strong> shows a folder, not an empty file (step 2 part 1 removes such a file by itself).</li>
-          <li><strong>ALREADY PROVISIONED</strong>: this router was set up before. Reset it to factory settings (<strong>/system reset-configuration</strong>, then confirm with y) and start again. Never repair a half-finished setup by hand.</li>
-          <li><strong>The setup link has expired</strong>: press <strong>Setup Commands</strong> on the Business Panel's Routers page to get new commands.</li>
-          <li><strong>Staff cannot open Winbox</strong> after setup: use a port without an access point (see "Staff door"). Still nothing: support uses the "Emergency key" section above.</li>
-          <li><strong>The access point's own settings page shows the customer login</strong>: give it a fixed address from 192.168.88.2 to .9.</li>
-          <li><strong>Router stays OFFLINE</strong> after 5 minutes: on the router run <strong>{'/log print where message~"wg-"'}</strong> and send the result to support.</li>
-        </ul>
-      </Section>
     </div>
   );
 }

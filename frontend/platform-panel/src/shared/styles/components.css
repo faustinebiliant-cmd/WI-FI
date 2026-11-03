@@ -276,3 +276,13 @@ tbody tr:hover td { background: #f8fafc; }
   .search-box { max-width: none; flex-basis: 100%; }
   .filter-bar select.form-control { flex: 1; }
 }
+
+/* Setup Guide: commands with a copy button, quick links */
+.guide-code-box { position: relative; }
+.guide-code-box .guide-code { padding-right: 44px; }
+.guide-code-copy { position: absolute; top: 6px; right: 6px; color: #cbd5e1; }
+.guide-code-copy:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.guide-inline-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; background: var(--light); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1px 6px; word-break: break-all; }
+.guide-toc { margin: 0; padding-left: 20px; columns: 2; font-size: 14px; line-height: 1.9; }
+.guide-page .card { scroll-margin-top: 16px; }
+@media (max-width: 600px) { .guide-toc { columns: 1; } }

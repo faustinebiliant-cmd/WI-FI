@@ -4,7 +4,7 @@ const { hashPassword } = require('../services/password');
 const { signTenantToken } = require('../services/jwt');
 const { issueImpersonationCode } = require('../services/impersonationCodes');
 const { removeWireGuardPeer } = require('../services/wireguard');
-const { isValidEmail, isValidPhone, isSafeText, isValidUUID } = require('../utils/validators');
+const { isValidEmail, isValidPhone, cleanPhone, isValidName, nameRuleMessage, isWholeNumberBetween, isValidUUID } = require('../utils/validators');
 
 // A new business may use the system this many days, then it is blocked
 // automatically (see TENANT_BLOCKED_SQL) until it is activated in the admin panel
@@ -24,18 +24,26 @@ const makeTempPassword = () =>
 
 const createTenant = async (req, res) => {
   try {
-    const { business_name, owner_name, owner_email, owner_phone, monthly_fee } = req.body;
+    const { business_name, owner_name, owner_email, owner_phone, monthly_fee } = req.body || {};
     if (!business_name || !owner_name || !owner_email || !owner_phone) {
       return res.status(400).json({ success: false, error: 'All fields are required' });
     }
-    if (!isSafeText(business_name) || !isSafeText(owner_name)) {
-      return res.status(400).json({ success: false, error: 'Invalid characters in name' });
+    if (!isValidName(business_name, 2, 60)) {
+      return res.status(400).json({ success: false, error: nameRuleMessage('Business name', 2, 60) });
     }
-    if (!isValidEmail(owner_email)) {
+    if (!isValidName(owner_name, 2, 60)) {
+      return res.status(400).json({ success: false, error: nameRuleMessage('Owner name', 2, 60) });
+    }
+    if (!isValidEmail(typeof owner_email === 'string' ? owner_email.trim() : owner_email)) {
       return res.status(400).json({ success: false, error: 'Invalid email format' });
     }
     if (!isValidPhone(owner_phone)) {
       return res.status(400).json({ success: false, error: 'Invalid phone format (use 07XXXXXXXX)' });
+    }
+    // Empty means no fee agreed yet
+    const fee = monthly_fee === undefined || monthly_fee === null || monthly_fee === '' ? 0 : monthly_fee;
+    if (!isWholeNumberBetween(fee, 0, 1000000)) {
+      return res.status(400).json({ success: false, error: 'Monthly fee: a whole number from 0 to 1,000,000 TZS.' });
     }
 
     const cleanEmail = owner_email.toLowerCase().trim();
@@ -49,7 +57,7 @@ const createTenant = async (req, res) => {
     const result = await db.transaction(async (client) => {
       const { rows } = await client.query(
         `SELECT create_tenant_with_owner($1, $2, $3, $4, $5, $6) as result`,
-        [business_name.trim(), owner_name.trim(), cleanEmail, owner_phone.trim(), passwordHash, monthly_fee || 0]
+        [business_name.trim(), owner_name.trim(), cleanEmail, cleanPhone(owner_phone), passwordHash, Number(fee)]
       );
       await client.query('UPDATE tenant_users SET must_change_password = true WHERE id = $1', [rows[0].result.user_id]);
       // Last trial day = today + TRIAL_DAYS, counted in Tanzania time
@@ -117,7 +125,9 @@ const toggleTenantStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { action } = req.body || {};
-    const reason = String((req.body || {}).reason || '').trim();
+    // Text only: an object would turn into the 15 characters "[object Object]"
+    const rawReason = (req.body || {}).reason;
+    const reason = typeof rawReason === 'string' ? rawReason.trim() : '';
     // Only known actions: anything else (a typo) must not silently change a business
     const change = Object.prototype.hasOwnProperty.call(STATUS_ACTIONS, action) ? STATUS_ACTIONS[action] : null;
     if (!change) {
@@ -155,8 +165,11 @@ const toggleTenantStatus = async (req, res) => {
 const impersonateTenant = async (req, res) => {
   try {
     const { id } = req.params;
-    const { reason } = req.body;
-    if (!reason || reason.trim().length < 10) return res.status(400).json({ success: false, error: 'A detailed reason (min 10 chars) is required' });
+    const rawReason = (req.body || {}).reason;
+    const reason = typeof rawReason === 'string' ? rawReason.trim() : '';
+    if (reason.length < 10 || reason.length > 300) {
+      return res.status(400).json({ success: false, error: 'Write a reason (10 to 300 characters).' });
+    }
     if (!isValidUUID(id)) return res.status(404).json({ success: false, error: 'Tenant owner not found' });
 
     const ownerRes = await db.query("SELECT * FROM tenant_users WHERE tenant_id = $1 AND role = 'owner'", [id]);
@@ -171,12 +184,12 @@ const impersonateTenant = async (req, res) => {
       await client.query(
         `INSERT INTO impersonation_sessions (admin_id, admin_email, tenant_id, tenant_user_id, reason, token_id, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [req.admin.id, req.admin.email, id, owner.id, reason.trim(), tokenId, expiresAt.toISOString()]
+        [req.admin.id, req.admin.email, id, owner.id, reason, tokenId, expiresAt.toISOString()]
       );
       await client.query(
         `INSERT INTO platform_audit_logs (admin_id, admin_email, action, target_type, target_id, target_label, details)
          VALUES ($1, $2, 'Impersonation Started', 'tenant', $3, $4, $5)`,
-        [req.admin.id, req.admin.email, id, owner.full_name, JSON.stringify({ reason: reason.trim() })]
+        [req.admin.id, req.admin.email, id, owner.full_name, JSON.stringify({ reason })]
       );
     });
 

@@ -298,9 +298,10 @@ const registerRouterKey = async (req, res) => {
     const pubkey = String((req.body && req.body.pubkey) || '');
     if (!PUBKEY_RE.test(pubkey)) return res.status(400).send('Invalid key');
 
-    // One extra hour, so a setup started just before the link expired can still finish
+    // 10 extra minutes, so a setup started just before the link expired can still finish
+    // (the router registers about a minute after it downloaded its setup)
     const routerRes = await db.query(
-      `SELECT *, (provision_token_expires_at + INTERVAL '1 hour' > NOW()) AS token_valid
+      `SELECT *, (provision_token_expires_at + INTERVAL '10 minutes' > NOW()) AS token_valid
        FROM routers WHERE provision_token = $1`,
       [token]
     );

@@ -6,6 +6,7 @@
 // ============================================================
 const RouterOSAPI = require('node-routeros').RouterOSAPI;
 const { Channel } = require('node-routeros/dist/Channel');
+const { Receiver } = require('node-routeros/dist/connector/Receiver');
 const { decrypt } = require('../../utils/encryption');
 
 // ------------------------------------------------------------
@@ -26,6 +27,34 @@ if (!Channel.prototype.__emptyReplyPatched) {
     return originalProcessPacket.call(this, packet);
   };
   Channel.prototype.__emptyReplyPatched = true;
+}
+
+// ------------------------------------------------------------
+// PROTECTION AGAINST A HOSTILE ROUTER (endless answers)
+// The library keeps a router's whole answer in memory. A router controlled by
+// someone with bad intentions could answer with an endless list: one such answer
+// grew the server's memory by about 1.5 GB in 15 seconds in a test, enough to crash
+// it for every business. So one connection may bring in at most 2 MB (a real router
+// with 1,000 customers online sends about 0.1 MB); beyond that the connection is cut
+// and the router counts as "not answering", like a router that is offline.
+// ------------------------------------------------------------
+const MAX_BYTES_PER_CONNECTION = 2 * 1024 * 1024;
+if (!Receiver.prototype.__sizeLimitPatched) {
+  const originalProcessRawData = Receiver.prototype.processRawData;
+  Receiver.prototype.processRawData = function processRawDataWithLimit(data) {
+    if (this.__overLimit) return;
+    this.__receivedBytes = (this.__receivedBytes || 0) + data.length;
+    if (this.__receivedBytes > MAX_BYTES_PER_CONNECTION) {
+      this.__overLimit = true;
+      // The tunnel address names the router (admin panel > Routers)
+      const from = (this.socket && this.socket.remoteAddress) || 'unknown address';
+      console.error(`[MikroTik] A router sent more than 2 MB in one connection: connection cut (a real router never does this). Router: ${from}`);
+      this.socket.destroy(new Error('Router sent too much data'));
+      return;
+    }
+    return originalProcessRawData.call(this, data);
+  };
+  Receiver.prototype.__sizeLimitPatched = true;
 }
 
 // Kept as a second line of defence, in case a library version
@@ -278,8 +307,9 @@ class MikroTikRouter {
    */
   async getActiveUsers() {
     try {
+      // Only the 3 fields we use: a smaller answer, faster over the tunnel
       const active = await this._step((conn) =>
-        safePrint(conn, '/ip/hotspot/active/print')
+        safePrint(conn, '/ip/hotspot/active/print', ['=.proplist=mac-address,address,user'])
       );
       return active.map((user) => ({
         mac: user['mac-address'],

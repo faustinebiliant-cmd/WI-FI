@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import apiClient from '../api/client';
 import PasswordInput from '../shared/components/PasswordInput';
+import { MAX_PASSWORD_LENGTH } from '../shared/inputRules';
 
 // Used on the forced "choose a new password" screen and on the Settings page
 export default function ChangePasswordForm({ onSuccess }) {
@@ -16,8 +17,8 @@ export default function ChangePasswordForm({ onSuccess }) {
     setError('');
     setMessage('');
 
-    if (newPassword.length < 8) {
-      setError('The new password must be at least 8 characters long.');
+    if (newPassword.length < 8 || newPassword.length > MAX_PASSWORD_LENGTH) {
+      setError(`The new password must be 8 to ${MAX_PASSWORD_LENGTH} characters long.`);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -52,17 +53,17 @@ export default function ChangePasswordForm({ onSuccess }) {
 
       <div className="form-group">
         <label>Current Password</label>
-        <PasswordInput autoComplete="current-password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required disabled={saving} />
+        <PasswordInput autoComplete="current-password" maxLength={MAX_PASSWORD_LENGTH} value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required disabled={saving} />
       </div>
 
       <div className="form-group">
-        <label>New Password (at least 8 characters)</label>
-        <PasswordInput autoComplete="new-password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required disabled={saving} />
+        <label>New Password (8 to 50 characters)</label>
+        <PasswordInput autoComplete="new-password" maxLength={MAX_PASSWORD_LENGTH} value={newPassword} onChange={e => setNewPassword(e.target.value)} required disabled={saving} />
       </div>
 
       <div className="form-group">
         <label>Repeat New Password</label>
-        <PasswordInput autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required disabled={saving} />
+        <PasswordInput autoComplete="new-password" maxLength={MAX_PASSWORD_LENGTH} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required disabled={saving} />
       </div>
 
       <button type="submit" className="btn btn-primary btn-block" disabled={saving}>

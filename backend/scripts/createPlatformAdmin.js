@@ -18,7 +18,7 @@ const run = async () => {
   console.log('--- Create Platform Admin ---');
   const email = await ask('Email: ');
   const fullName = await ask('Full Name: ');
-  const password = await ask('Password (12 to 72 characters): ');
+  const password = await ask('Password (12 to 50 characters): ');
 
   if (!email || !fullName || !password) {
     console.log('All fields are required.');
@@ -29,8 +29,8 @@ const run = async () => {
     console.log('That email address does not look valid.');
     process.exit(1);
   }
-  if (password.length < 12 || password.length > 72) {
-    console.log('The password must be 12 to 72 characters long.');
+  if (password.length < 12 || password.length > 50) {
+    console.log('The password must be 12 to 50 characters long.');
     process.exit(1);
   }
 

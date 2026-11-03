@@ -3,6 +3,7 @@ import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
 import { useToast } from '../shared/components/Toast';
 import { FiCopy } from 'react-icons/fi';
+import { onlyNameChars } from '../shared/inputRules';
 
 
 // Longer commands are hidden until "Show command" is pressed; short ones stay visible
@@ -116,7 +117,7 @@ export default function RoutersPage() {
     setDeleteError('');
   };
 
-  // "Show setup commands again": the server makes a NEW setup link (valid 12 hours)
+  // "Show setup commands again": the server makes a NEW setup link (valid 30 minutes)
   const showSetupAgain = async (router) => {
     setActionError('');
     try {
@@ -257,11 +258,11 @@ export default function RoutersPage() {
             <form onSubmit={handleCreate}>
               <div className="form-group">
                 <label>Router Name</label>
-                <input className="form-control" required type="text" placeholder="e.g. Main Lobby" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                <input className="form-control" required type="text" placeholder="e.g. Main Lobby" maxLength={40} value={formData.name} onChange={e => setFormData({ ...formData, name: onlyNameChars(e.target.value) })} />
               </div>
               <div className="form-group">
                 <label>Location (optional)</label>
-                <input className="form-control" type="text" placeholder="e.g. Ground floor" value={formData.location_label} onChange={e => setFormData({ ...formData, location_label: e.target.value })} />
+                <input className="form-control" type="text" placeholder="e.g. Ground floor" maxLength={60} value={formData.location_label} onChange={e => setFormData({ ...formData, location_label: onlyNameChars(e.target.value) })} />
               </div>
               <div className="modal-actions">
                 <button type="button" onClick={() => setShowModal(false)} disabled={isCreating} className="btn btn-secondary">Cancel</button>
@@ -289,7 +290,7 @@ export default function RoutersPage() {
               <strong>Router password:</strong> the first time you log in, Winbox asks you to set a new password. Choose a strong one and write it down: you need it every time you open the router.
             </p>
             <p className="notice notice-warning" style={{ marginBottom: '20px' }}>
-              The setup commands below contain a secret: never share them. They work for 12 hours. If they expire, or you close this window too early, press "Setup Commands" on the Routers page to get new ones (only while the router is not set up yet).
+              The setup commands below contain a secret: never share them. They work for 30 minutes, so open them when you are at the router. If they expire, or you close this window too early, press "Setup Commands" on the Routers page to get new ones (only while the router is not set up yet).
             </p>
 
             <CommandBox

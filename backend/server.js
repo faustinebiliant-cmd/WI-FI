@@ -77,7 +77,16 @@ const accessLogFormat = env.IS_PROD
   ? ':remote-addr - :remote-user [:date[clf]] ":method :safe-url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent"'
   : ':method :safe-url :status :response-time ms';
 app.use(morgan(accessLogFormat));
-app.use(express.json({ limit: '1mb' }));
+// The biggest real request is under 1 KB: 32 KB is plenty, and nobody can make the
+// server read megabytes of nothing
+app.use(express.json({ limit: '32kb' }));
+
+// API answers hold private data (customers, phone numbers, voucher codes): no browser
+// or proxy may keep a copy, so the next person on a shared computer cannot see them
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 
 // ------------------------------------------------------------
 // Health check (public): is the database reachable?

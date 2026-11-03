@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
 import { useToast } from '../shared/components/Toast';
+import { onlyNameChars, onlyDigits } from '../shared/inputRules';
 
 // Speeds the router setup prepares (1 to 20 Mbps, whole numbers only)
 const MIN_SPEED_MBPS = 1;
@@ -82,7 +83,7 @@ export default function PackagesPage() {
     try {
       await apiClient.post('/tenant/packages', {
         name: formData.name,
-        price_tzs: parseFloat(formData.price_tzs),
+        price_tzs: Number(formData.price_tzs),
         duration_minutes: duration_minutes,
         speed_down_kbps: speed_kbps,
         speed_up_kbps: speed_kbps,
@@ -188,12 +189,12 @@ export default function PackagesPage() {
             <form onSubmit={handleCreate} className="form-stack">
               <div className="form-group">
                 <label>Package Name</label>
-                <input className="form-control" required type="text" placeholder="e.g. Daily 5 Mbps" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} disabled={isSubmitting} />
+                <input className="form-control" required type="text" placeholder="e.g. Daily 5 Mbps" maxLength={40} value={formData.name} onChange={e => setFormData({ ...formData, name: onlyNameChars(e.target.value) })} disabled={isSubmitting} />
               </div>
 
               <div className="form-group">
                 <label>Price (TZS)</label>
-                <input className="form-control" required type="number" min="0" inputMode="numeric" placeholder="e.g. 1000" value={formData.price_tzs} onChange={e => setFormData({ ...formData, price_tzs: e.target.value })} disabled={isSubmitting} />
+                <input className="form-control" required type="text" inputMode="numeric" maxLength={7} placeholder="e.g. 1000" value={formData.price_tzs} onChange={e => setFormData({ ...formData, price_tzs: onlyDigits(e.target.value) })} disabled={isSubmitting} />
               </div>
 
               <div className="form-row">

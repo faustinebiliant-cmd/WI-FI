@@ -1,5 +1,6 @@
 const db = require('../config/db');
-const { verifyPassword, hashPassword } = require('../services/password');
+const { MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH } = require('../utils/validators');
+const { verifyPassword, hashPassword, wasteSameTime } = require('../services/password');
 const { signTenantToken } = require('../services/jwt');
 const { redeemImpersonationCode } = require('../services/impersonationCodes');
 const { TENANT_BLOCKED_SQL, TENANT_BLOCKED_ERROR } = require('../middleware/subscriptionGuard');
@@ -11,7 +12,9 @@ const LEGACY_DEFAULT_PASSWORD = 'Welcome123!';
 const login = async (req, res) => {
   try {
     const { email, password } = req.body || {};
-    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
+    // Sizes: no email or password in this system is longer than 50 characters
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password ||
+        email.length > MAX_EMAIL_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
       return res.status(400).json({ success: false, error: 'Email and password required' });
     }
 
@@ -26,14 +29,13 @@ const login = async (req, res) => {
 
     const user = rows[0];
 
+    // A stranger gets the same answer, after the same time, whether the email exists or not
     const FAILED = { success: false, error: 'Invalid credentials' };
-    if (!user) return res.status(401).json(FAILED);
-    if (!user.is_active) return res.status(403).json({ success: false, error: 'Account deactivated' });
-
-    const isValid = await verifyPassword(password, user.password_hash);
+    const isValid = user ? await verifyPassword(password, user.password_hash) : await wasteSameTime(password);
     if (!isValid) return res.status(401).json(FAILED);
 
-    // Checked after the password, so a stranger cannot learn which accounts are suspended
+    // Checked after the password, so a stranger cannot learn which accounts are deactivated or suspended
+    if (!user.is_active) return res.status(403).json({ success: false, error: 'Account deactivated' });
     if (user.tenant_blocked) return res.status(403).json(TENANT_BLOCKED_ERROR);
 
     let mustChangePassword = user.must_change_password === true;
@@ -76,8 +78,8 @@ const changePassword = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Please fill in your current and your new password.' });
     }
     // bcrypt only uses the first 72 characters
-    if (new_password.length < 8 || new_password.length > 72) {
-      return res.status(400).json({ success: false, error: 'The new password must be 8 to 72 characters long.' });
+    if (current_password.length > MAX_PASSWORD_LENGTH || new_password.length < 8 || new_password.length > MAX_PASSWORD_LENGTH) {
+      return res.status(400).json({ success: false, error: `The new password must be 8 to ${MAX_PASSWORD_LENGTH} characters long.` });
     }
     if (new_password === current_password) {
       return res.status(400).json({ success: false, error: 'The new password must be different from the current one.' });
@@ -145,4 +147,24 @@ const exchangeImpersonationCode = async (req, res) => {
   }
 };
 
-module.exports = { login, changePassword, endImpersonationSelf, exchangeImpersonationCode };
+// POST /api/tenant/auth/logout-all
+// Logs this account out on every device, this one included (a borrowed laptop, a lost
+// phone, a login someone copied). The time is set to the start of the NEXT second, so
+// every login issued up to now is refused; logging in again works a second later.
+const logoutAllDevices = async (req, res) => {
+  try {
+    if (req.tenantUser.is_impersonation) {
+      return res.status(403).json({ success: false, error: 'This cannot be done while impersonating.' });
+    }
+    await db.query(
+      "UPDATE tenant_users SET logged_out_at = date_trunc('second', NOW()) + INTERVAL '1 second' WHERE id = $1",
+      [req.tenantUser.id]
+    );
+    return res.status(200).json({ success: true, message: 'Logged out of all devices' });
+  } catch (error) {
+    console.error('Log out of all devices error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to log out of all devices' });
+  }
+};
+
+module.exports = { login, changePassword, endImpersonationSelf, exchangeImpersonationCode, logoutAllDevices };

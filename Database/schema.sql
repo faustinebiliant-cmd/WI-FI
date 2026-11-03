@@ -13,6 +13,7 @@
 --   2026-11-01-one-open-session.sql        one open session per voucher and device
 --   2026-11-01-history-retention-indexes.sql  indexes for the nightly history clean-up
 --   2026-11-03-password-changed-at.sql     tenant_users.password_changed_at
+--   2026-11-03-logout-everywhere.sql       tenant_users.logged_out_at
 --
 -- When the database changes: update this file AND add a migration file.
 -- ============================================================
@@ -57,6 +58,7 @@ CREATE TABLE public.tenant_users (
     is_active boolean DEFAULT true NOT NULL,
     must_change_password boolean DEFAULT false NOT NULL, -- true while the owner still has a temporary password
     password_changed_at timestamptz, -- logins (tokens) issued before this moment are refused
+    logged_out_at timestamptz, -- "Log out of all devices": logins issued before this moment are refused
     last_login_at timestamptz,
     created_at timestamptz DEFAULT now() NOT NULL
 );

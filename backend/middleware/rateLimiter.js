@@ -59,6 +59,25 @@ const redeemPerAddressLimiter = rateLimit({
   max: devMax(300)
 });
 
+// Per ACCOUNT, whatever the internet address: someone guessing one owner's password from
+// many addresses (a botnet) still gets only 10 wrong tries per hour. The owner can log in
+// again after the hour, or at once from another account; the same email typed in capitals
+// or with spaces counts as the same account.
+const loginAccountKey = (prefix) => (req) => {
+  const email = req.body && typeof req.body.email === 'string' ? req.body.email.toLowerCase().trim().slice(0, 50) : '';
+  return `${prefix}:${email}`;
+};
+const accountLimiterOptions = {
+  windowMs: 60 * 60 * 1000,
+  max: devMax(10),
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: limitMessage('Too many wrong passwords for this account. Please try again in 1 hour.')
+};
+const tenantAccountLoginLimiter = rateLimit({ ...accountLimiterOptions, keyGenerator: loginAccountKey('tenant') });
+const platformAccountLoginLimiter = rateLimit({ ...accountLimiterOptions, keyGenerator: loginAccountKey('admin') });
+
 const tenantGlobalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: devMax(100),
@@ -99,6 +118,8 @@ const provisionFailureLimiter = rateLimit({
 module.exports = {
   platformLoginLimiter,
   tenantLoginLimiter,
+  tenantAccountLoginLimiter,
+  platformAccountLoginLimiter,
   redeemPerAddressLimiter,
   redeemPerRouterLimiter,
   tenantGlobalLimiter,

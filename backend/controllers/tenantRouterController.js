@@ -3,13 +3,14 @@
 // ============================================================
 const crypto = require('crypto');
 const db = require('../config/db');
-const { isSafeText, isValidUUID } = require('../utils/validators');
+const { isValidName, nameRuleMessage, isValidUUID } = require('../utils/validators');
 const { encrypt } = require('../utils/encryption');
 const { removeWireGuardPeer } = require('../services/wireguard');
 
 const MAX_ROUTERS_PER_TENANT = 10;
-// A setup link (provision token) works this long, then a new one must be made
-const SETUP_LINK_HOURS = 12;
+// A setup link (provision token) works this long, then a new one must be made.
+// Short on purpose: a link copied or photographed by someone else soon stops working.
+const SETUP_LINK_MINUTES = 30;
 
 // Only what the page needs. Tokens and passwords are never sent to the browser.
 const listRouters = async (req, res) => {
@@ -33,18 +34,16 @@ const createRouter = async (req, res) => {
   try {
     // Only the name and the location come from the browser.
     // Tokens, address and password are created here, on the server.
-    const name = String((req.body && req.body.name) || '').trim();
-    const location = String((req.body && req.body.location_label) || '').trim();
-
-    if (!name || name.length > 100) {
-      return res.status(400).json({ success: false, error: 'Please enter a router name (up to 100 characters).' });
+    const rawName = (req.body && req.body.name) || '';
+    const rawLocation = (req.body && req.body.location_label) || '';
+    if (!isValidName(rawName, 1, 40)) {
+      return res.status(400).json({ success: false, error: nameRuleMessage('Router name', 1, 40) });
     }
-    if (!isSafeText(name)) {
-      return res.status(400).json({ success: false, error: 'Invalid characters in the router name.' });
+    if (!isValidName(rawLocation, 0, 60)) {
+      return res.status(400).json({ success: false, error: nameRuleMessage('Location', 0, 60) });
     }
-    if (location && (location.length > 100 || !isSafeText(location))) {
-      return res.status(400).json({ success: false, error: 'Invalid location.' });
-    }
+    const name = rawName.trim();
+    const location = rawLocation.trim();
 
     const provisionToken = crypto.randomBytes(24).toString('hex'); // 48 characters, secret
     const routerToken = crypto.randomBytes(16).toString('hex');    // used in the customer portal link
@@ -66,9 +65,9 @@ const createRouter = async (req, res) => {
            (tenant_id, name, location_label, ip_address, api_port, api_username,
             api_password_encrypted, router_token, status, provision_token, provision_token_expires_at)
          VALUES ($1, $2, $3, '0.0.0.0', 8728, 'wifiapi', $4, $5, 'offline', $6,
-                 NOW() + make_interval(hours => $7::int))
+                 NOW() + make_interval(mins => $7::int))
          RETURNING id, name, location_label, ip_address, status, provision_token`,
-        [req.tenantId, name, location || null, encryptedPassword, routerToken, provisionToken, SETUP_LINK_HOURS]
+        [req.tenantId, name, location || null, encryptedPassword, routerToken, provisionToken, SETUP_LINK_MINUTES]
       );
       return rows[0];
     });
@@ -97,10 +96,10 @@ const newSetupToken = async (req, res) => {
     const provisionToken = crypto.randomBytes(24).toString('hex');
     const { rows } = await db.query(
       `UPDATE routers
-       SET provision_token = $1, provision_token_expires_at = NOW() + make_interval(hours => $2::int)
+       SET provision_token = $1, provision_token_expires_at = NOW() + make_interval(mins => $2::int)
        WHERE id = $3 AND tenant_id = $4 AND provisioned_at IS NULL
        RETURNING id, provision_token`,
-      [provisionToken, SETUP_LINK_HOURS, id, req.tenantId]
+      [provisionToken, SETUP_LINK_MINUTES, id, req.tenantId]
     );
     if (rows.length === 0) {
       return res.status(409).json({ success: false, error: 'This router is already set up, or it was not found.' });

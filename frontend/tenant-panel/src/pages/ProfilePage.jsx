@@ -2,12 +2,33 @@ import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
 import ChangePasswordForm from '../components/ChangePasswordForm';
+import ConfirmDialog from '../shared/components/ConfirmDialog';
+import { useAuth } from '../contexts/AuthContext';
+import { onlyDigits } from '../shared/inputRules';
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState({ business_name: '', lipa_namba: '', payout_provider: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null); // { ok, text }
+  const { logout } = useAuth();
+  const [confirmLogoutAll, setConfirmLogoutAll] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
+
+  // Every device (this one too) has to log in again
+  const logoutAllDevices = async () => {
+    setLoggingOut(true);
+    setLogoutError('');
+    try {
+      await apiClient.post('/tenant/auth/logout-all');
+      try { sessionStorage.setItem('loginNotice', 'You logged out of all devices. Log in again on the devices you use.'); } catch (e) { /* storage blocked */ }
+      logout();
+    } catch (err) {
+      setLogoutError(err.response?.data?.error || 'Failed to log out of all devices.');
+      setLoggingOut(false);
+    }
+  };
 
   useEffect(() => {
     apiClient.get('/tenant/profile')
@@ -68,7 +89,7 @@ export default function ProfilePage() {
 
           <div className="form-group">
             <label>Lipa Namba (Payment Number)</label>
-            <input className="form-control" type="text" placeholder="e.g. 123456" inputMode="numeric" value={profile.lipa_namba || ''} onChange={e => setProfile({...profile, lipa_namba: e.target.value})} required />
+            <input className="form-control" type="text" placeholder="e.g. 123456" inputMode="numeric" maxLength={15} value={profile.lipa_namba || ''} onChange={e => setProfile({...profile, lipa_namba: onlyDigits(e.target.value)})} required />
             <p className="form-hint">This is where the money will be sent when customers buy WiFi.</p>
           </div>
 
@@ -82,6 +103,29 @@ export default function ProfilePage() {
         <h2 className="section-title">Change Password</h2>
         <ChangePasswordForm />
       </div>
+
+      <div className="card">
+        <h2 className="section-title">Log out of all devices</h2>
+        <p className="form-hint" style={{ marginTop: 0 }}>
+          Use this if you logged in on a computer that is not yours, lost a phone, or think someone else may be using your login.
+          Every device, this one too, has to log in again.
+        </p>
+        {logoutError && <div className="alert alert-danger">{logoutError}</div>}
+        <button type="button" className="btn btn-danger btn-block" onClick={() => setConfirmLogoutAll(true)} disabled={loggingOut}>
+          Log out of all devices
+        </button>
+      </div>
+
+      <ConfirmDialog
+        open={confirmLogoutAll}
+        title="Log out of all devices?"
+        message="Every phone and computer logged in to this account, this one too, is logged out at once."
+        confirmLabel="Log out everywhere"
+        variant="danger"
+        loading={loggingOut}
+        onConfirm={logoutAllDevices}
+        onCancel={() => setConfirmLogoutAll(false)}
+      />
     </div>
   );
 }

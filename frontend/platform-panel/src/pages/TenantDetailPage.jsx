@@ -249,6 +249,7 @@ export default function TenantDetailPage() {
                 <textarea
                   required
                   placeholder="e.g. Owner asked for help creating packages"
+                  maxLength={300}
                   value={reason}
                   onChange={e => setReason(e.target.value)}
                   className="form-control"

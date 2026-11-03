@@ -76,7 +76,7 @@ const generateVouchers = async (req, res) => {
 
 const listVouchers = async (req, res) => {
   try {
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const page = Math.min(Math.max(parseInt(req.query.page, 10) || 1, 1), 10000);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
     const offset = (page - 1) * limit;
 

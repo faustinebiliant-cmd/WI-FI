@@ -2,14 +2,16 @@
 // Oswagolink - Platform Auth Controller
 // ============================================================
 const db = require('../config/db');
-const { verifyPassword } = require('../services/password');
+const { MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH } = require('../utils/validators');
+const { verifyPassword, wasteSameTime } = require('../services/password');
 const { signAdminToken } = require('../services/jwt');
 
 const login = async (req, res) => {
   try {
     const { email, password } = req.body || {};
 
-    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password ||
+        email.length > MAX_EMAIL_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
       return res.status(400).json({ success: false, error: 'Email and password are required' });
     }
 
@@ -25,12 +27,11 @@ const login = async (req, res) => {
     // Use a generic error message so attackers can't guess valid emails
     const FAILED = { success: false, error: 'Invalid credentials' };
 
-    if (!admin) return res.status(401).json(FAILED);
-    if (!admin.is_active) return res.status(403).json({ success: false, error: 'Account deactivated' });
-
-    // 2. Check password
-    const isValid = await verifyPassword(password, admin.password_hash);
+    // 2. Check the password: same answer and same time whether the email exists or not;
+    //    "deactivated" is only told to someone who knows the password
+    const isValid = admin ? await verifyPassword(password, admin.password_hash) : await wasteSameTime(password);
     if (!isValid) return res.status(401).json(FAILED);
+    if (!admin.is_active) return res.status(403).json({ success: false, error: 'Account deactivated' });
 
     // 3. Generate Token
     const token = signAdminToken({

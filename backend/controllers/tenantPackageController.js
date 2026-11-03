@@ -1,6 +1,6 @@
 const db = require('../config/db');
 const { getRouter } = require('../services/routers/routerFactory');
-const { isValidUUID, isSafeText } = require('../utils/validators');
+const { isValidUUID, isValidName, nameRuleMessage, isWholeNumberBetween } = require('../utils/validators');
 
 // Every router is set up with speed profiles for 1 to 20 Mbps (see provisionController),
 // so a package speed must be one of those: a whole number of Mbps from 1 to 20.
@@ -37,16 +37,16 @@ const listPackages = async (req, res) => {
 
 const createPackage = async (req, res) => {
   try {
-    const { name, price_tzs, duration_minutes, speed_down_kbps, speed_up_kbps, router_id } = req.body;
+    const { name, price_tzs, duration_minutes, speed_down_kbps, speed_up_kbps, router_id } = req.body || {};
 
     if (!name || price_tzs === undefined || duration_minutes === undefined || speed_down_kbps === undefined || speed_up_kbps === undefined || !router_id) {
       return res.status(400).json({ success: false, error: 'All fields, including Router, are required' });
     }
 
-    const packageName = String(name).trim();
-    if (!packageName || packageName.length > 100 || !isSafeText(packageName)) {
-      return res.status(400).json({ success: false, error: 'Package name: 1 to 100 characters, no HTML.' });
+    if (!isValidName(name, 1, 40)) {
+      return res.status(400).json({ success: false, error: nameRuleMessage('Package name', 1, 40) });
     }
+    const packageName = name.trim();
 
     if (!isValidUUID(router_id)) {
       return res.status(400).json({ success: false, error: 'Invalid router selected.' });
@@ -67,7 +67,9 @@ const createPackage = async (req, res) => {
     if (![price, duration, down, up].every(Number.isFinite)) {
       return res.status(400).json({ success: false, error: 'Price, duration and speeds must be numbers.' });
     }
-    if (price < 0) return res.status(400).json({ success: false, error: 'Price cannot be negative.' });
+    if (!isWholeNumberBetween(price_tzs, 0, 1000000)) {
+      return res.status(400).json({ success: false, error: 'Price: a whole number from 0 to 1,000,000 TZS.' });
+    }
     if (duration <= 0 || duration > 525600) return res.status(400).json({ success: false, error: 'Duration must be between 1 minute and 365 days.' });
     if (!isAllowedSpeed(down) || !isAllowedSpeed(up)) {
       return res.status(400).json({ success: false, error: 'Speed must be a whole number from 1 to 20 Mbps.' });

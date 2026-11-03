@@ -1,4 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* The Inter font comes with the panel itself (package @fontsource/inter), not from Google:
+   visitors' addresses are not sent to anyone else, and the panel needs no outside service.
+   Latin letters only (English and Swahili). */
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-500.css';
+@import '@fontsource/inter/latin-600.css';
+@import '@fontsource/inter/latin-700.css';
+@import '@fontsource/inter/latin-800.css';
 
 :root {
   --primary: #1a56db;

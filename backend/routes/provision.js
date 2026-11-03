@@ -15,6 +15,7 @@ router.use(provisionFailureLimiter);
 // The router will call these URLs
 router.get('/bootstrap/:token', getBootstrapScript);
 router.get('/login/:token', getLoginPage);
-router.get('/register/:token', registerRouterKey);
+// POST with the key in the body (the setup script sends it so, never in the address)
+router.post('/register/:token', registerRouterKey);
 
 module.exports = router;

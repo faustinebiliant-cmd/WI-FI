@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const authTenant = require('../middleware/authTenant');
-const { tenantLoginLimiter, tenantGlobalLimiter } = require('../middleware/rateLimiter');
+const { tenantLoginLimiter, tenantAccountLoginLimiter, tenantGlobalLimiter } = require('../middleware/rateLimiter');
 
-const { login, changePassword, endImpersonationSelf, exchangeImpersonationCode } = require('../controllers/authTenantController');
+const { login, changePassword, endImpersonationSelf, exchangeImpersonationCode, logoutAllDevices } = require('../controllers/authTenantController');
 const { listPackages, createPackage, deletePackage } = require('../controllers/tenantPackageController');
 const { listRouters, createRouter, newSetupToken, deleteRouter } = require('../controllers/tenantRouterController');
 const { generateVouchers, listVouchers, revokeVoucher } = require('../controllers/tenantVoucherController');
@@ -11,7 +11,7 @@ const { getActiveSessions, disconnectSession } = require('../controllers/tenantS
 const { getDashboardStats } = require('../controllers/tenantDashboardController');
 const { updateProfile, getProfile } = require('../controllers/tenantProfileController');
 
-router.post('/auth/login', tenantLoginLimiter, login);
+router.post('/auth/login', tenantLoginLimiter, tenantAccountLoginLimiter, login);
 // Before authTenant: the code itself is the proof (one use, 60 seconds)
 router.post('/auth/impersonation/exchange', tenantLoginLimiter, exchangeImpersonationCode);
 
@@ -23,6 +23,7 @@ router.get('/profile', getProfile);
 router.put('/profile', updateProfile);
 router.post('/auth/end-impersonation', endImpersonationSelf);
 router.post('/auth/change-password', changePassword);
+router.post('/auth/logout-all', logoutAllDevices);
 
 router.get('/packages', listPackages);
 router.post('/packages', createPackage);

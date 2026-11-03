@@ -29,8 +29,8 @@ apiClient.interceptors.response.use(
     if (!isLoginAttempt && (error.response?.status === 401 || mustLogInAgain)) {
       localStorage.removeItem('tenantToken');
       localStorage.removeItem('tenantUser');
-      // The password was changed on another device: the login page says why
-      if (code === 'PASSWORD_CHANGED') {
+      // The password was changed, or "Log out of all devices" was used: the login page says why
+      if (code === 'PASSWORD_CHANGED' || code === 'LOGGED_OUT') {
         try { sessionStorage.setItem('loginNotice', error.response.data.error); } catch (e) { /* storage blocked */ }
       }
       window.location.href = import.meta.env.VITE_TENANT_BASE + '/login';

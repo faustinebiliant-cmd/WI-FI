@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Navigate } from 'react-router-dom';
 import PasswordInput from '../shared/components/PasswordInput';
+import { MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH } from '../shared/inputRules';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -46,6 +47,7 @@ export default function LoginPage() {
               className="form-control"
               type="email"
               autoComplete="email"
+              maxLength={MAX_EMAIL_LENGTH}
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
@@ -56,6 +58,7 @@ export default function LoginPage() {
             <label>Password</label>
             <PasswordInput
               autoComplete="current-password"
+              maxLength={MAX_PASSWORD_LENGTH}
               value={password}
               onChange={e => setPassword(e.target.value)}
               required

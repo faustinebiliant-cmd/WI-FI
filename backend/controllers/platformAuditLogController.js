@@ -4,7 +4,7 @@ const { formatDateTimeEAT } = require('../utils/tz');
 const listAuditLogs = async (req, res) => {
   try {
     // Page size 1 to 200, so one request can never ask for the whole log
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const page = Math.min(Math.max(parseInt(req.query.page, 10) || 1, 1), 10000);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
     const offset = (page - 1) * limit;
 

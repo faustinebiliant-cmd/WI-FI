@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import { Link } from 'react-router-dom';
 import Loader from '../shared/components/Loader';
+import CopyButton from '../shared/components/CopyButton';
+import { onlyNameChars, onlyPhoneChars, MAX_EMAIL_LENGTH } from '../shared/inputRules';
 
 export default function DashboardPage() {
   const [tenants, setTenants] = useState([]);
@@ -100,7 +102,10 @@ export default function DashboardPage() {
                 <div className="alert alert-success">
                   Temporary password for the owner. It is shown <strong>only once</strong>: give it to the owner now.
                   The owner chooses a new password at the first login.
-                  <code className="secret">{created.temp_password}</code>
+                  <span className="code-with-copy">
+                    <code className="secret">{created.temp_password}</code>
+                    <CopyButton text={created.temp_password} toastMessage="Temporary password copied" />
+                  </span>
                 </div>
                 <div className="modal-actions">
                   <button type="button" onClick={closeModal} className="btn btn-primary">Done</button>
@@ -112,19 +117,19 @@ export default function DashboardPage() {
               {submitError && <div className="alert alert-danger">{submitError}</div>}
               <div className="form-group">
                 <label>Business Name</label>
-                <input className="form-control" required type="text" name="business_name" value={formData.business_name} onChange={e => setFormData({...formData, business_name: e.target.value})} />
+                <input className="form-control" required type="text" name="business_name" maxLength={60} value={formData.business_name} onChange={e => setFormData({...formData, business_name: onlyNameChars(e.target.value)})} />
               </div>
               <div className="form-group">
                 <label>Owner Name</label>
-                <input className="form-control" required type="text" name="owner_name" value={formData.owner_name} onChange={e => setFormData({...formData, owner_name: e.target.value})} />
+                <input className="form-control" required type="text" name="owner_name" maxLength={60} value={formData.owner_name} onChange={e => setFormData({...formData, owner_name: onlyNameChars(e.target.value)})} />
               </div>
               <div className="form-group">
                 <label>Owner Email</label>
-                <input className="form-control" required type="email" name="owner_email" value={formData.owner_email} onChange={e => setFormData({...formData, owner_email: e.target.value})} />
+                <input className="form-control" required type="email" name="owner_email" maxLength={MAX_EMAIL_LENGTH} value={formData.owner_email} onChange={e => setFormData({...formData, owner_email: e.target.value})} />
               </div>
               <div className="form-group">
                 <label>Owner Phone</label>
-                <input className="form-control" required type="text" name="owner_phone" value={formData.owner_phone} onChange={e => setFormData({...formData, owner_phone: e.target.value})} />
+                <input className="form-control" required type="tel" inputMode="tel" name="owner_phone" maxLength={13} value={formData.owner_phone} onChange={e => setFormData({...formData, owner_phone: onlyPhoneChars(e.target.value)})} />
               </div>
               <div className="modal-actions">
                 <button type="button" onClick={closeModal} className="btn btn-secondary" disabled={isCreating}>Cancel</button>

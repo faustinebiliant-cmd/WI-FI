@@ -403,6 +403,7 @@ From `pm2 logs wifi-backend` (4c). Times in the log are UTC (Tanzania = UTC + 3)
 | `[Cleaner] Router … did not answer 3 times in a row` | Router counted as offline; its open sessions closed | Green |
 | `[Pinger] Router … check failed` | The 5-minute status check could not reach one router | Green |
 | `Router connection error (server kept running)` | A router sent a strange reply; that one connection was dropped | Green now and then. Yellow if many per day |
+| `[MikroTik] A router sent more than 2 MB in one connection: connection cut (a real router never does this). Router: 10.20.X.Y` | A router tried to flood the server; someone has probably tampered with it. The server cut it off and kept running. The address at the end names the router (admin panel → Routers) | **Red**: tell Claude the same day with the time (see SECURITY-STATUS.md section 7) |
 | `Revoke voucher: router could not be used` / `Disconnect: router could not be used` / `Delete package: router could not be used` | The button was pressed while the router was off; the panel said "NOT …, try again" | Green |
 | `Router adapter error` | The system could not prepare a router connection | Yellow (red if every router shows it) |
 | `Decryption failed` | A saved router password could not be unlocked | **Red**: usually means the secret key in `.env` was changed. Do not change `.env` |
