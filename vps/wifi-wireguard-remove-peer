@@ -66,12 +66,15 @@ if ! running_has_peer && ! config_has_peer; then
     exit 0
 fi
 
-TMP_CONFIG="$(mktemp /etc/wireguard/wg0.conf.XXXXXX)"
-TMP_STRIPPED="$(mktemp /etc/wireguard/wg0.stripped.XXXXXX)"
+# The working copy lives in a private folder and is named exactly wg0.conf:
+# "wg-quick strip" refuses any file whose name is not <interface>.conf
+TMP_DIR="$(mktemp -d /etc/wireguard/tmp.XXXXXX)"
+TMP_CONFIG="$TMP_DIR/$WG_INTERFACE.conf"
+TMP_STRIPPED="$TMP_DIR/stripped"
 BACKUP_CONFIG="/etc/wireguard/wg0.conf.before-remove.$(date +%Y%m%d%H%M%S)"
 
 cleanup() {
-    rm -f "$TMP_CONFIG" "$TMP_STRIPPED"
+    rm -rf "$TMP_DIR"
 }
 
 trap cleanup EXIT
