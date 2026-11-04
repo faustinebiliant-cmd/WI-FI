@@ -385,6 +385,7 @@ describes.
 | Your localhost vs VPS notes | `LOCALHOST-VS-VPS.md` |
 | What protects the system, what is still open | `SECURITY-STATUS.md` |
 | How the VPS sets up and controls the routers | `HOW-VPS-CONTROLS-ROUTERS.md` |
+| Everything on the VPS: each part, every secret, what to renew and when | `VPS-HANDBOOK.md` |
 
 ---
 

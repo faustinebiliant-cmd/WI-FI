@@ -210,6 +210,9 @@ ${speedProfiles}
 /interface bridge filter add chain=input in-interface-list=ap-ports mac-protocol=ip ip-protocol=tcp dst-port=8291 action=drop comment="Oswagolink: no Winbox from access points"
 /interface bridge filter add chain=input in-interface-list=ap-ports mac-protocol=ip ip-protocol=udp dst-port=20561 action=drop comment="Oswagolink: no Winbox by MAC from access points"
 /interface bridge filter add chain=input in-interface-list=ap-ports mac-protocol=ip ip-protocol=udp dst-port=5678 action=drop comment="Oswagolink: customers cannot see the router in Neighbors"
+# The router also announces itself (Neighbors) every 30 seconds on its own: not towards access points
+/interface bridge filter add chain=output out-interface-list=ap-ports mac-protocol=ip ip-protocol=udp dst-port=5678 action=drop comment="Oswagolink: router does not announce itself to access points"
+/interface bridge filter add chain=output out-interface-list=ap-ports mac-protocol=ipv6 ip-protocol=udp dst-port=5678 action=drop comment="Oswagolink: router does not announce itself to access points (IPv6)"
 /system script add name=ap-port-check policy=read,write,policy,test source={
     :local apPorts [:toarray ""]
     :if ([:len [/interface list find name="ap-check-paused"]] = 0) do={

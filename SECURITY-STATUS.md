@@ -4,7 +4,7 @@ What protects your system today, what was fixed, and what is still open.
 Plain English, no secrets. Keep it next to `OWNER-CHECKUP-GUIDE.md` (the
 weekly checks that keep these protections working).
 
-Last updated: 2 November 2026
+Last updated: 4 November 2026
 
 ---
 
@@ -110,9 +110,9 @@ Also fixed earlier the same day:
 
 | # | What | Why it matters | Status |
 |---|---|---|---|
-| 7 | **Routers: customers could reach the Winbox admin login** | Paying customers on the WiFi could see the router and try to guess its admin password | **Built into the setup script, waiting for the test on a reset router**: Winbox and the Neighbors list are blocked on access-point ports (found automatically every minute); any other LAN port stays open for staff; up to 8 access points (192.168.88.2 to .9); emergency key `scripts/routerStaffDoor.js` on the VPS. A reset router has no old `test`/`1234` user |
+| 7 | **Routers: customers could reach the Winbox admin login** | Paying customers on the WiFi could see the router and try to guess its admin password | **Done and tested 4 November 2026** on a reset router: a phone on the access-point WiFi could not log in with the MikroTik app (9 Winbox tries and 9 discovery tries blocked, counters above 0), while the cable port still works for staff. The phone could still see the router's name in its "Discovered" list, so a 4th and 5th rule (same day) stop the router announcing itself towards access points. Winbox and the Neighbors list are blocked on access-point ports (found automatically every minute); any other LAN port stays open for staff; up to 8 access points (192.168.88.2 to .9); emergency key `scripts/routerStaffDoor.js` on the VPS. A reset router has no old `test`/`1234` user |
 | 8 | **Backend runs as its own low-rights user** (today it runs as `biliant`) | If the backend were ever broken into, the intruder would not get your account | Plan for a calm day |
-| 9 | **VPS tidy-up**: old `.env` copies (contain secrets), Nginx default site, old script copies | Fewer old files with secrets lying around | From about 4 November |
+| 9 | **VPS tidy-up** | Fewer old files with secrets lying around | **Done 4 November 2026**: old `.env` copies, old Nginx copies and default site, old login page, old tunnel copies (with the private key) and old helpers removed. Still to do: delete the device pass `.p12` copies from the VPS home folder once both devices work |
 | Later | **SSH keys only** (switch off password login) | Removes password guessing completely | When you are ready: one line in `00-oswagolink.conf` |
 
 ---

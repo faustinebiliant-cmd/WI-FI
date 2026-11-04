@@ -108,7 +108,7 @@ them a fake setup script.
 | 20 speed profiles (1 to 20 Mbps) | The package speeds |
 | Script `wg-boot` (at start-up) | Waits for the internet, then opens the tunnel |
 | Script `wg-watchdog` (every 2 minutes) | Restarts the tunnel if the VPS stops answering |
-| Script `ap-port-check` (every minute) + list `ap-ports` + 3 blocking rules | **Staff door**: Winbox and the Neighbors list are blocked on ports with an access point; every other LAN port stays open for staff |
+| Script `ap-port-check` (every minute) + list `ap-ports` + 5 blocking rules | **Staff door**: Winbox and the Neighbors list are blocked on ports with an access point; every other LAN port stays open for staff |
 
 ---
 

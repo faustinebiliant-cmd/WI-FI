@@ -50,6 +50,7 @@ export default function SetupGuidePage() {
           <li><a href="#method-a">Method A (normal)</a></li>
           <li><a href="#method-b">Method B (one laptop port)</a></li>
           <li><a href="#setup-problems">If the setup goes wrong</a></li>
+          <li><a href="#reused-router">Reusing a router</a></li>
           <li><a href="#access-points">Access points</a></li>
           <li><a href="#more-access-points">More than one access point</a></li>
           <li><a href="#staff-door">Staff door: Winbox after setup</a></li>
@@ -132,6 +133,11 @@ export default function SetupGuidePage() {
         <h3 className="guide-step">5. Close the door (never skip this)</h3>
         <Code>/tool mac-server mac-winbox set allowed-interface-list=LAN</Code>
         <p className="guide-text">Winbox disconnects at once. That is normal: the work is finished.</p>
+        <Note tone="amber">
+          Testing at home, where port 1 is plugged only into your own laptop: you may leave the door open while you keep testing.
+          But run this line <strong>before the router goes to any business</strong>. There, port 1 faces the business's modem, and an
+          open door would let others try the router's password.
+        </Note>
 
         <h3 className="guide-step">6. Install at the business</h3>
         <p className="guide-text">
@@ -151,10 +157,30 @@ export default function SetupGuidePage() {
           <li><strong>ROUTEROS TOO OLD</strong>: the router's software is too old for the secure setup. Update it (System &gt; Packages &gt; Check For Updates, then Download &amp; Install; the router restarts), then paste step 1 again.</li>
           <li><strong>SOME FEATURES ARE OFF</strong> (normal once on a new router): step 1 has already asked the router to switch them on. Unplug the router's power, plug it back in, log in again and paste step 1 again. If it then says <strong>THE POWER WAS NOT UNPLUGGED IN TIME</strong>, paste step 1 again and unplug within 5 minutes.</li>
           <li><strong>A download fails</strong> (step 1 or step 2): check in this order: the router can reach the internet and names (<Cmd>/ping 8.8.8.8 count=3</Cmd> and <Cmd>/ping oswagolink.co.tz count=3</Cmd>); the login page goes to <strong>flash/hotspot/login.html</strong> (not hotspot/…); and <Cmd>{'/file print where name~"flash/hotspot"'}</Cmd> shows a folder, not an empty file (step 2 part 1 removes such a file by itself).</li>
-          <li><strong>ALREADY PROVISIONED</strong>: this router was set up before. Reset it to factory settings (<Cmd>/system reset-configuration</Cmd>, then confirm with y) and start again. Never repair a half-finished setup by hand.</li>
+          <li><strong>ALREADY PROVISIONED</strong>: this router was set up before. Reset it to factory settings (<Cmd>/system reset-configuration</Cmd>, then confirm with y) and start again (see "Reusing a router"). Never repair a half-finished setup by hand.</li>
           <li><strong>The setup link has expired</strong>: press <strong>Setup Commands</strong> on the Business Panel's Routers page to get new commands.</li>
           <li><strong>Router stays OFFLINE</strong> after 5 minutes: on the router run <Cmd>{'/log print where message~"wg-"'}</Cmd> and send the result to support.</li>
         </ul>
+      </Section>
+
+      <Section id="reused-router" title="Reusing a router (it was set up before)">
+        <p className="guide-text">
+          A router that was used before, for testing or for another business, must be reset and set up fresh for the new business.
+        </p>
+        <ol className="guide-list">
+          <li>Reset it to factory settings: <Cmd>/system reset-configuration</Cmd>, then confirm with y. Keep the default configuration:
+            on the first login press <strong>OK</strong>, never "Remove Configuration".</li>
+          <li>On the new business's Business Panel, use <strong>Add Router</strong> (or <strong>Setup Commands</strong> for an entry
+            that is not set up yet), then follow Method A or B.</li>
+          <li><strong>A reset keeps the router's files.</strong> After the setup, remove what is left from before. The backup made by the
+            reset holds the old passwords and keys:
+            <Code>{'/file remove [find where name~"auto-before-reset"]\n/file print'}</Code>
+            Remove any other old file too (for example an old <strong>.rsc</strong> file):
+            <Cmd>/file remove flash/FILE-NAME</Cmd>. Keep <strong>flash</strong>, <strong>flash/hotspot</strong> (the customer login
+            pages) and <strong>flash/skins</strong>.</li>
+          <li>Delete the router's <strong>old entry</strong> on the old business's panel, if it still exists (its tunnel is removed
+            automatically).</li>
+        </ol>
       </Section>
 
       <Section id="access-points" title="Access points (TP-Link EAP225)">
