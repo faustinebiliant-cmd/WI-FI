@@ -4,6 +4,7 @@ const db = require('../config/db');
 const { encrypt, decrypt } = require('../utils/encryption');
 
 const { isValidRouterToken } = require('../utils/validators');
+const { removeWireGuardPeer } = require('../services/wireguard');
 const PUBKEY_RE = /^[A-Za-z0-9+/]{43}=$/;
 // Tunnel network 10.20.0.0/16 (about 65,000 addresses).
 // 10.20.0.1 is the VPS and 10.20.0.2 the owner's own router; client routers
@@ -130,7 +131,9 @@ const getBootstrapScript = async (req, res) => {
 # Access points use the fixed addresses 192.168.88.2 to .9 (up to 8): their own traffic skips the customer login
 :for i from=2 to=9 do={ /ip hotspot ip-binding add address=("192.168.88." . $i) type=bypassed comment="Access point" }
 /ip hotspot walled-garden add dst-host=oswagolink.co.tz
-/ip hotspot walled-garden ip add dst-address=69.62.105.119 action=accept
+# Before paying, customers reach the VPS only on the web ports (the portal), never SSH or the tunnel port
+/ip hotspot walled-garden ip add dst-address=69.62.105.119 protocol=tcp dst-port=443 action=accept comment="Oswagolink portal (HTTPS)"
+/ip hotspot walled-garden ip add dst-address=69.62.105.119 protocol=tcp dst-port=80 action=accept comment="Oswagolink portal (HTTP)"
 /ip hotspot user profile set default rate-limit=1M/1M
 /ip firewall nat add action=masquerade chain=srcnat comment="masquerade hotspot network" src-address=192.168.88.0/24 out-interface-list=WAN
 
@@ -314,18 +317,40 @@ const registerRouterKey = async (req, res) => {
     if (!router.token_valid) return res.status(410).send('Setup link expired');
     if (!isClientTunnelIp(router.tunnel_ip)) return res.status(400).send('No tunnel address yet');
 
-    // No shell is used, so nothing sent by the router can run as a command
+    // Mark the link as used BEFORE adding the tunnel: two registrations arriving at the same
+    // moment can never both add one. public_key is needed later to remove the tunnel.
+    const claim = await db.query(
+      `UPDATE routers SET provisioned_at = NOW(), public_key = $2
+       WHERE id = $1 AND provisioned_at IS NULL RETURNING id`,
+      [router.id, pubkey]
+    );
+    if (claim.rowCount === 0) return res.status(410).send('Token already used');
+
+    // No shell is used, so nothing sent by the router can run as a command.
+    // At most 30 seconds: a stuck helper gets "failed", and the router tries again.
     execFile(
       'flock',
       ['-w', '10', '/var/lock/wg-enroll.lock', 'sudo', '-n', '/usr/local/sbin/wifi-wireguard-add-peer', pubkey, router.tunnel_ip + '/32'],
-      (error, stdout, stderr) => {
+      { timeout: 30000 },
+      async (error, stdout, stderr) => {
         if (error) {
-          console.error('Enrollment error:', stderr || error.message);
+          console.error('Enrollment error:', (stderr && stderr.trim()) || error.message);
+          // The link works again for the router's next try. public_key stays, so deleting
+          // the router still removes the tunnel if the helper added it after all.
+          await db.query('UPDATE routers SET provisioned_at = NULL WHERE id = $1', [router.id])
+            .catch((e) => console.error('provisioned_at reset failed:', e.message));
           return res.status(500).send('Failed to add peer');
         }
-        // public_key is needed later to remove this peer when the router is deleted
-        db.query('UPDATE routers SET provisioned_at = NOW(), public_key = $2 WHERE id = $1', [router.id, pubkey])
-          .catch((e) => console.error('provisioned_at update failed:', e.message));
+        // Router deleted in the panel during these few seconds: do not leave its tunnel behind
+        try {
+          const still = await db.query('SELECT 1 FROM routers WHERE id = $1', [router.id]);
+          if (still.rowCount === 0) {
+            await removeWireGuardPeer(pubkey);
+            return res.status(410).send('Router was deleted');
+          }
+        } catch (e) {
+          console.error('Register check failed:', e.message);
+        }
         res.type('text/plain').send('OK');
       }
     );

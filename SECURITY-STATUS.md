@@ -81,6 +81,17 @@ Also fixed earlier the same day:
 - **The server no longer stops** when a router sends a strange reply (it logs it and keeps running).
 - **Broken requests** get a clean "bad request" answer instead of looking like server errors.
 
+Fixed on 4 November 2026 (the optional items, plus the router staff door):
+
+| What was wrong | What could have happened | What was done |
+|---|---|---|
+| **Customers on the Wi-Fi could find the router**: its name showed in the MikroTik app's "Discovered" list, and they could try to log in | A paying customer could guess the router's admin password and take over the business's Wi-Fi | Winbox, Winbox-by-MAC and the Neighbors list are blocked on access-point ports, and the router no longer announces itself there (5 rules). Phone-tested: the app found nothing and could not log in; the cable port still works for staff |
+| **Before paying, customers could reach every port of the VPS** (SSH 22, tunnel 51820), because the portal's address was fully open | A customer could guess the SSH password from inside the Wi-Fi, and fail2ban would then ban the whole business's internet address | Before paying, customers reach the VPS **only on ports 80 and 443** (the portal). New routers get this from the setup; existing routers need 3 commands once |
+| **Router answers about online customers were saved without checking** | A tampered router could send rubbish (very long text, fake addresses) every minute: errors in the logs, a broken minute-check for that router | Only real MAC and IP addresses are used; anything else is skipped quietly (15 tests passed) |
+| **Router registration had no time limit, and two registrations at the same moment could both add a tunnel** | A stuck helper could hang the request forever; one setup link could create two tunnels | At most 30 seconds, then "failed" and the router tries again. The setup link is marked used **before** the tunnel is added, so a second registration is refused. If the router is deleted during setup, its new tunnel is removed again |
+| **Every router deletion left a copy of the tunnel settings, including the VPS private key** | Copies of the most important tunnel secret piling up on the VPS | The copy now exists only while the removal runs: deleted on success, kept only if the removal fails (for recovery) |
+| **Device pass files stayed in the VPS home folder** | Someone who got into the VPS account could copy an admin device pass | Deleted. How to add, remove or renew a device: admin panel → Setup Guide → "Admin panel device passes" |
+
 ---
 
 ## 3. Protections that were already in place (checked and confirmed)
@@ -112,8 +123,9 @@ Also fixed earlier the same day:
 |---|---|---|---|
 | 7 | **Routers: customers could reach the Winbox admin login** | Paying customers on the WiFi could see the router and try to guess its admin password | **Done and tested 4 November 2026** on a reset router: a phone on the access-point WiFi could not log in with the MikroTik app (9 Winbox tries and 9 discovery tries blocked, counters above 0), while the cable port still works for staff. The phone could still see the router's name in its "Discovered" list, so a 4th and 5th rule (same day) stop the router announcing itself towards access points. Winbox and the Neighbors list are blocked on access-point ports (found automatically every minute); any other LAN port stays open for staff; up to 8 access points (192.168.88.2 to .9); emergency key `scripts/routerStaffDoor.js` on the VPS. A reset router has no old `test`/`1234` user |
 | 8 | **Backend runs as its own low-rights user** (today it runs as `biliant`) | If the backend were ever broken into, the intruder would not get your account | Plan for a calm day |
-| 9 | **VPS tidy-up** | Fewer old files with secrets lying around | **Done 4 November 2026**: old `.env` copies, old Nginx copies and default site, old login page, old tunnel copies (with the private key) and old helpers removed. Still to do: delete the device pass `.p12` copies from the VPS home folder once both devices work |
-| Later | **SSH keys only** (switch off password login) | Removes password guessing completely | When you are ready: one line in `00-oswagolink.conf` |
+| 9 | **VPS tidy-up** | Fewer old files with secrets lying around | **Done 4 November 2026**: old `.env` copies, old Nginx copies and default site, old login page, old tunnel copies (with the private key) and old helpers removed. The device pass `.p12` copies were deleted the same day. Since then, router deletions leave no tunnel copies behind |
+| Later | **SSH keys only** (switch off password login) | Removes password guessing completely | When you are ready: one line in `00-oswagolink.conf`. After it, only your PC can log in; the emergency way in is Hostinger's VNC console |
+| Later | **Portal on its own address** (for example `wifi.oswagolink.co.tz`) | The portal and the business login would no longer share one website address | Bigger change, no rush |
 
 ---
 

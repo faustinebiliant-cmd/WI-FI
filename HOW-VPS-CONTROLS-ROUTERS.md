@@ -50,7 +50,7 @@ always **10.20.0.1**. One router can never walk into another router's corridor.
 | Helper | Where | What it does |
 |---|---|---|
 | `wifi-wireguard-add-peer` | `/usr/local/sbin/` (copy in `vps/`) | Adds one new router to the tunnel list. Checks the key and address are correctly shaped, refuses duplicates, saves only after WireGuard accepted it |
-| `wifi-wireguard-remove-peer` | `/usr/local/sbin/` (copy in `vps/`) | Removes one router from the tunnel list (makes a backup copy first). Removing one that is already gone is fine |
+| `wifi-wireguard-remove-peer` | `/usr/local/sbin/` (copy in `vps/`) | Removes one router from the tunnel list. Keeps a safety copy only while it works: deleted on success, kept on failure for recovery. Removing one that is already gone is fine |
 
 The backend is allowed to run **only these two** with `sudo` and no password, nothing else.
 They never run typed text as a command. A lock makes sure two changes never happen at once.
@@ -104,6 +104,7 @@ them a fake setup script.
 | Router services | API only from the VPS; web admin, SSH, Telnet, FTP switched **off** |
 | Firewall rules | API only through the tunnel; customers can never use the tunnel |
 | Hotspot (the customer login) on ports 2 to 5 | Every customer must log in with a voucher; `flash/hotspot/login.html` sends them to your portal |
+| Walled garden (before paying) | Customers may open only the portal: the VPS on ports 80 and 443. Never SSH or the tunnel port |
 | Access points `192.168.88.2` to `.9` | Their own traffic skips the customer login |
 | 20 speed profiles (1 to 20 Mbps) | The package speeds |
 | Script `wg-boot` (at start-up) | Waits for the internet, then opens the tunnel |
@@ -119,7 +120,9 @@ them a fake setup script.
 2. **Step 1** pasted on the router: the router sets its clock, downloads its setup script over
    HTTPS, gets its tunnel address (10.20.0.X), builds everything in section 3.
 3. **Registration** (end of step 1): the router sends its **public** tunnel key. The VPS adds
-   it with the add-helper and saves the key. The setup code is used up. **SETUP COMPLETE**.
+   it with the add-helper (at most 30 seconds) and saves the key. The setup code is marked used
+   first, so it can never add two tunnels; if the helper fails, the code works again for the
+   router's next try (it tries 6 times). **SETUP COMPLETE**.
 4. **Step 2**: the router downloads its customer login page.
 5. **Within about 5 minutes**: the tunnel is up, the VPS reaches the router, it shows **ONLINE**.
 6. **Every day**: the VPS creates voucher users, removes ended ones, checks who is online.

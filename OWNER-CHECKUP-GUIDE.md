@@ -353,7 +353,7 @@ describes.
 | Every 3 months | Practice restore (6a), certificate check (6b) | See section 6 |
 | **Domain `oswagolink.co.tz`** | Expiry date: **write it here: ____________** | Check with your domain seller; renew before it expires or the whole system goes offline |
 | 19 Oct 2028 | Hostinger VPS plan paid until here (auto-renew is on) | Make sure the payment card is still valid |
-| **Before 31 Oct 2028** | Admin device passes (laptop + phone) expire | Ask Claude to renew them, otherwise the admin panel locks you out |
+| **Before 31 Oct 2028** | Admin device passes (laptop + phone) expire | Renew them (admin panel → Setup Guide → "Admin panel device passes"), otherwise the admin panel locks you out |
 
 ---
 
@@ -410,7 +410,7 @@ From `pm2 logs wifi-backend` (4c). Times in the log are UTC (Tanzania = UTC + 3)
 | `Router adapter error` | The system could not prepare a router connection | Yellow (red if every router shows it) |
 | `Decryption failed` | A saved router password could not be unlocked | **Red**: usually means the secret key in `.env` was changed. Do not change `.env` |
 | `Failed to remove WireGuard peer` | A deleted router's VPN tunnel could not be removed; nothing was deleted | Yellow: try again in a minute; red if it keeps failing |
-| `provisioned_at update failed` / `Enrollment error` / `Bootstrap error` | A router setup step failed | Yellow during a router setup; tell Claude if a setup does not finish |
+| `Enrollment error` / `provisioned_at reset failed` / `Register check failed` / `Bootstrap error` | A router setup step failed (an `Enrollment error` that says `killed` = the tunnel helper took more than 30 seconds; the router tries again by itself) | Yellow during a router setup; tell Claude if a setup does not finish |
 
 ### Background work
 | Message starts with | Meaning | Level |

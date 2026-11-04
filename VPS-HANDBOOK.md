@@ -222,9 +222,9 @@ Full explanation: `HOW-VPS-CONTROLS-ROUTERS.md`.
 | Helpers that add / remove routers | `/usr/local/sbin/wifi-wireguard-add-peer`, `wifi-wireguard-remove-peer` (copies in `vps/`); the backend may run only these two with `sudo` |
 | Emergency key for a router's staff door | `~/WI-FI/backend/scripts/routerStaffDoor.js` |
 
-**Never edit `wg0.conf` by hand.** Each router deletion leaves a backup copy
-`wg0.conf.before-remove.<date>` (holds the private key, root only): delete old ones now and then
-(`sudo ls /etc/wireguard/`).
+**Never edit `wg0.conf` by hand.** Since 4 November 2026 a router deletion leaves **no** copy of
+`wg0.conf` behind (the safety copy is deleted once the removal works). A file
+`wg0.conf.before-remove.<date>` (holds the private key, root only) now means a removal **failed**: tell Claude.
 
 ---
 
@@ -241,7 +241,7 @@ Full explanation: `HOW-VPS-CONTROLS-ROUTERS.md`.
 | VPS tunnel private key | `/etc/wireguard/server_private.key` and inside `wg0.conf` | root only | Someone could pretend to be the VPS to routers | Every router would need new settings: only if it really leaked |
 | HTTPS certificate keys | `/etc/letsencrypt/` | root only | Someone could pretend to be your website | `certbot` can replace them (ask Claude) |
 | Device pass office key | `/etc/nginx/admin-devices/ca.key` | root only | Someone could make their own admin device passes | Rebuild the pass office and give new passes to your devices (ask Claude) |
-| Device passes | installed on your laptop and phone (`.p12` files); delete the `.p12` copies from the VPS home folder once installed | you | That device's access to the admin panel | `sudo wifi-admin-device remove NAME`, then `add NAME` for a new one |
+| Device passes | installed on your laptop and phone (`.p12` files); delete the `.p12` copies from the VPS home folder once installed | you | That device's access to the admin panel | `sudo wifi-admin-device remove NAME` (admin panel → Setup Guide → "Admin panel device passes") |
 | Database backups | `/var/backups/wifi-db/` | root only | The whole database | Not changeable: protect them |
 | Router API passwords | in the database, **encrypted** | the backend | Little alone (they only work through the tunnel) | Made per router at setup |
 | Router setup codes | in the database, 30 minutes, single use | the backend | A router slot could be hijacked within those 30 minutes | They expire by themselves |
@@ -274,13 +274,13 @@ whether a setting is **set**, or how **long** it is, never its value.
 | Daily (1 min) | Backend running, routers online | Guide section 3 |
 | Weekly (5 min) | Backups, memory, disk, errors, the other logs, fail2ban and SSH rules | Guide section 4 |
 | Monthly (15 min) | Speed report, **Ubuntu updates** (`sudo apt update && sudo apt upgrade`, reboot at a quiet time if asked), **copy a backup to your PC**, business subscriptions | Guide section 5 |
-| Monthly | Delete old `wg0.conf.before-remove.*` copies, if routers were deleted | Section 8 |
+| Monthly | `sudo ls /etc/wireguard/`: a `wg0.conf.before-remove.*` file means a router removal failed (tell Claude) | Section 8 |
 | Every 3 months | **Practice restore**, certificate check | Guide section 6 |
 | Every year (suggested) | Change your `biliant` password and the admin panel password | `passwd`; admin password with Claude |
 | When MikroTik offers a new **long-term** RouterOS | Update routers one at a time (not the "testing" versions) | Winbox: System > Packages |
 | On a calm day (planned) | Vite upgrade in the 3 apps (clears the "5 vulnerabilities" note) | With Claude, never `npm audit fix --force` |
 | When you are ready | SSH keys only (password login off) | Section 2 |
-| Before **31 October 2028** | **Renew the admin device passes** (they last 2 years), or the admin panel locks you out | `sudo wifi-admin-device add NAME` for each device (ask Claude) |
+| Before **31 October 2028** | **Renew the admin device passes** (they last 2 years), or the admin panel locks you out | Add a new pass with a new name, install it, check it, then remove the old one: admin panel → Setup Guide → "Admin panel device passes" |
 | Before **19 October 2028** | Hostinger renewal (auto-renew on: keep the payment card valid) | hPanel |
 | Before your **domain expiry date** (write it in the guide, section 10) | Renew `oswagolink.co.tz`, or everything goes offline | Your domain seller |
 | Around **2036** | The device pass office itself expires (10 years) | Ask Claude well before |

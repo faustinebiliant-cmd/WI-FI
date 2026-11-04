@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const env = require('../config/env');
 const { getRouter } = require('./routers/routerFactory');
+const { isValidMACAddress, isValidIPAddress } = require('../utils/validators');
 
 let running = false;  // router round (every minute)
 let expiring = false; // voucher expiry (every 15 seconds)
@@ -106,6 +107,15 @@ const syncRouterSessions = async (router) => {
     activeOnRouter = null;
   }
   if (activeOnRouter !== null) {
+    // A tampered router could send anything: keep only real device addresses, so rubbish
+    // never reaches the database or the logs. An IP that is not a real address is dropped.
+    activeOnRouter = (Array.isArray(activeOnRouter) ? activeOnRouter : [])
+      .map((u) => ({
+        mac: typeof u?.mac === 'string' ? u.mac.trim().toUpperCase().replace(/-/g, ':') : '',
+        ip: typeof u?.ip === 'string' && isValidIPAddress(u.ip.trim()) ? u.ip.trim() : null,
+        voucherCode: typeof u?.voucherCode === 'string' && u.voucherCode.length <= 32 ? u.voucherCode : ''
+      }))
+      .filter((u) => isValidMACAddress(u.mac));
     // The router answered: the 5-minute pinger does not need to ask it again
     await db.query("UPDATE routers SET status = 'online', last_seen_at = NOW() WHERE id = $1", [router.id]);
   }

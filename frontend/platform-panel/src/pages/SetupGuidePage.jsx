@@ -55,6 +55,7 @@ export default function SetupGuidePage() {
           <li><a href="#more-access-points">More than one access point</a></li>
           <li><a href="#staff-door">Staff door: Winbox after setup</a></li>
           <li><a href="#emergency-key">Emergency key</a></li>
+          <li><a href="#device-passes">Admin panel device passes</a></li>
         </ul>
       </div>
 
@@ -259,6 +260,72 @@ export default function SetupGuidePage() {
           Safe to use: it changes only that one router's Winbox door. Wi-Fi, vouchers and customers keep working the whole time, and no other
           router is touched. A wrong or unknown address, an address shared by two routers, a typo, or a router that is offline: it says so
           and changes nothing.
+        </Note>
+      </Section>
+
+      <Section id="device-passes" title="Admin panel device passes: add, remove or renew a device">
+        <p className="guide-text">
+          The admin panel only opens on devices that hold a <strong>device pass</strong> (a key installed in the device). Any other
+          device gets <strong>403 Forbidden</strong>, even with the right password. Each pass has a name (today: <strong>laptop</strong> and
+          <strong> phone</strong>) and works for 2 years. Only the owner does this. All commands run on the VPS.
+        </p>
+
+        <h3 className="guide-step">See which devices are allowed</h3>
+        <Code>sudo wifi-admin-device list</Code>
+        <p className="guide-text">Shows each device name and the date its pass stops working.</p>
+
+        <h3 className="guide-step">Add a device (new phone, new laptop)</h3>
+        <ol className="guide-list">
+          <li>Choose a name: small letters, numbers and - only, for example <Cmd>phone2</Cmd> or <Cmd>office-laptop</Cmd>. Then on the VPS:
+            <Code>sudo wifi-admin-device add phone2</Code>
+            It shows the <strong>file</strong> (admin-pass-phone2.p12 in your VPS home folder) and a <strong>password</strong>.
+            Write the password down now: it is shown only once.
+          </li>
+          <li>Copy the file to your PC. In PowerShell <strong>on your PC</strong> (not on the VPS):
+            <Code>scp biliant@oswagolink.co.tz:admin-pass-phone2.p12 $HOME/Downloads/</Code>
+          </li>
+          <li><strong>Laptop (Windows, Chrome or Edge):</strong> double-click the file in Downloads → Current User → Next → type the
+            password → "Automatically select the certificate store" → Finish. Close and reopen the browser.</li>
+          <li><strong>Phone (Android):</strong> copy the file to the phone with a USB cable (do not send it by WhatsApp or e-mail).
+            Settings → Security → Encryption &amp; credentials → Install a certificate → <strong>VPN &amp; app user certificate</strong> →
+            pick the file → type the password. When Chrome opens the admin panel it asks which certificate to use: choose the
+            Oswagolink one.</li>
+          <li>Check it: open <Cmd>https://admin.oswagolink.co.tz/device-check</Cmd> on that device. It must say
+            <strong> Device pass: OK (phone2)</strong>.</li>
+          <li><strong>Delete every copy of the file</strong>: on the VPS <Cmd>rm ~/admin-pass-phone2.p12</Cmd>, and from the PC's
+            Downloads folder and the phone's Downloads folder. The device keeps its installed pass; the file and password are no longer needed.</li>
+        </ol>
+
+        <h3 className="guide-step">Remove a device (lost, stolen, sold or replaced)</h3>
+        <Code>sudo wifi-admin-device remove phone</Code>
+        <p className="guide-text">
+          Works at once: that pass no longer opens the admin panel, even if someone knows your admin password. Do it the same day a
+          device is lost. Then <strong>change your admin password</strong> too, to be safe.
+        </p>
+
+        <h3 className="guide-step">Renew passes before they expire (before 31 October 2028)</h3>
+        <ol className="guide-list">
+          <li>Add a new pass with a <strong>new name</strong> (for example <Cmd>laptop2028</Cmd>) and install it, as in "Add a device".</li>
+          <li>Check <Cmd>https://admin.oswagolink.co.tz/device-check</Cmd> says OK with the new name.</li>
+          <li>Only then remove the old one: <Cmd>sudo wifi-admin-device remove laptop</Cmd>. Do the same for the phone.</li>
+        </ol>
+        <Note tone="amber">
+          Never remove a device's old pass before its new one works: you would lock yourself out of the admin panel on that device.
+        </Note>
+
+        <h3 className="guide-step">Locked out on every device</h3>
+        <p className="guide-text">
+          Log in to the VPS (SSH, or the VNC console in Hostinger's hPanel) and switch the check off for a moment:
+        </p>
+        <Code>sudo wifi-admin-device mode off</Code>
+        <p className="guide-text">
+          The admin panel now opens with just your password. Add a new pass for your device, check it, then switch the check back on
+          straight away:
+        </p>
+        <Code>sudo wifi-admin-device mode enforce</Code>
+        <Note tone="red">
+          Never leave the mode on <strong>off</strong>: while it is off, anyone on the internet can reach your admin login page.
+          Never share a .p12 file or its password, and never put it on GitHub.
         </Note>
       </Section>
 
