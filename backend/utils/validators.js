@@ -82,7 +82,35 @@ const isWholeNumberBetween = (value, min, max) => {
   return Number.isInteger(n) && n >= min && n <= max;
 };
 
+// ------------------------------------------------------------
+// TP-Link (Omada)
+// ------------------------------------------------------------
+
+// One written form for a MAC address: AA:BB:CC:DD:EE:FF. Returns '' when it is not a
+// real MAC (wrong shape, all zeros, or broadcast).
+const normalizeMac = (mac) => {
+  if (!isValidMACAddress(mac)) return '';
+  const clean = mac.trim().toUpperCase().replace(/-/g, ':');
+  if (clean === '00:00:00:00:00:00' || clean === 'FF:FF:FF:FF:FF:FF') return '';
+  return clean;
+};
+
+// A site in the Omada controller: 24 hexadecimal characters (e.g. 6aebf7665e69d22b0e493f11)
+const isValidOmadaSiteId = (id) => typeof id === 'string' && /^[0-9a-f]{24}$/.test(id);
+
+// A WiFi name as the access point reports it: 1 to 32 characters, no control characters
+// (the same limit as WiFi itself)
+// eslint-disable-next-line no-control-regex
+const isValidSsidName = (name) => typeof name === 'string' && name.length >= 1 && name.length <= 32 && !/[\u0000-\u001f\u007f]/.test(name);
+
+// Which radio of the access point the phone is on: 0 to 3 (2.4 GHz, 5 GHz, ...)
+const isValidRadioId = (value) => isWholeNumberBetween(value, 0, 3);
+
 module.exports = {
+  normalizeMac,
+  isValidOmadaSiteId,
+  isValidSsidName,
+  isValidRadioId,
   isValidEmail,
   MAX_EMAIL_LENGTH,
   MAX_PASSWORD_LENGTH,

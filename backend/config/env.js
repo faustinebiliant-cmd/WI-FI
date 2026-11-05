@@ -134,6 +134,50 @@ if (IS_PROD && !ADMIN_HOST) {
 }
 
 // ------------------------------------------------------------
+// TP-Link Omada controller (optional: all five or none)
+// The controller runs on this VPS (Docker box "omada"). The backend talks to it
+// only inside the VPS, and only after checking its certificate fingerprint.
+//   OMADA_CONTROLLER_ID       32 hexadecimal characters (https://127.0.0.1:8043/api/info)
+//   OMADA_OPERATOR_USER       the hotspot operator (role Hotspot Admin)
+//   OMADA_OPERATOR_PASSWORD   its password (secret)
+//   OMADA_CERT_SHA256         the controller's certificate fingerprint (64 hex, colons allowed)
+//   OMADA_PORT                optional, default 8043
+// Without them, TP-Link routers are switched off; MikroTik routers are not affected.
+// ------------------------------------------------------------
+const OMADA_NAMES = ['OMADA_CONTROLLER_ID', 'OMADA_OPERATOR_USER', 'OMADA_OPERATOR_PASSWORD', 'OMADA_CERT_SHA256'];
+const omadaSet = OMADA_NAMES.filter((name) => trimmed(process.env[name]));
+if (omadaSet.length > 0 && omadaSet.length < OMADA_NAMES.length) {
+  fail(`TP-Link settings are incomplete: set all of ${OMADA_NAMES.join(', ')} (or none of them).`);
+}
+const OMADA_ENABLED = omadaSet.length === OMADA_NAMES.length;
+const OMADA_CONTROLLER_ID = (trimmed(process.env.OMADA_CONTROLLER_ID) || '').toLowerCase();
+const OMADA_OPERATOR_USER = trimmed(process.env.OMADA_OPERATOR_USER);
+// The password is used exactly as written (no trimming of inner characters)
+const OMADA_OPERATOR_PASSWORD = typeof process.env.OMADA_OPERATOR_PASSWORD === 'string'
+  ? process.env.OMADA_OPERATOR_PASSWORD.trim()
+  : '';
+const OMADA_CERT_SHA256 = (trimmed(process.env.OMADA_CERT_SHA256) || '').replace(/:/g, '').toLowerCase();
+const rawOmadaPort = trimmed(process.env.OMADA_PORT);
+const OMADA_PORT = rawOmadaPort ? Number(rawOmadaPort) : 8043;
+if (OMADA_ENABLED) {
+  if (!/^[0-9a-f]{32}$/.test(OMADA_CONTROLLER_ID)) {
+    fail('OMADA_CONTROLLER_ID must be the 32 hexadecimal characters shown as omadacId at https://127.0.0.1:8043/api/info');
+  }
+  if (!/^[A-Za-z0-9._-]{1,64}$/.test(OMADA_OPERATOR_USER)) {
+    fail('OMADA_OPERATOR_USER must be 1 to 64 letters, numbers, dots, dashes or underscores.');
+  }
+  if (OMADA_OPERATOR_PASSWORD.length < 8 || OMADA_OPERATOR_PASSWORD.length > 64) {
+    fail('OMADA_OPERATOR_PASSWORD must be 8 to 64 characters.');
+  }
+  if (!/^[0-9a-f]{64}$/.test(OMADA_CERT_SHA256)) {
+    fail('OMADA_CERT_SHA256 must be the controller certificate SHA-256 fingerprint (64 hexadecimal characters).');
+  }
+  if (!Number.isInteger(OMADA_PORT) || OMADA_PORT < 1 || OMADA_PORT > 65535) {
+    fail('OMADA_PORT must be an integer between 1 and 65535.');
+  }
+}
+
+// ------------------------------------------------------------
 // Frozen export. Nothing downstream reads process.env.
 // ------------------------------------------------------------
 const env = Object.freeze({
@@ -156,7 +200,14 @@ const env = Object.freeze({
   ADMIN_HOST,
 
   ROUTER_MODE,
-  ROUTER_ENCRYPTION_KEY
+  ROUTER_ENCRYPTION_KEY,
+
+  OMADA_ENABLED,
+  OMADA_CONTROLLER_ID,
+  OMADA_OPERATOR_USER,
+  OMADA_OPERATOR_PASSWORD,
+  OMADA_CERT_SHA256,
+  OMADA_PORT
 });
 
 module.exports = env;

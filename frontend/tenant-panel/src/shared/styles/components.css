@@ -110,6 +110,11 @@ tbody tr:hover td { background: #f8fafc; }
 .form-row .form-group { margin-bottom: 0; }
 .form-stack .form-row { margin-bottom: 20px; }
 
+/* A big choice button (Routers: "MikroTik router" or "TP-Link only") */
+.choice-option { display: block; width: 100%; text-align: left; padding: 14px 16px; margin: 0 0 10px 0; background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--dark); font: inherit; cursor: pointer; transition: var(--transition); }
+.choice-option:hover { border-color: var(--primary); background: var(--primary-soft); }
+.choice-option small { display: block; margin-top: 4px; color: var(--gray); font-size: 13px; }
+
 .notice { padding: 12px 14px; border-radius: var(--radius-sm); margin: 0 0 12px 0; font-size: 13px; line-height: 1.5; border: 1px solid transparent; }
 .notice-info { background: var(--primary-soft); color: #1e3a8a; border-color: #bfdbfe; }
 .notice-warning { background: var(--warning-soft); color: #92400e; border-color: #fde68a; }

@@ -57,12 +57,16 @@ export default function PackagesPage() {
     }
   };
 
+  // TP-Link-only routers: one speed for the whole business, so packages have no speed field
+  const selectedRouter = routers.find((r) => r.id === formData.router_id);
+  const isOmada = selectedRouter && selectedRouter.device_type === 'omada';
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
     const speed_mbps = Number(formData.speed_mbps);
-    if (!Number.isInteger(speed_mbps) || speed_mbps < MIN_SPEED_MBPS || speed_mbps > MAX_SPEED_MBPS) {
+    if (!isOmada && (!Number.isInteger(speed_mbps) || speed_mbps < MIN_SPEED_MBPS || speed_mbps > MAX_SPEED_MBPS)) {
       setErrorMsg(`Speed must be a whole number from ${MIN_SPEED_MBPS} to ${MAX_SPEED_MBPS} Mbps.`);
       return;
     }
@@ -85,8 +89,8 @@ export default function PackagesPage() {
         name: formData.name,
         price_tzs: Number(formData.price_tzs),
         duration_minutes: duration_minutes,
-        speed_down_kbps: speed_kbps,
-        speed_up_kbps: speed_kbps,
+        // TP-Link: no speed of its own (the server saves 0)
+        ...(isOmada ? {} : { speed_down_kbps: speed_kbps, speed_up_kbps: speed_kbps }),
         router_id: formData.router_id
       });
       setShowModal(false);
@@ -161,7 +165,9 @@ export default function PackagesPage() {
                   <td>{pkg.router_name || '-'}</td>
                   <td>TZS {pkg.price_tzs.toLocaleString()}</td>
                   <td>{formatDuration(pkg.duration_minutes)}</td>
-                  <td>{pkg.speed_down_kbps / 1024} Mbps</td>
+                  <td className={pkg.router_type === 'omada' ? 'cell-muted' : undefined}>
+                    {pkg.router_type === 'omada' ? 'Business speed' : `${pkg.speed_down_kbps / 1024} Mbps`}
+                  </td>
                   <td className="col-actions">
                     <button onClick={() => openDelete(pkg)} className="btn btn-sm btn-danger">
                       Delete
@@ -214,23 +220,6 @@ export default function PackagesPage() {
               </div>
 
               <div className="form-group">
-                <label>Speed (Mbps, {MIN_SPEED_MBPS} to {MAX_SPEED_MBPS})</label>
-                <input
-                  className="form-control"
-                  required
-                  type="number"
-                  min={MIN_SPEED_MBPS}
-                  max={MAX_SPEED_MBPS}
-                  step="1"
-                  inputMode="numeric"
-                  placeholder={`${MIN_SPEED_MBPS} - ${MAX_SPEED_MBPS}`}
-                  value={formData.speed_mbps}
-                  onChange={e => setFormData({ ...formData, speed_mbps: e.target.value.replace(/[^0-9]/g, '') })}
-                  disabled={isSubmitting}
-                />
-              </div>
-
-              <div className="form-group">
                 <label>Router</label>
                 <select
                   className="form-control"
@@ -240,10 +229,34 @@ export default function PackagesPage() {
                   disabled={isSubmitting}
                 >
                   {routers.length === 0 && <option value="">Add a router first (Routers page)</option>}
-                  {routers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  {routers.map(r => <option key={r.id} value={r.id}>{r.name}{r.device_type === 'omada' ? ' (TP-Link)' : ''}</option>)}
                 </select>
                 <p className="form-hint">Customers see this package only on this router's WiFi.</p>
               </div>
+
+              {isOmada ? (
+                <p className="notice notice-info">
+                  <strong>Speed:</strong> on a TP-Link router every customer gets the same speed (set by
+                  Oswagolink for your business), so packages differ by time and price.
+                </p>
+              ) : (
+                <div className="form-group">
+                  <label>Speed (Mbps, {MIN_SPEED_MBPS} to {MAX_SPEED_MBPS})</label>
+                  <input
+                    className="form-control"
+                    required
+                    type="number"
+                    min={MIN_SPEED_MBPS}
+                    max={MAX_SPEED_MBPS}
+                    step="1"
+                    inputMode="numeric"
+                    placeholder={`${MIN_SPEED_MBPS} - ${MAX_SPEED_MBPS}`}
+                    value={formData.speed_mbps}
+                    onChange={e => setFormData({ ...formData, speed_mbps: e.target.value.replace(/[^0-9]/g, '') })}
+                    disabled={isSubmitting}
+                  />
+                </div>
+              )}
 
               <div className="modal-actions">
                 <button type="button" onClick={() => setShowModal(false)} disabled={isSubmitting} className="btn btn-secondary">Cancel</button>

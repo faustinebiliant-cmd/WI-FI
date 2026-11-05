@@ -9,6 +9,12 @@ class MockRouter {
     return { ok: true };
   }
 
+  // TP-Link routers let a phone in instead of creating a voucher user
+  async authorizeClient({ minutes }) {
+    console.log(`[MockRouter] Let a phone in for ${minutes} mins`);
+    return { ok: true };
+  }
+
   async removeVoucher(code) {
     console.log('[MockRouter] Removed voucher');
     return { ok: true };

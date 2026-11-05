@@ -2,23 +2,59 @@ import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Loader from '../shared/components/Loader';
 
+// A site ID from the Omada controller: 24 characters 0-9 and a-f
+const SITE_ID_RE = /^[0-9a-f]{24}$/;
+
 export default function RoutersPage() {
   const [routers, setRouters] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  // "Set site ID" for a TP-Link router
+  const [siteTarget, setSiteTarget] = useState(null);
+  const [siteInput, setSiteInput] = useState('');
+  const [siteError, setSiteError] = useState('');
+  const [siteSaving, setSiteSaving] = useState(false);
+
+  const load = () =>
     apiClient.get('/platform/routers')
       .then(res => setRouters(res.data.data))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
-  }, []);
+
+  useEffect(() => { load(); }, []);
+
+  const openSite = (router) => {
+    setSiteTarget(router);
+    setSiteInput(router.omada_site_id || '');
+    setSiteError('');
+  };
+
+  const saveSite = async (e) => {
+    e.preventDefault();
+    const value = siteInput.trim().toLowerCase();
+    if (!SITE_ID_RE.test(value)) {
+      setSiteError('The site ID has 24 characters (0-9 and a-f), for example 6aebf7665e69d22b0e493f11.');
+      return;
+    }
+    setSiteSaving(true);
+    setSiteError('');
+    try {
+      await apiClient.patch(`/platform/routers/${siteTarget.id}/omada-site`, { site_id: value });
+      setSiteTarget(null);
+      load();
+    } catch (error) {
+      setSiteError(error.response?.data?.error || 'Failed to save the site ID.');
+    } finally {
+      setSiteSaving(false);
+    }
+  };
 
   return (
     <div className="page-wrapper">
       <div className="page-header">
         <div>
           <h1>All Routers</h1>
-          <p>Read-only view of every router across all businesses.</p>
+          <p>Every router across all businesses. TP-Link routers need their controller site ID (Setup Guide, "TP-Link only").</p>
         </div>
       </div>
 
@@ -33,27 +69,84 @@ export default function RoutersPage() {
               <tr>
                 <th>Business</th>
                 <th>Router Name</th>
+                <th>Type</th>
                 <th>Location</th>
                 <th>Status</th>
+                <th className="col-actions">Action</th>
               </tr>
             </thead>
             <tbody>
-              {routers.map((router) => (
-                <tr key={router.id}>
-                  <td className="cell-strong">{router.tenant_name || 'Unknown'}</td>
-                  <td>{router.name}</td>
-                  <td>{router.location_label || '-'}</td>
-                  <td>
-                    <span className={`badge ${router.status === 'online' ? 'badge-success' : 'badge-danger'}`}>
-                      {router.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {routers.map((router) => {
+                const isOmada = router.device_type === 'omada';
+                const apMacs = Array.isArray(router.ap_macs) ? router.ap_macs : [];
+                return (
+                  <tr key={router.id}>
+                    <td className="cell-strong">{router.tenant_name || 'Unknown'}</td>
+                    <td>
+                      {router.name}
+                      {isOmada && apMacs.length > 0 && <span className="cell-sub">Access point {apMacs.join(', ')}</span>}
+                      {isOmada && router.omada_site_id && <span className="cell-sub">Site {router.omada_site_id}</span>}
+                    </td>
+                    <td>{isOmada ? 'TP-Link' : 'MikroTik'}</td>
+                    <td>{router.location_label || '-'}</td>
+                    <td>
+                      {isOmada && !router.omada_site_id ? (
+                        <span className="badge badge-warning">Needs site ID</span>
+                      ) : (
+                        <span className={`badge ${router.status === 'online' ? 'badge-success' : 'badge-danger'}`}>
+                          {router.status}
+                        </span>
+                      )}
+                    </td>
+                    <td className="col-actions">
+                      {isOmada && (
+                        <button onClick={() => openSite(router)} className="btn btn-sm btn-soft">
+                          {router.omada_site_id ? 'Change site ID' : 'Set site ID'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
+
+      {siteTarget && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 className="modal-title">Site ID for {siteTarget.name}</h2>
+            <p className="modal-sub">
+              {siteTarget.tenant_name}. Create the business's site in the Omada controller first, then paste its
+              site ID here (the 24 characters after <code>site=</code> in a portal link, or from the
+              controller's address bar when the site is open).
+            </p>
+            {siteError && <div className="alert alert-danger">{siteError}</div>}
+            <form onSubmit={saveSite}>
+              <div className="form-group">
+                <label>Site ID</label>
+                <input
+                  className="form-control"
+                  required
+                  type="text"
+                  maxLength={24}
+                  placeholder="6aebf7665e69d22b0e493f11"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  value={siteInput}
+                  onChange={e => setSiteInput(e.target.value.toLowerCase().replace(/[^0-9a-f]/g, ''))}
+                  disabled={siteSaving}
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setSiteTarget(null)} disabled={siteSaving} className="btn btn-secondary">Cancel</button>
+                <button type="submit" disabled={siteSaving} className="btn btn-primary">{siteSaving ? 'Saving...' : 'Save'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

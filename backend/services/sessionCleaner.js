@@ -1,6 +1,6 @@
 const db = require('../config/db');
 const env = require('../config/env');
-const { getRouter } = require('./routers/routerFactory');
+const { getRouter, isRouterReady } = require('./routers/routerFactory');
 const { isValidMACAddress, isValidIPAddress } = require('../utils/validators');
 
 let running = false;  // router round (every minute)
@@ -40,6 +40,7 @@ const removeFromRouter = async (router, code) => {
 const expireVouchers = async () => {
   const { rows } = await db.query(`
     SELECT v.id, v.code, p.router_id,
+           r.id AS r_id, r.tenant_id, r.device_type, r.omada_site_id,
            r.ip_address, r.api_port, r.api_username, r.api_password_encrypted
     FROM vouchers v
     LEFT JOIN packages p ON p.id = v.package_id
@@ -55,16 +56,18 @@ const expireVouchers = async () => {
   // and the vouchers of one router one after the other.
   const byRouter = new Map();
   for (const v of rows) {
-    const hasRouter = v.router_id && v.ip_address && v.ip_address !== '0.0.0.0';
+    // The adapter needs the router's own id (v.id is the voucher's id)
+    const router = { ...v, id: v.r_id };
+    const hasRouter = Boolean(v.router_id) && isRouterReady(router);
     const key = hasRouter ? v.router_id : `none:${v.id}`;
     if (!byRouter.has(key)) byRouter.set(key, []);
-    byRouter.get(key).push({ ...v, hasRouter });
+    byRouter.get(key).push({ ...v, router, hasRouter });
   }
 
   const expireGroup = async (vouchers) => {
     for (const v of vouchers) {
       if (v.hasRouter) {
-        const result = await removeFromRouter(v, v.code);
+        const result = await removeFromRouter(v.router, v.code);
         // Router not reachable: its other vouchers wait for the next check too
         if (!result || !result.ok) return;
       }

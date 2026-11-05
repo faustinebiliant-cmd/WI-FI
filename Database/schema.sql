@@ -14,6 +14,7 @@
 --   2026-11-01-history-retention-indexes.sql  indexes for the nightly history clean-up
 --   2026-11-03-password-changed-at.sql     tenant_users.password_changed_at
 --   2026-11-03-logout-everywhere.sql       tenant_users.logged_out_at
+--   2026-11-05-tplink-routers.sql          routers.device_type + omada_site_id, table omada_aps
 --
 -- When the database changes: update this file AND add a migration file.
 -- ============================================================
@@ -81,6 +82,19 @@ CREATE TABLE public.routers (
     tunnel_ip varchar(50) UNIQUE,        -- The WireGuard IP assigned to this router
     public_key varchar(100),             -- The router's WireGuard public key (needed to remove its peer)
     provisioned_at timestamptz,          -- Marks when the router was successfully set up
+    device_type varchar(20) NOT NULL DEFAULT 'mikrotik'
+      CONSTRAINT routers_device_type_check CHECK (device_type IN ('mikrotik', 'omada')),
+    omada_site_id varchar(24) UNIQUE,    -- TP-Link only: the business's site in the Omada controller
+    created_at timestamptz DEFAULT now() NOT NULL,
+    CONSTRAINT routers_omada_site_id_check
+      CHECK (omada_site_id IS NULL OR (omada_site_id ~ '^[0-9a-f]{24}$' AND device_type = 'omada'))
+);
+
+-- 4b. omada_aps (the TP-Link access points of a TP-Link router; one router each)
+CREATE TABLE public.omada_aps (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    router_id uuid REFERENCES public.routers(id) ON DELETE CASCADE NOT NULL,
+    mac varchar(17) UNIQUE NOT NULL CHECK (mac ~ '^([0-9A-F]{2}:){5}[0-9A-F]{2}$'),
     created_at timestamptz DEFAULT now() NOT NULL
 );
 
@@ -217,6 +231,7 @@ $$;
 -- Base indexes (tenant scoping)
 CREATE INDEX idx_tenant_users_tenant ON public.tenant_users(tenant_id);
 CREATE INDEX idx_routers_tenant ON public.routers(tenant_id);
+CREATE INDEX idx_omada_aps_router ON public.omada_aps(router_id);
 CREATE INDEX idx_packages_tenant ON public.packages(tenant_id);
 CREATE INDEX idx_packages_router ON public.packages(router_id);
 CREATE INDEX idx_vouchers_tenant_status ON public.vouchers(tenant_id, status);

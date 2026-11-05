@@ -55,6 +55,7 @@ export default function SetupGuidePage() {
           <li><a href="#more-access-points">More than one access point</a></li>
           <li><a href="#staff-door">Staff door: Winbox after setup</a></li>
           <li><a href="#emergency-key">Emergency key</a></li>
+          <li><a href="#tplink-only">TP-Link only business (no MikroTik)</a></li>
           <li><a href="#device-passes">Admin panel device passes</a></li>
         </ul>
       </div>
@@ -260,6 +261,69 @@ export default function SetupGuidePage() {
           Safe to use: it changes only that one router's Winbox door. Wi-Fi, vouchers and customers keep working the whole time, and no other
           router is touched. A wrong or unknown address, an address shared by two routers, a typo, or a router that is offline: it says so
           and changes nothing.
+        </Note>
+      </Section>
+
+      <Section id="tplink-only" title="TP-Link only business (no MikroTik)">
+        <p className="guide-text">
+          The business has only a TP-Link Omada access point (EAP). The Omada controller on the VPS lets customers in and out;
+          vouchers work as usual. One speed for the whole business. Full background: <strong>TPLINK-CONTROLLER-GUIDE.md</strong>.
+        </p>
+
+        <h3 className="guide-step">1. The business adds it (Business Panel)</h3>
+        <p className="guide-text">
+          Routers → <strong>Add Router</strong> → <strong>TP-Link only</strong> → name, location and the access point's MAC from its
+          sticker. Here (admin panel → Routers) it then shows <strong>Needs site ID</strong>.
+        </p>
+
+        <h3 className="guide-step">2. You create its site in the controller (about 10 minutes)</h3>
+        <ol className="guide-list">
+          <li>Open the controller through the tunnel (PowerShell on your PC, leave it open):
+            <Code>ssh -N -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 8043:127.0.0.1:8043 biliant@69.62.105.119</Code>
+            then <Cmd>https://127.0.0.1:8043</Cmd> and log in.</li>
+          <li><strong>Global View → Add New Site</strong>: name = business + router name, Tanzania, (UTC+03:00) Nairobi.</li>
+          <li>In the new site, <strong>Site Settings → Device Account</strong>: <strong>eap-admin</strong> and the device account password
+            (password manager).</li>
+          <li><strong>Network Config → Rate Limit</strong>: a profile with the business's speed (for example Speed-5M, 5 down / 2 up).</li>
+          <li><strong>Network Config → WLAN → Create</strong>: the business's WiFi name, Security <strong>None</strong>, Advanced Settings →
+            Client Rate Limit Profile = that speed profile.</li>
+          <li><strong>Network Config → Authentication → Portal → Create</strong>: that WiFi only, <strong>External Portal Server</strong>,
+            URL <Cmd>https://oswagolink.co.tz/portal/</Cmd>, HTTPS Redirection on. Tab <strong>Access Control</strong>: Pre-Authentication
+            Access on, IP Range <Cmd>69.62.105.119</Cmd> / 32. Authentication-Free Client off.</li>
+          <li><strong>Hotspot → Operators</strong>: edit the portal operator (the one in the VPS .env) → Site Privileges: also tick the
+            new site → Apply. (Without this, vouchers on this site get "not reachable".)</li>
+          <li>The site ID: <strong>Site Settings → Inform URL</strong> shows <code>…&amp;omadacId=XXXXXXXXXXXXXXXXXXXXXXXX</code>: those
+            24 characters are the site ID. Admin panel → <strong>Routers → Set site ID</strong> → paste → Save.</li>
+        </ol>
+
+        <h3 className="guide-step">3. The technician at the business (about 15 minutes)</h3>
+        <ol className="guide-list">
+          <li>Plug the access point (PoE adapter) into the business's <strong>own internet box</strong>. Reset it first if it was used before
+            (Reset button 10 seconds).</li>
+          <li>Phone → the access point's factory WiFi → <Cmd>omadaeap.net</Cmd> → it asks for a new login: choose a temporary one and
+            remember it for 30 minutes.</li>
+          <li><strong>System → Controller Settings → Controller Inform URL</strong>: paste exactly (small letters, no spaces):
+            <Code>oswagolink.co.tz?dPort=29810&amp;mPort=29814&amp;omadacId=cd94399be58321df0d45c1ff32d49f95</Code>
+            Save. If the access point never shows up (step 4), use the number instead of the name:
+            <Code>69.62.105.119?dPort=29810&amp;mPort=29814&amp;omadacId=cd94399be58321df0d45c1ff32d49f95</Code>
+          </li>
+          <li>Switch off the internet box's own WiFi (or give it a password), so customers cannot skip paying.</li>
+        </ol>
+
+        <h3 className="guide-step">4. You adopt it</h3>
+        <ol className="guide-list">
+          <li>Controller → the business's site → <strong>Devices</strong>: within 1 to 2 minutes the access point shows <strong>Pending</strong>.
+            <strong> Check its MAC is the one the business typed</strong> (never adopt an access point you do not recognise).</li>
+          <li><strong>Adopt</strong>. "Username or password is incorrect": <strong>Retry</strong> and type the technician's temporary login.</li>
+          <li>Wait for <strong>Connected</strong>. The access point gets the WiFi, the portal and the speed by itself.</li>
+          <li>Test: create a package and a voucher (Business Panel), connect a phone to the WiFi, use the voucher.</li>
+        </ol>
+        <Note tone="amber">
+          Still being confirmed with several sites: in which site a new Pending access point appears. If it is not in the business's site,
+          look in Global View → Devices and adopt it into the business's site.
+        </Note>
+        <Note tone="red">
+          Never open ports 8043, 8088, 8843 or 27217 on the VPS. The controller's admin page is only for you, through the tunnel.
         </Note>
       </Section>
 

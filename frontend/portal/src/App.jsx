@@ -45,10 +45,24 @@ export default function App() {
 
   const queryParams = new URLSearchParams(window.location.search);
   const routerToken = queryParams.get('router');
+
+  // TP-Link (Omada) access points send the phone here with their own link:
+  //   ?clientMac=..&apMac=..&ssidName=..&radioId=..&site=..&redirectUrl=..
+  // The server checks every value; here they are only passed on.
+  const omada = (queryParams.get('site') && queryParams.get('clientMac') && queryParams.get('apMac'))
+    ? {
+        site: queryParams.get('site'),
+        apMac: queryParams.get('apMac'),
+        clientMac: queryParams.get('clientMac'),
+        ssidName: queryParams.get('ssidName') || '',
+        radioId: queryParams.get('radioId') || ''
+      }
+    : null;
+
   // The router adds the device ID (mac) when it sends the customer here.
   // Without it a voucher cannot be tied to the device, so the form stays locked.
-  const macAddress = queryParams.get('mac') || null;
-  const ipAddress = queryParams.get('ip') || null;
+  const macAddress = (omada ? omada.clientMac : queryParams.get('mac')) || null;
+  const ipAddress = omada ? null : (queryParams.get('ip') || null);
 
   // The router's login address: after a redeem the portal logs the phone in there.
   // Only a router on the local network is accepted (e.g. http://192.168.88.1/login), so a
@@ -57,19 +71,30 @@ export default function App() {
 
   // The page info includes this device's state (time left, or when its time ended)
   const loadInfo = () => {
-    const macQuery = macAddress ? `?mac=${encodeURIComponent(macAddress)}` : '';
-    return apiClient.get(`/portal/info/${routerToken}${macQuery}`)
+    let path;
+    if (omada) {
+      const q = new URLSearchParams({ site: omada.site, ap: omada.apMac, mac: omada.clientMac });
+      path = `/portal/omada/info?${q.toString()}`;
+    } else {
+      const macQuery = macAddress ? `?mac=${encodeURIComponent(macAddress)}` : '';
+      path = `/portal/info/${routerToken}${macQuery}`;
+    }
+    return apiClient.get(path)
       .then(res => setBusinessInfo(res.data.data))
       .catch((err) => setErrorMessage(err.response?.data?.error || 'Invalid or inactive router.'));
   };
 
   useEffect(() => {
-    if (!routerToken) {
+    if (!routerToken && !omada) {
       setErrorMessage('This portal is not configured correctly (Missing Router Token).');
       return;
     }
     loadInfo();
   }, [routerToken]);
+
+  // TP-Link businesses have one speed for all customers: their packages carry speed 0,
+  // and no speed is shown
+  const showSpeed = (mbps) => Number(mbps) > 0;
 
   // While the device's time runs, count down; at zero, ask the server again so the page
   // switches to "your time is over" by itself
@@ -142,12 +167,22 @@ export default function App() {
     setErrorMessage('');
 
     try {
-      const res = await apiClient.post('/portal/redeem', {
-        router_token: routerToken,
-        code: voucherCode,
-        mac_address: macAddress,
-        ip_address: ipAddress
-      });
+      // TP-Link: the server asks the controller to let this phone in (no router login form)
+      const res = omada
+        ? await apiClient.post('/portal/omada/redeem', {
+            site: omada.site,
+            ap_mac: omada.apMac,
+            client_mac: omada.clientMac,
+            ssid_name: omada.ssidName,
+            radio_id: omada.radioId,
+            code: voucherCode
+          })
+        : await apiClient.post('/portal/redeem', {
+            router_token: routerToken,
+            code: voucherCode,
+            mac_address: macAddress,
+            ip_address: ipAddress
+          });
 
       localStorage.removeItem('portal_fail_count');
       setSuccessData(res.data.data);
@@ -257,9 +292,9 @@ export default function App() {
 
           <div className="success-time">
             {end ? (
-              <>You have internet until <strong>{end}</strong><br />({formatLeft(successData.remaining_minutes)} left) at <strong>{successData.speed_down_mbps} Mbps</strong></>
+              <>You have internet until <strong>{end}</strong><br />({formatLeft(successData.remaining_minutes)} left){showSpeed(successData.speed_down_mbps) && <> at <strong>{successData.speed_down_mbps} Mbps</strong></>}</>
             ) : (
-              <>You have internet for <strong>{formatDuration(successData.duration_minutes)}</strong> at <strong>{successData.speed_down_mbps} Mbps</strong></>
+              <>You have internet for <strong>{formatDuration(successData.duration_minutes)}</strong>{showSpeed(successData.speed_down_mbps) && <> at <strong>{successData.speed_down_mbps} Mbps</strong></>}</>
             )}
           </div>
 
@@ -300,7 +335,7 @@ export default function App() {
           <p className="price-note">You can close this page. When your time is over, your phone will bring you back here.</p>
           {/* The router only sends a phone here when it is not logged in: entering the
               voucher again logs it in, and the time already running continues */}
-          {loginUrl && (
+          {(loginUrl || omada) && (
             <button onClick={() => setEnterAgain(true)} className="btn btn-secondary btn-block">
               No internet? Enter your voucher again
             </button>
@@ -355,7 +390,7 @@ export default function App() {
                 <button key={pkg.id} type="button" className="package-option" onClick={() => handleBuy(pkg)}>
                   <span>
                     <strong>{pkg.name}</strong>
-                    <small style={{ display: 'block', color: 'var(--gray)' }}>{formatDuration(pkg.duration_minutes)} at {pkg.speed_down_kbps / 1024} Mbps</small>
+                    <small style={{ display: 'block', color: 'var(--gray)' }}>{formatDuration(pkg.duration_minutes)}{showSpeed(pkg.speed_down_kbps) && ` at ${pkg.speed_down_kbps / 1024} Mbps`}</small>
                   </span>
                   <strong style={{ color: 'var(--primary)' }}>TZS {pkg.price_tzs.toLocaleString()}</strong>
                 </button>
@@ -428,7 +463,7 @@ export default function App() {
                 <p className="price-list-title">Prices</p>
                 {packages.map(pkg => (
                   <div key={pkg.id} className="price-row">
-                    <span>{pkg.name}<small>{formatDuration(pkg.duration_minutes)} · {pkg.speed_down_kbps / 1024} Mbps</small></span>
+                    <span>{pkg.name}<small>{formatDuration(pkg.duration_minutes)}{showSpeed(pkg.speed_down_kbps) && ` · ${pkg.speed_down_kbps / 1024} Mbps`}</small></span>
                     <strong>TZS {pkg.price_tzs.toLocaleString()}</strong>
                   </div>
                 ))}

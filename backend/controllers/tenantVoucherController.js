@@ -149,6 +149,7 @@ const revokeVoucher = async (req, res) => {
     const vRes = await db.query(
       // The voucher and its router (only what the router connection needs) in one trip
       `SELECT v.id, v.code, v.status, r.id AS router_id,
+              r.tenant_id AS router_tenant_id, r.device_type, r.omada_site_id,
               r.ip_address, r.api_port, r.api_username, r.api_password_encrypted
        FROM vouchers v
        LEFT JOIN packages p ON p.id = v.package_id
@@ -173,7 +174,8 @@ const revokeVoucher = async (req, res) => {
     if (previousStatus === 'active' && v.router_id) {
       let result;
       try {
-        result = await getRouter(v).removeVoucher(v.code);
+        // The adapter needs the router's own id and business (v.id is the voucher's id)
+        result = await getRouter({ ...v, id: v.router_id, tenant_id: v.router_tenant_id }).removeVoucher(v.code);
       } catch (err) {
         console.error('Revoke voucher: router could not be used:', err.message);
         result = { ok: false };

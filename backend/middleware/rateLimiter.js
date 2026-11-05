@@ -1,6 +1,6 @@
 const rateLimit = require('express-rate-limit');
 const env = require('../config/env');
-const { isValidRouterToken } = require('../utils/validators');
+const { isValidRouterToken, isValidOmadaSiteId } = require('../utils/validators');
 
 const devMax = (n) => (env.IS_DEV ? n * 10 : n);
 
@@ -48,7 +48,11 @@ const redeemPerRouterLimiter = rateLimit({
   max: devMax(30),
   keyGenerator: (req) => {
     const token = req.body && req.body.router_token;
-    return `${req.ip}|${isValidRouterToken(token) ? token : 'invalid'}`;
+    if (isValidRouterToken(token)) return `${req.ip}|${token}`;
+    // TP-Link routers are known by their controller site
+    const site = req.body && req.body.site;
+    if (isValidOmadaSiteId(site)) return `${req.ip}|omada:${site}`;
+    return `${req.ip}|invalid`;
   }
 });
 

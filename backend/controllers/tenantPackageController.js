@@ -1,5 +1,5 @@
 const db = require('../config/db');
-const { getRouter } = require('../services/routers/routerFactory');
+const { getRouter, isRouterReady, ROUTER_ADAPTER_COLUMNS } = require('../services/routers/routerFactory');
 const { isValidUUID, isValidName, nameRuleMessage, isWholeNumberBetween } = require('../utils/validators');
 
 // Every router is set up with speed profiles for 1 to 20 Mbps (see provisionController),
@@ -12,7 +12,7 @@ const listPackages = async (req, res) => {
   try {
     // Include the router name, and the vouchers a delete would take away (shown in the delete dialog)
     const { rows } = await db.query(`
-      SELECT p.*, r.name as router_name,
+      SELECT p.*, r.name as router_name, r.device_type AS router_type,
              COALESCE(vc.unused_vouchers, 0) AS unused_vouchers,
              COALESCE(vc.active_vouchers, 0) AS active_vouchers
       FROM packages p
@@ -39,7 +39,7 @@ const createPackage = async (req, res) => {
   try {
     const { name, price_tzs, duration_minutes, speed_down_kbps, speed_up_kbps, router_id } = req.body || {};
 
-    if (!name || price_tzs === undefined || duration_minutes === undefined || speed_down_kbps === undefined || speed_up_kbps === undefined || !router_id) {
+    if (!name || price_tzs === undefined || duration_minutes === undefined || !router_id) {
       return res.status(400).json({ success: false, error: 'All fields, including Router, are required' });
     }
 
@@ -52,17 +52,24 @@ const createPackage = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid router selected.' });
     }
 
-    // Check if the router belongs to this tenant
-    const routerCheck = await db.query('SELECT id FROM routers WHERE id = $1 AND tenant_id = $2', [router_id, req.tenantId]);
+    // Check if the router belongs to this tenant (and which kind it is)
+    const routerCheck = await db.query('SELECT id, device_type FROM routers WHERE id = $1 AND tenant_id = $2', [router_id, req.tenantId]);
     if (routerCheck.rows.length === 0) {
       return res.status(403).json({ success: false, error: 'Invalid router selected.' });
+    }
+    // TP-Link-only routers: one speed for the whole business (set on its controller site),
+    // so the package has no speed of its own (saved as 0)
+    const isOmada = routerCheck.rows[0].device_type === 'omada';
+
+    if (!isOmada && (speed_down_kbps === undefined || speed_up_kbps === undefined)) {
+      return res.status(400).json({ success: false, error: 'All fields, including Router, are required' });
     }
 
     // MATH VALIDATION & MAX LIMITS
     const price = Number(price_tzs);
     const duration = Number(duration_minutes);
-    const down = Number(speed_down_kbps);
-    const up = Number(speed_up_kbps);
+    const down = isOmada ? 0 : Number(speed_down_kbps);
+    const up = isOmada ? 0 : Number(speed_up_kbps);
 
     if (![price, duration, down, up].every(Number.isFinite)) {
       return res.status(400).json({ success: false, error: 'Price, duration and speeds must be numbers.' });
@@ -71,7 +78,7 @@ const createPackage = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Price: a whole number from 0 to 1,000,000 TZS.' });
     }
     if (duration <= 0 || duration > 525600) return res.status(400).json({ success: false, error: 'Duration must be between 1 minute and 365 days.' });
-    if (!isAllowedSpeed(down) || !isAllowedSpeed(up)) {
+    if (!isOmada && (!isAllowedSpeed(down) || !isAllowedSpeed(up))) {
       return res.status(400).json({ success: false, error: 'Speed must be a whole number from 1 to 20 Mbps.' });
     }
 
@@ -107,7 +114,7 @@ const deletePackage = async (req, res) => {
 
     // The package and its router (only what the router connection needs)
     const pkgRes = await db.query(
-      `SELECT p.name, r.id AS router_id, r.ip_address, r.api_port, r.api_username, r.api_password_encrypted
+      `SELECT p.name, r.id AS router_id, ${ROUTER_ADAPTER_COLUMNS}
        FROM packages p
        LEFT JOIN routers r ON r.id = p.router_id AND r.tenant_id = p.tenant_id
        WHERE p.id = $1 AND p.tenant_id = $2`,
@@ -131,7 +138,7 @@ const deletePackage = async (req, res) => {
     // Only an active voucher has a user on the router: take every one off, so nobody
     // keeps internet from a voucher that no longer exists
     const active = cancelled.filter((v) => v.previous_status === 'active');
-    if (active.length > 0 && pkg.router_id && pkg.ip_address && pkg.ip_address !== '0.0.0.0') {
+    if (active.length > 0 && pkg.router_id && isRouterReady(pkg)) {
       for (const v of active) {
         let result;
         try {

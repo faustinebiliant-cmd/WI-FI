@@ -4,13 +4,13 @@
 // marked ended only when the router really kicked the device off.
 // ============================================================
 const db = require('../config/db');
-const { getRouter } = require('./routers/routerFactory');
+const { getRouter, ROUTER_ADAPTER_COLUMNS } = require('./routers/routerFactory');
 
 // tenantId: only this business's sessions (business panel); null = any session (admin).
 // Returns 'ok', 'not_found' or 'router_unreachable'.
 const disconnectSession = async (sessionId, tenantId, reason) => {
   const { rows } = await db.query(
-    `SELECT s.mac_address, r.ip_address, r.api_port, r.api_username, r.api_password_encrypted
+    `SELECT s.mac_address, ${ROUTER_ADAPTER_COLUMNS}
      FROM sessions s
      JOIN routers r ON r.id = s.router_id
      WHERE s.id = $1 AND ($2::uuid IS NULL OR s.tenant_id = $2::uuid)`,

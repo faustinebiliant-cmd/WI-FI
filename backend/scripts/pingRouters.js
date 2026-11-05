@@ -4,7 +4,7 @@
 // ============================================================
 const db = require('../config/db');
 const env = require('../config/env');
-const MikroTikRouter = require('../services/routers/MikroTikRouter');
+const { getRouter, isRouterReady } = require('../services/routers/routerFactory');
 
 // Sized so that even 500 silent routers fit in one run:
 // 500 / 25 at a time x 8 seconds = 160 seconds, below the 4.5 minute limit set in server.js
@@ -22,9 +22,11 @@ const withTimeout = (promise, ms) =>
 const checkOne = async (r) => {
   try {
     // Not set up yet: nothing to check
-    if (!r.ip_address || r.ip_address === '0.0.0.0') return 'skipped';
+    // (MikroTik: no tunnel address yet; TP-Link: no controller site yet)
+    if (!isRouterReady(r)) return 'skipped';
 
-    const adapter = new MikroTikRouter(r);
+    // MikroTik or TP-Link, by the router's type
+    const adapter = getRouter(r);
     const status = await withTimeout(adapter.checkStatus(), CHECK_TIMEOUT_MS);
 
     if (status && status.online) {
@@ -58,7 +60,7 @@ const run = async () => {
   const { rows: routers } = await db.query(
     // Routers the session cleaner heard from in the last few minutes are online: no need to ask again.
     // Random order: if a run is ever cut short, a different set of routers misses out each time
-    `SELECT id, ip_address, api_port, api_username, api_password_encrypted FROM routers
+    `SELECT id, tenant_id, device_type, omada_site_id, ip_address, api_port, api_username, api_password_encrypted FROM routers
      WHERE last_seen_at IS NULL OR last_seen_at < NOW() - make_interval(mins => $1::int)
      ORDER BY random()`,
     [RECENTLY_SEEN_MINUTES]
