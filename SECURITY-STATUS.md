@@ -4,7 +4,7 @@ What protects your system today, what was fixed, and what is still open.
 Plain English, no secrets. Keep it next to `OWNER-CHECKUP-GUIDE.md` (the
 weekly checks that keep these protections working).
 
-Last updated: 4 November 2026
+Last updated: 5 November 2026
 
 ---
 
@@ -18,6 +18,7 @@ Think of the system as a building with four doors. Each door has its own lock:
 | **Websites** (portal, business panel, admin panel) | Customers, businesses, you | HTTPS padlock, logins, browser safety rules, admin device passes |
 | **The backend and database** | Only the websites, from inside the VPS | Not reachable from the internet at all |
 | **The router tunnel** (WireGuard) | Your customers' MikroTik routers | Each router has its own key and its own private address |
+| **The TP-Link controller doors** (since 5 Nov 2026) | TP-Link access points (EAPs), and phones passing the portal entrance | An EAP is only managed after you adopt it; the controller's admin page and database are never reachable from the internet |
 
 ---
 
@@ -92,12 +93,31 @@ Fixed on 4 November 2026 (the optional items, plus the router staff door):
 | **Every router deletion left a copy of the tunnel settings, including the VPS private key** | Copies of the most important tunnel secret piling up on the VPS | The copy now exists only while the removal runs: deleted on success, kept only if the removal fails (for recovery) |
 | **Device pass files stayed in the VPS home folder** | Someone who got into the VPS account could copy an admin device pass | Deleted. How to add, remove or renew a device: admin panel → Setup Guide → "Admin panel device passes" |
 
+Added on 5 November 2026: the TP-Link controller (for TP-Link-only businesses, still in testing).
+Details: `TPLINK-CONTROLLER-GUIDE.md`.
+
+| Risk | Protection |
+|---|---|
+| A new program on the VPS could take too much memory or CPU and stop billing | Sealed Docker box: at most 1.5 GB memory and 60% of the CPU; tested: billing unaffected |
+| Docker normally changes the firewall and switches "forwarding" on (routers could then reach each other) | Docker is configured never to touch the firewall or forwarding (checked: forwarding still `0`, no Docker firewall rules) |
+| The controller program itself is downloaded from the internet | Only from `static.tp-link.com`, refused if its fingerprint (SHA256) differs; Java and MongoDB from their official sources |
+| The controller running with full rights | Runs as an ordinary user inside the box, all special rights removed, cannot gain new ones |
+| Its admin page or database reachable from the internet | Admin (8043, 8088, 8843) closed: only through your SSH tunnel. MongoDB (27217) only listens inside the VPS. Checked from outside: closed |
+| The portal entrance shared the admin port (8088 by default) | Moved to its own port 8880; only 8880 is open, and its front page only points to the closed 8043 |
+| Strangers pointing their EAPs at our VPS | They only appear as "Pending"; nothing happens unless you adopt them |
+| Customers on the WiFi taking over an EAP | Each EAP's own web page and phone-app management are switched off; EAP logins use the device account, different from your admin login |
+| Customers using the internet before paying | Before paying, phones may reach only our VPS (`69.62.105.119/32`); the portal account (Hotspot Admin) can only let phones in and out, on its own site |
+| TP-Link's cloud | Not used (cloud access and data sharing off) |
+
+New doors this opened (each needed): 29810 and 19810 (udp), 29811 to 29817 and 8880 (tcp).
+**Never open** 8043, 8088, 8843 or 27217.
+
 ---
 
 ## 3. Protections that were already in place (checked and confirmed)
 
 **On the VPS**
-- Firewall: only 4 doors open to the internet: SSH (22), websites (80, 443), router tunnel (51820). The database (5432) and backend (5001) are private.
+- Firewall: only these doors open to the internet: SSH (22), websites (80, 443), router tunnel (51820), and since 5 November 2026 the TP-Link controller's EAP doors (29810 and 19810 udp, 29811 to 29817 and 8880 tcp). The database (5432), backend (5001) and the controller's admin (8043) and database (27217) are private.
 - The VPS does not pass traffic between routers: one router can never reach another.
 - Secret files (`.env`, backups, WireGuard keys, helper scripts) can only be read by their owner.
 - The database only accepts connections from inside the VPS, and the app's database user is not an administrator.
@@ -139,6 +159,7 @@ Fixed on 4 November 2026 (the optional items, plus the router staff door):
 | Browser safety rules (sender) | `/etc/nginx/snippets/oswagolink-page-headers.conf` | `vps/nginx-page-headers-snippet.conf` |
 | Admin device passes | managed by `sudo wifi-admin-device` | `vps/wifi-admin-device` |
 | Router tunnel add/remove | `/usr/local/sbin/wifi-wireguard-add-peer`, `-remove-peer` | `vps/` (same names) |
+| TP-Link controller box and Docker settings | Docker box `omada`, `/opt/omada/`, `/etc/docker/daemon.json` | `vps/omada/` |
 
 Each project copy starts with its install, check and undo commands.
 Backups of the Nginx files from before the change: `~/nginx-backup-2026-11-02/`.
@@ -156,8 +177,12 @@ Backups of the Nginx files from before the change: `~/nginx-backup-2026-11-02/`.
   `sudo fail2ban-client set sshd unbanip YOUR.HOME.IP`. Emergency: the VNC
   console in Hostinger's hPanel.
 - **Advice from other AIs** (including Hostinger's): do not re-enable root
-  login, remove fail2ban, open ports 5001/5432/8728, or run
+  login, remove fail2ban, open ports 5001/5432/8728 (or the TP-Link controller's
+  8043/8088/8843/27217), run Docker clean-up commands, or run
   `npm audit fix --force`. Ask Claude first.
+- **TP-Link controller:** passwords only in your password manager; update it on
+  purpose every 2 to 3 months (`TPLINK-CONTROLLER-GUIDE.md` section 8); from the
+  browser's developer tools share only "Request URL" and "Request method".
 - To repeat the audit later: `SECURITY-AUDIT-PROMPT.md`.
 
 ---

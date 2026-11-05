@@ -5,7 +5,7 @@ copy each command, paste it into the VPS window, and compare what you see
 with **"Good looks like"**. When something does not match, take a screenshot
 and send it to Claude (check the safety rules first).
 
-Last updated: 2 November 2026
+Last updated: 5 November 2026
 
 ---
 
@@ -59,6 +59,8 @@ cd ~/WI-FI
 | Router status check (pinger) | every 5 minutes | Marks routers online/offline (offline after 8 minutes of silence) |
 | History clean-up | every night 02:00 | Deletes ended sessions and finished vouchers older than 1 month |
 | Database backup | every night 03:00 | Saves a full copy in `/var/backups/wifi-db/`, keeps the last 14 |
+| TP-Link controller backup | every night 04:00 | The controller saves its settings in `/opt/omada/data/` |
+| TP-Link controller restart | when needed | Docker restarts the controller box by itself after a crash or reboot |
 | SSL certificate renewal check | 06:17 and 18:17 daily | Renews the website's padlock certificate before it expires |
 | Ubuntu security updates | daily | Installs urgent security fixes automatically |
 | Log rotation | automatic | Stops log files from filling the disk |
@@ -87,6 +89,16 @@ Open the admin panel (`admin.oswagolink.co.tz`) → **Routers**.
 **If one is offline:** first ask the business whether the router is switched
 on and has internet. A router that is turned off at night shows offline; that
 is normal and fixes itself when it comes back.
+
+### 3c. Is the TP-Link controller running?
+```
+sudo docker ps --format '{{.Names}}  {{.Status}}'
+```
+**Good looks like:** `omada  Up …` (for example `Up 3 days`).
+
+**If it is missing or says `Exited`:** `sudo docker restart omada`, wait 10 minutes,
+run the check again. Still not `Up`: send Claude
+`sudo tail -n 30 /opt/omada/logs/server.log`. Details: `TPLINK-CONTROLLER-GUIDE.md`.
 
 ---
 
@@ -119,6 +131,17 @@ uptime
 | `used` | `free -h`, line `Swap:` | `0B` or small and not growing | grows week after week |
 | `Use%` | `df -h /` | under 70% | above 80% |
 | load average (first number) | `uptime` | under 0.7 | above 0.7 most of the day (time to upgrade to KVM 2) |
+| TP-Link controller memory | `sudo docker stats --no-stream` | under 1.5 GB (its limit) | at the limit every week, or the box keeps restarting |
+
+**What `free -h` means:** `free` = completely unused memory (Linux keeps it low on
+purpose); `buff/cache` = borrowed to speed things up and given back instantly;
+**`available` = the real number to watch**.
+
+TP-Link controller backups (weekly):
+```
+sudo ls -l /opt/omada/data/autobackup/
+```
+**Good looks like:** a file from last night. Missing: tell Claude.
 
 ### 4c. Recent errors
 ```
@@ -308,6 +331,7 @@ itself; this only confirms it.
 | A business cannot open Winbox on its router (any port) | Ask them to plug the laptop into a port **without** an access point and use Winbox by MAC address (admin panel → Setup Guide → "Staff door") | Still nothing: on the VPS `cd ~/WI-FI/backend && node scripts/routerStaffDoor.js open 10.20.X.Y` (the router's tunnel address). When they are done: same command with `close` |
 | SSH fully broken (not a ban) | hPanel → your VPS → **VNC / emergency console** (works without SSH). Log in as `biliant` | Undo the SSH rules: `sudo rm /etc/ssh/sshd_config.d/00-oswagolink.conf && sudo systemctl reload ssh`, then message Claude |
 | Data deleted or database broken | **Stop. Do not try fixes from the internet.** | Message Claude: we choose the right backup together and restore it safely |
+| TP-Link EAPs all `Disconnected`, or the controller page will not open | `sudo docker ps`: must show `omada Up`. If not: `sudo docker restart omada`, wait 10 minutes | Page still not opening: restart the SSH tunnel (`TPLINK-CONTROLLER-GUIDE.md` section 4). Still broken: send Claude `sudo tail -n 30 /opt/omada/logs/server.log` |
 | `Unexpected crash, restarting` in the logs | Nothing: PM2 already started a fresh copy within a second | Send Claude the lines just above and below it: it is a bug to fix |
 | Did the backend crash? | Run the command just below this table | `code [0] via signal [SIGINT]` = a normal update restart. `code [1]` = a crash: send Claude a screenshot |
 
@@ -339,6 +363,9 @@ describes.
 | `2 vulnerabilities (1 moderate, 1 high)` after `npm run build` | Only affects the build tool's preview server on a programmer's computer, never the live site. A careful upgrade is planned. Do **not** run `npm audit fix --force`. |
 | `Use --update-env to update environment variables` after `pm2 restart` | Just a PM2 tip |
 | `4 additional security updates can be applied with ESM Apps` at login | Optional extra updates from Ubuntu Pro (free for personal use); can be enabled later |
+| `client_loop: send disconnect: Connection reset` in the tunnel window | Your internet cut the quiet SSH tunnel. Run the tunnel command again (`TPLINK-CONTROLLER-GUIDE.md` section 4) |
+| `channel 2: open failed: connect failed: Connection refused` in the tunnel window | The TP-Link controller is still starting (5 to 10 minutes after a restart). Wait |
+| TP-Link controller memory near 1.4 GB | Normal for Java + MongoDB; the box is limited to 1.5 GB and billing is never affected |
 | `LF will be replaced by CRLF` | Windows/Linux line-ending notice, harmless |
 | `Swap: 2.0Gi … 0B used` | The memory safety net is ready and not needed: good |
 | Router `offline` at night | Router switched off or without internet; it comes back by itself |
@@ -361,7 +388,10 @@ describes.
 
 - **Off-VPS backups:** today backups live on the VPS itself. If the whole VPS
   were lost, you would depend on Hostinger's weekly backup. Set up an automatic
-  nightly copy to a second place; until then, do step 5c every month.
+  nightly copy to a second place; until then, do step 5c every month. The
+  TP-Link controller's backups (`/opt/omada/data/autobackup/`) belong in the same copy.
+- **TP-Link controller update check** every 2 to 3 months, never automatic
+  (`TPLINK-CONTROLLER-GUIDE.md` section 8, with Claude, snapshot first).
 - **Upgrade to KVM 2** when the load average (4b) stays above 0.7, or available
   memory stays under 1 GB.
 - **Before each new business:** test a new router's setup once.
@@ -386,6 +416,7 @@ describes.
 | What protects the system, what is still open | `SECURITY-STATUS.md` |
 | How the VPS sets up and controls the routers | `HOW-VPS-CONTROLS-ROUTERS.md` |
 | Everything on the VPS: each part, every secret, what to renew and when | `VPS-HANDBOOK.md` |
+| TP-Link controller (Docker box `omada`, data `/opt/omada/`): history, checks, updates, removal | `TPLINK-CONTROLLER-GUIDE.md` |
 
 ---
 

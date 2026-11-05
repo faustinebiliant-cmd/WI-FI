@@ -8,9 +8,10 @@ Related guides (all in the project root):
 - `OWNER-CHECKUP-GUIDE.md`: daily, weekly and monthly checks, emergencies, message list
 - `HOW-VPS-CONTROLS-ROUTERS.md`: the router tunnel and router control in detail
 - `SECURITY-STATUS.md`: what protects the system, what is still open
+- `TPLINK-CONTROLLER-GUIDE.md`: the TP-Link (Omada) controller: what was installed and why, checks, updates, removal
 - Admin panel, Router Setup Guide: how to set up a router
 
-Last updated: 4 November 2026
+Last updated: 5 November 2026
 
 ---
 
@@ -30,7 +31,8 @@ Last updated: 4 November 2026
 ```
  Internet
     |
-    |  only 4 doors open (firewall): 22 SSH, 80 + 443 websites, 51820 router tunnel
+    |  doors open (firewall): 22 SSH, 80 + 443 websites, 51820 router tunnel,
+    |  and for TP-Link EAPs: 29810 + 19810 (udp), 29811-29817 + 8880 (tcp)
     v
  +--------------------------------------------------------------------------------+
  | VPS                                                                            |
@@ -45,6 +47,7 @@ Last updated: 4 November 2026
  |                        |-- routers, through the WireGuard tunnel (wg0)         |
  |                                                                                |
  |  WireGuard (51820) ....... one private tunnel per router (10.20.0.X)           |
+ |  Docker box "omada" ...... TP-Link controller (admin 8043 via SSH tunnel only)  |
  |  Automatic jobs .......... backups, clean-up, certificates, updates, logs      |
  +--------------------------------------------------------------------------------+
 ```
@@ -83,12 +86,17 @@ console** in Hostinger's hPanel works without SSH.
 | 80 / tcp | Websites (only redirects to HTTPS) | Open |
 | 443 / tcp | Websites with the padlock | Open |
 | 51820 / udp | Router tunnel (WireGuard) | Open (only routers with the right key get in) |
+| 29810, 19810 / udp and 29811 to 29817 / tcp | TP-Link EAPs reaching the controller | Open since 5 Nov 2026 (an EAP is only managed after you adopt it) |
+| 8880 / tcp | TP-Link portal entrance (phones pass it on the way to our portal) | Open since 5 Nov 2026 (its front page only points to the closed 8043) |
+| 8043, 8088, 8843 | TP-Link controller admin | **Never open**: only through your SSH tunnel (`TPLINK-CONTROLLER-GUIDE.md` section 4) |
+| 27217 | TP-Link controller's database (MongoDB) | **Never open**: listens inside the VPS only |
 | 5001 | Backend | **Never open**: only Nginx uses it, inside the VPS |
 | 5432 | Database | **Never open**: only the backend uses it, inside the VPS |
 | 8728 | Router API (on the routers) | **Never open**: only through the tunnel |
 
 Check: `sudo ufw status verbose`. The VPS also does **not** pass traffic between routers
-(`ip_forward = 0`), so one router can never reach another.
+(`ip_forward = 0`), so one router can never reach another. Docker is set so it can never change
+the firewall or switch forwarding on (`/etc/docker/daemon.json`).
 
 ---
 
@@ -228,6 +236,22 @@ Full explanation: `HOW-VPS-CONTROLS-ROUTERS.md`.
 
 ---
 
+## 8b. The TP-Link controller, in short
+
+Full explanation: `TPLINK-CONTROLLER-GUIDE.md` (history, checks, how an EAP joins, updates, removal).
+
+| Thing | Where |
+|---|---|
+| The controller (Omada 6.3.0.45) | Docker box `omada`: at most 1.5 GB memory and 60% CPU, restarts by itself |
+| Its data, settings, backups, logs | `/opt/omada/data/`, `/opt/omada/logs/` (**never delete**) |
+| The box recipe | `vps/omada/` in the project (README has every command) |
+| Docker settings | `/etc/docker/daemon.json` (Docker never touches the firewall or forwarding) |
+| Admin page | `https://127.0.0.1:8043` through the SSH tunnel only |
+
+Everyday: `sudo docker ps` (running?), `sudo docker stats --no-stream` (memory), `sudo docker restart omada`.
+
+---
+
 ## 9. Every secret on the VPS
 
 | Secret | Where | Who can read it | If it leaked | If it must be changed |
@@ -245,6 +269,10 @@ Full explanation: `HOW-VPS-CONTROLS-ROUTERS.md`.
 | Database backups | `/var/backups/wifi-db/` | root only | The whole database | Not changeable: protect them |
 | Router API passwords | in the database, **encrypted** | the backend | Little alone (they only work through the tunnel) | Made per router at setup |
 | Router setup codes | in the database, 30 minutes, single use | the backend | A router slot could be hijacked within those 30 minutes | They expire by themselves |
+| TP-Link controller admin login | your password manager | you | Someone with SSH access could change every EAP | Controller → your profile → change password |
+| TP-Link device account (`eap-admin`) | your password manager; every adopted EAP keeps it | you, the EAPs | Someone holding an EAP could log in to that EAP | Controller → Site Settings → Device Account (all EAPs get the new one) |
+| TP-Link hotspot operator | laptop test file now; in Phase C only in `.env` | you / the backend | Phones could be let in for free on that site | Controller → Hotspot → Operators |
+| TP-Link controller data and backups | `/opt/omada/` | root and the box | All controller settings and logins | Not changeable: protect them |
 
 **Never put any of these in chat, GitHub, email, screenshots, or another AI.** You may tell Claude
 whether a setting is **set**, or how **long** it is, never its value.
@@ -258,6 +286,8 @@ whether a setting is **set**, or how **long** it is, never its value.
 | Voucher expiry, online checks | every 15 seconds / 1 minute / 5 minutes | the backend |
 | History clean-up | 02:00 every night | the backend |
 | Database backup | 03:00 every night | `/etc/cron.d/wifi-db-backup` |
+| TP-Link controller backup | 04:00 every night (set in the controller) | Controller → Settings → Maintenance → Backup Schedule |
+| Restart the TP-Link controller if it stops, start it after a reboot | always | Docker (`--restart unless-stopped`) |
 | Certificate renewal check | 06:17 and 18:17 | `/etc/cron.d/certbot-renew` |
 | Ubuntu security updates | daily | Ubuntu (unattended upgrades) |
 | Log rotation | daily | Ubuntu (logrotate) and `pm2-logrotate` |
@@ -276,6 +306,7 @@ whether a setting is **set**, or how **long** it is, never its value.
 | Monthly (15 min) | Speed report, **Ubuntu updates** (`sudo apt update && sudo apt upgrade`, reboot at a quiet time if asked), **copy a backup to your PC**, business subscriptions | Guide section 5 |
 | Monthly | `sudo ls /etc/wireguard/`: a `wg0.conf.before-remove.*` file means a router removal failed (tell Claude) | Section 8 |
 | Every 3 months | **Practice restore**, certificate check | Guide section 6 |
+| Every 2 to 3 months | **TP-Link controller update check** (never automatic, snapshot first) | `TPLINK-CONTROLLER-GUIDE.md` section 8, with Claude |
 | Every year (suggested) | Change your `biliant` password and the admin panel password | `passwd`; admin password with Claude |
 | When MikroTik offers a new **long-term** RouterOS | Update routers one at a time (not the "testing" versions) | Winbox: System > Packages |
 | On a calm day (planned) | Vite upgrade in the 3 apps (clears the "5 vulnerabilities" note) | With Claude, never `npm audit fix --force` |
@@ -289,7 +320,9 @@ whether a setting is **set**, or how **long** it is, never its value.
 
 ## 12. Never do this
 
-- **Never open ports 5001, 5432 or 8728** in the firewall.
+- **Never open ports 5001, 5432 or 8728** in the firewall, nor the TP-Link controller's
+  **8043, 8088, 8843 or 27217**.
+- **Never delete `/opt/omada`** and never run Docker clean-up commands (`docker system prune -a`).
 - **Never edit by hand:** `/etc/wireguard/wg0.conf`, the device-pass files Nginx uses,
   `/var/lib/postgresql/`, or the website folders in `/var/www/wifi-app/`.
 - **Never change `ROUTER_ENCRYPTION_KEY`** without a planned change.
@@ -315,6 +348,7 @@ whether a setting is **set**, or how **long** it is, never its value.
 | Disk almost full (`df -h /` above 80%) | Tell Claude | Usually old logs or backups |
 | VPS does not answer at all | hPanel: is the VPS running? | Hostinger support |
 | Router problems | `HOW-VPS-CONTROLS-ROUTERS.md` section 7 | |
+| TP-Link EAPs offline / controller page will not open | `sudo docker ps` (must show `omada Up`); if not: `sudo docker restart omada` and wait 10 minutes | `sudo tail -n 30 /opt/omada/logs/server.log` to Claude; `TPLINK-CONTROLLER-GUIDE.md` sections 4 and 7 |
 
 ---
 
@@ -339,4 +373,5 @@ whether a setting is **set**, or how **long** it is, never its value.
 | Backups | `/var/backups/wifi-db/`, `/usr/local/sbin/wifi-db-backup`, `/etc/cron.d/wifi-db-backup` | `vps/wifi-db-backup`, `vps/wifi-db-backup.cron` |
 | Swap (memory safety net) | `/swapfile` (2 GB) | `vps/wifi-add-swap` |
 | Router tunnel | `/etc/wireguard/`, helpers in `/usr/local/sbin/` | `vps/wifi-wireguard-*` |
+| TP-Link controller | Docker box `omada`, data `/opt/omada/`, `/etc/docker/daemon.json` | `vps/omada/`, `TPLINK-CONTROLLER-GUIDE.md` |
 | Logs | `/var/log/nginx/`, `/var/log/postgresql/`, `~/.pm2/logs/`, system journal | |
