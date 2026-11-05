@@ -188,6 +188,15 @@ export default function App() {
       setSuccessData(res.data.data);
       setStatus('success');
 
+      // TP-Link: the controller has let the phone in, but the phone only notices when the
+      // page moves on (tested 5 Nov 2026: pressing "Done" brought the internet). So after
+      // 4 seconds the page reloads by itself, and then shows "You're connected" with the time left.
+      if (omada) {
+        setTimeout(() => {
+          window.location.reload();
+        }, 4000);
+      }
+
       // Log the phone in on the router: that is what actually unlocks the internet
       if (loginUrl) {
         // MikroTik expects the username and password to be the voucher code, written exactly
@@ -298,7 +307,16 @@ export default function App() {
             )}
           </div>
 
-          {loginUrl ? (
+          {omada ? (
+            <>
+              <span className="unlocking"><span className="spinner-sm" /> Unlocking internet...</span>
+              <p className="price-note">
+                This window may close by itself once the internet is on. When your time is over,
+                your phone will bring you back here.
+              </p>
+              <button onClick={() => window.location.reload()} className="btn btn-secondary btn-block">Done</button>
+            </>
+          ) : loginUrl ? (
             <>
               <span className="unlocking"><span className="spinner-sm" /> Unlocking internet...</span>
               <p className="price-note">

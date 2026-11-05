@@ -94,7 +94,7 @@ export default function SessionsPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         title="Disconnect Customer"
-        message={disconnectError || `Are you sure you want to kick ${deleteTarget?.mac_address} off the WiFi?`}
+        message={disconnectError || `Kick ${deleteTarget?.mac_address} off the WiFi? Their voucher ends now: the same code will not work again.`}
         confirmLabel="Disconnect"
         cancelLabel="Cancel"
         variant="danger"
