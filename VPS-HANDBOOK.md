@@ -242,7 +242,7 @@ Full explanation: `TPLINK-CONTROLLER-GUIDE.md` (history, checks, how an EAP join
 
 | Thing | Where |
 |---|---|
-| The controller (Omada 6.3.0.45) | Docker box `omada`: at most 1.5 GB memory and 60% CPU, restarts by itself |
+| The controller (Omada 6.3.0.45) | Docker box `omada`: at most 1.75 GB memory and 60% CPU, restarts by itself |
 | Its data, settings, backups, logs | `/opt/omada/data/`, `/opt/omada/logs/` (**never delete**) |
 | The box recipe | `vps/omada/` in the project (README has every command) |
 | Docker settings | `/etc/docker/daemon.json` (Docker never touches the firewall or forwarding) |

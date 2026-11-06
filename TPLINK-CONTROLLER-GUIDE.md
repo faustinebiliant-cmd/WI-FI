@@ -50,9 +50,10 @@ yet). Decision for the first version: **one speed per business** (packages diffe
 | 5 Nov 2026 | **Docker** (Ubuntu's own package `docker.io`, plus `docker-buildx`) | TP-Link does not support our Ubuntu 26.04. Inside a sealed box (Docker) the controller gets Ubuntu 24.04, which TP-Link supports. The box also lets us limit its memory and CPU, and remove it cleanly | 10a step 5 |
 | 5 Nov 2026 | **Docker settings file** `/etc/docker/daemon.json` | Docker must **never** touch the firewall or switch on "forwarding" (forwarding stays off so one router can never reach another). Docker's logs are kept small (3 files of 10 MB) | 10a step 5 |
 | 5 Nov 2026 | **The box recipe** `vps/omada/` in the project (Dockerfile, starter, README) | Builds the box from official parts only: Ubuntu 24.04, Java 21, MongoDB 8.0, and the controller 6.3.0.45 from `static.tp-link.com`, refused if its fingerprint (SHA256) does not match | delete the image, 10a step 1 |
-| 5 Nov 2026 | **The box itself**, name `omada` | Runs the controller all the time; restarts by itself after a crash or reboot; at most **1.5 GB** memory and **60% of the CPU**; no special rights; runs as an ordinary user (not root) | 10a step 1 |
+| 5 Nov 2026 | **The box itself**, name `omada` | Runs the controller all the time; restarts by itself after a crash or reboot; at most **1.75 GB** memory (1.5 GB until 6 Nov 2026) and **60% of the CPU**; no special rights; runs as an ordinary user (not root) | 10a step 1 |
 | 5 Nov 2026 | **Folder `/opt/omada/`** (data + logs) | The controller's database, settings and automatic backups. Kept outside the box so updates do not lose anything | 10a step 4 |
-| 6 Nov 2026 | **Java memory settings** in the starter (`MALLOC_ARENA_MAX=2`, network buffers 128 MB, code space 96 MB) | Java used 1.38 GB with a 700 MB heap and slowly climbed to the box's 1.5 GB limit; these are the standard fixes for that climb | rebuild without them (not needed) |
+| 6 Nov 2026 | **Java memory settings** in the starter (`MALLOC_ARENA_MAX=2`, network buffers 128 MB, code space 96 MB) | Java used 1.38 GB with a 700 MB heap and slowly climbed to the box's 1.5 GB limit; these are the standard fixes for that climb. Result: Java flat at 1.21 GB for over an hour | rebuild without them (not needed) |
+| 6 Nov 2026 | **Box limit raised 1.5 → 1.75 GB** (`sudo docker update --memory 1.75g --memory-swap 2.25g omada`, no restart) | Working in the controller's admin pages (login, creating the Open API key, firmware check, then the API document) made Java jump from 1.22 to 1.36 GB and the box to 1.497 of 1.5 GB. Java keeps that memory afterwards, so 1.5 GB was too tight | `sudo docker update --memory 1.5g --memory-swap 2g omada` |
 | 5 Nov 2026 | **Firewall: 4 new doors** (see 2c) | EAPs anywhere must reach the controller, and customers' phones must reach the portal entrance | 10a step 3 |
 
 ### 2b. Settings inside the controller (and why)
@@ -100,7 +101,7 @@ To give it back to MikroTik use: section 10c.
 | What you want | Command | Good looks like |
 |---|---|---|
 | Is it running? | `sudo docker ps --format '{{.Names}}  {{.Status}}'` | `omada  Up …` |
-| Memory and CPU | `sudo docker stats --no-stream --format '{{.Name}}  CPU {{.CPUPerc}}  MEM {{.MemUsage}}'` | memory under 1.5 GB, CPU usually a few % |
+| Memory and CPU | `sudo docker stats --no-stream --format '{{.Name}}  CPU {{.CPUPerc}}  MEM {{.MemUsage}}'` | memory under 1.6 GB (limit 1.75 GB), CPU usually a few % |
 | Restart it | `sudo docker restart omada` | It takes **5 to 10 minutes** to be fully up (Java starts slowly on our CPU limit) |
 | Its recent errors (to send Claude) | `sudo tail -n 30 /opt/omada/logs/server.log` | mostly `INFO` lines |
 
@@ -133,7 +134,7 @@ buttons silently do nothing. Press Ctrl+C in the tunnel window, run step 1 again
 | When | What | How |
 |---|---|---|
 | Daily (with the backend check) | Controller running | Section 3, "Is it running?" |
-| Weekly | Memory under 1.5 GB; VPS `available` above 1 GB | Section 3 + `free -h` |
+| Weekly | Memory under 1.6 GB; VPS `available` above 1 GB | Section 3 + `free -h` |
 | Weekly | The controller's backups exist | `sudo ls -l /opt/omada/data/autobackup/` (newest from last night) |
 | Weekly | EAPs online | Controller → Devices: all `Connected` |
 | Every 2 to 3 months | Controller update check (never automatic) | Section 8 |
@@ -146,6 +147,7 @@ buttons silently do nothing. Press Ctrl+C in the tunnel window, run step 1 again
 |---|---|---|
 | Controller admin login | your password manager | Used only through the tunnel |
 | Device account (`eap-admin`) | your password manager | Every adopted EAP keeps this login inside itself: never the same as the admin login |
+| Open API key `oswagolink-backend` (Client ID + Client Secret, created 6 Nov 2026) | only the VPS `.env` (`OMADA_OPENAPI_CLIENT_ID`, `OMADA_OPENAPI_CLIENT_SECRET`) | Mode Client, role **Admin**, all sites (including new ones). For automation: create/delete sites, adopt EAPs, speeds. If it leaks: delete the app in Global > Settings > Platform Integration > Open API and create a new one |
 | Hotspot operator (`portal-test` today) | laptop `omada-test\operator.json` (test); in Phase C only in the VPS `.env` | Role **Hotspot Admin**: can let phones in and out, cannot change the controller |
 | The controller's data `/opt/omada/` and its backups | VPS, root and the box only | Hold the controller's settings and logins: **never share or copy into the project** |
 | MongoDB (inside the box) | no password, but only reachable from inside the VPS (`127.0.0.1:27217`) | Never open 27217 |

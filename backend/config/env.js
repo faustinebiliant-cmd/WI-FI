@@ -178,6 +178,31 @@ if (OMADA_ENABLED) {
 }
 
 // ------------------------------------------------------------
+// TP-Link Open API key (optional: both or none; needs the five OMADA_* above)
+// Created in the controller: Global > Settings > Platform Integration > Open API,
+// mode Client, role Admin, all sites. Used for automation (sites, adopt, speeds).
+//   OMADA_OPENAPI_CLIENT_ID       32 hexadecimal characters
+//   OMADA_OPENAPI_CLIENT_SECRET   its secret
+// ------------------------------------------------------------
+const OMADA_OPENAPI_CLIENT_ID = (trimmed(process.env.OMADA_OPENAPI_CLIENT_ID) || '').toLowerCase();
+const OMADA_OPENAPI_CLIENT_SECRET = trimmed(process.env.OMADA_OPENAPI_CLIENT_SECRET);
+if (Boolean(OMADA_OPENAPI_CLIENT_ID) !== Boolean(OMADA_OPENAPI_CLIENT_SECRET)) {
+  fail('TP-Link Open API settings are incomplete: set both OMADA_OPENAPI_CLIENT_ID and OMADA_OPENAPI_CLIENT_SECRET (or neither).');
+}
+const OMADA_OPENAPI_ENABLED = Boolean(OMADA_OPENAPI_CLIENT_ID);
+if (OMADA_OPENAPI_ENABLED) {
+  if (!OMADA_ENABLED) {
+    fail('OMADA_OPENAPI_* needs the other TP-Link settings (OMADA_CONTROLLER_ID, OMADA_OPERATOR_USER, OMADA_OPERATOR_PASSWORD, OMADA_CERT_SHA256).');
+  }
+  if (!/^[0-9a-f]{32}$/.test(OMADA_OPENAPI_CLIENT_ID)) {
+    fail('OMADA_OPENAPI_CLIENT_ID must be the 32 hexadecimal characters shown as Client ID in the controller.');
+  }
+  if (!/^[A-Za-z0-9]{16,128}$/.test(OMADA_OPENAPI_CLIENT_SECRET)) {
+    fail('OMADA_OPENAPI_CLIENT_SECRET must be the Client Secret shown in the controller (letters and numbers only).');
+  }
+}
+
+// ------------------------------------------------------------
 // Frozen export. Nothing downstream reads process.env.
 // ------------------------------------------------------------
 const env = Object.freeze({
@@ -207,7 +232,11 @@ const env = Object.freeze({
   OMADA_OPERATOR_USER,
   OMADA_OPERATOR_PASSWORD,
   OMADA_CERT_SHA256,
-  OMADA_PORT
+  OMADA_PORT,
+
+  OMADA_OPENAPI_ENABLED,
+  OMADA_OPENAPI_CLIENT_ID,
+  OMADA_OPENAPI_CLIENT_SECRET
 });
 
 module.exports = env;

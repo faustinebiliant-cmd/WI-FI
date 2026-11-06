@@ -6,7 +6,7 @@ The TP-Link controller runs in a Docker box on the VPS. Everything here is for t
 | Setting | Value | Why |
 |---|---|---|
 | Network | `host` | No Docker networking; the UFW firewall stays in full control |
-| Memory | 1.5 GB (+0.5 GB swap) | Can never starve billing |
+| Memory | 1.75 GB (+0.5 GB swap); raised from 1.5 GB on 6 Nov 2026 with `sudo docker update --memory 1.75g --memory-swap 2.25g omada` | Can never starve billing |
 | CPU | at most 0.6 of the core | Billing always keeps at least 40% |
 | User | `omada` (uid 508), no extra rights | Never root |
 | Data | `/opt/omada/data`, logs `/opt/omada/logs` | Survives updates and rebuilds |
@@ -39,7 +39,7 @@ sudo docker build --network host -t oswagolink/omada:6.3.0.45 .
 sudo mkdir -p /opt/omada/data /opt/omada/logs
 sudo chown -R 508:508 /opt/omada
 sudo docker run -d --name omada --init --network host --restart unless-stopped \
-  --memory 1.5g --memory-swap 2g --cpus 0.6 --stop-timeout 120 \
+  --memory 1.75g --memory-swap 2.25g --cpus 0.6 --stop-timeout 120 \
   --cap-drop ALL --security-opt no-new-privileges \
   -e OMADA_JAVA_XMX=700m \
   -v /opt/omada/data:/opt/tplink/EAPController/data \

@@ -98,7 +98,7 @@ Details: `TPLINK-CONTROLLER-GUIDE.md`.
 
 | Risk | Protection |
 |---|---|
-| A new program on the VPS could take too much memory or CPU and stop billing | Sealed Docker box: at most 1.5 GB memory and 60% of the CPU; tested: billing unaffected |
+| A new program on the VPS could take too much memory or CPU and stop billing | Sealed Docker box: at most 1.75 GB memory and 60% of the CPU; tested: billing unaffected |
 | Docker normally changes the firewall and switches "forwarding" on (routers could then reach each other) | Docker is configured never to touch the firewall or forwarding (checked: forwarding still `0`, no Docker firewall rules) |
 | The controller program itself is downloaded from the internet | Only from `static.tp-link.com`, refused if its fingerprint (SHA256) differs; Java and MongoDB from their official sources |
 | The controller running with full rights | Runs as an ordinary user inside the box, all special rights removed, cannot gain new ones |

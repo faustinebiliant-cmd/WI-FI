@@ -235,4 +235,14 @@ const ping = async (site) => {
   return true;
 };
 
-module.exports = { authorize, listValid, cutMac, ping, OmadaError, _test: { toDashes, toColons } };
+module.exports = {
+  authorize,
+  listValid,
+  cutMac,
+  ping,
+  OmadaError,
+  // For omadaOpenApi.js only: the same certificate-checked connection
+  rawRequest,
+  toDashes,
+  _test: { toDashes, toColons }
+};

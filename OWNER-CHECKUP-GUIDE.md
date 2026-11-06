@@ -131,7 +131,7 @@ uptime
 | `used` | `free -h`, line `Swap:` | `0B` or small and not growing | grows week after week |
 | `Use%` | `df -h /` | under 70% | above 80% |
 | load average (first number) | `uptime` | under 0.7 | above 0.7 most of the day (time to upgrade to KVM 2) |
-| TP-Link controller memory | `sudo docker stats --no-stream` | under 1.5 GB (its limit) | at the limit every week, or the box keeps restarting |
+| TP-Link controller memory | `sudo docker stats --no-stream` | under 1.6 GB (its limit is 1.75 GB) | at the limit every week, or the box keeps restarting |
 
 **What `free -h` means:** `free` = completely unused memory (Linux keeps it low on
 purpose); `buff/cache` = borrowed to speed things up and given back instantly;
@@ -365,7 +365,7 @@ describes.
 | `4 additional security updates can be applied with ESM Apps` at login | Optional extra updates from Ubuntu Pro (free for personal use); can be enabled later |
 | `client_loop: send disconnect: Connection reset` in the tunnel window | Your internet cut the quiet SSH tunnel. Run the tunnel command again (`TPLINK-CONTROLLER-GUIDE.md` section 4) |
 | `channel 2: open failed: connect failed: Connection refused` in the tunnel window | The TP-Link controller is still starting (5 to 10 minutes after a restart). Wait |
-| TP-Link controller memory near 1.4 GB | Normal for Java + MongoDB; the box is limited to 1.5 GB and billing is never affected |
+| TP-Link controller memory near 1.3–1.5 GB | Normal for Java + MongoDB (it jumps up when someone works in the controller's admin pages, and stays there); the box is limited to 1.75 GB and billing is never affected |
 | `LF will be replaced by CRLF` | Windows/Linux line-ending notice, harmless |
 | `Swap: 2.0Gi … 0B used` | The memory safety net is ready and not needed: good |
 | Router `offline` at night | Router switched off or without internet; it comes back by itself |
