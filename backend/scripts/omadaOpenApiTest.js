@@ -95,8 +95,18 @@ const check = async () => {
   });
 };
 
-// A strong one-time password for the trial site's device account (never printed)
-const strongPassword = () => `Ow${crypto.randomBytes(12).toString('hex')}#9Z`;
+// A strong one-time password for the trial site's device account (never printed).
+// TP-Link's rule: 10-64 characters with upper, lower, number and symbol, and never the
+// same character twice in a row.
+const strongPassword = () => {
+  const sets = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnpqrstuvwxyz', '23456789', '!#$%&*@^'];
+  const out = [];
+  for (let i = 0; i < 24; i++) {
+    const set = sets[i % sets.length]; // rotating sets: every kind present, neighbours always differ
+    out.push(set[crypto.randomInt(set.length)]);
+  }
+  return out.join('');
+};
 
 const trialSite = async () => {
   const model = await findSite(SITE_NAME);
