@@ -47,12 +47,18 @@ gives the business WiFi speed (the speed profile on the WiFi), and a package spe
 faster than that. If setting the speed fails, the customer still gets in at the business WiFi speed.
 Both panels also show each access point's status (online, offline, pending, …), checked every 5 minutes.
 
+**Update 6 November 2026 (one speed setting, as on MikroTik):** with the Open API key, every TP-Link
+package **must** have a speed (1-20 Mbps), exactly like MikroTik, and Add Router no longer asks for a
+WiFi speed (two speed settings confused businesses). Oswagolink puts a hidden **20 Mbps safety limit**
+per phone on each WiFi it makes: normally it changes nothing, but if setting a phone's package speed
+ever fails, that phone gets at most 20 Mbps instead of the whole line. Older TP-Link packages without
+a speed keep working at that limit. Without the key (sites made by hand) nothing changed.
+
 **Update 7 November 2026 (automation steps V2-2, V2-3, V2-4):** with the Open API key, nobody touches
 the controller for a new TP-Link business any more:
-- **Add Router → TP-Link** (business panel) asks for the access point's MAC, a **WiFi name** and the
-  **WiFi speed per phone** (1-50 Mbps). Oswagolink then makes the whole site in a few seconds: site
+- **Add Router → TP-Link** (business panel) asks for the access point's MAC and a **WiFi name**. Oswagolink then makes the whole site in a few seconds: site
   (Tanzania, Africa/Nairobi, General) with its own random access point login (`eap-admin`, kept
-  encrypted), the open WiFi as a guest network, the speed, the External Portal
+  encrypted), the open WiFi as a guest network, a hidden 20 Mbps safety limit per phone, the External Portal
   `https://oswagolink.co.tz/portal/`, before-paying access only to `69.62.105.119/32`, and the site is
   added to the hotspot operator. If any step fails, the half-made site is deleted again and nothing is saved.
 - The business panel then shows **Connect**: the steps for the technician, the Inform URL and a

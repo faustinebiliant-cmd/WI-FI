@@ -35,7 +35,7 @@ class OmadaRouter {
 
   // Let one phone in for `minutes`. Any older approval of the same phone is cut first,
   // so the time is exactly the voucher's remaining time.
-  // speedDownKbps / speedUpKbps: the package speed (0 = the business WiFi speed).
+  // speedDownKbps / speedUpKbps: the package speed (0 = the WiFi's own speed limit).
   async authorizeClient({ clientMac, apMac, ssidName, radioId, minutes, speedDownKbps = 0, speedUpKbps = 0 }) {
     const client = normalizeMac(clientMac);
     const ap = normalizeMac(apMac);
@@ -48,13 +48,13 @@ class OmadaRouter {
       await omada.cutMac(this.site, client);
       // The speed is set BEFORE the phone is let in, so it never has a moment at full speed.
       // The controller keeps a phone's speed, so it is set (or removed) on every voucher.
-      // If only the speed fails, the phone still gets in at the business WiFi speed: the
+      // If only the speed fails, the phone still gets in at the WiFi speed limit: the
       // customer paid and must not be refused because of the speed.
       if (env.OMADA_OPENAPI_ENABLED) {
         try {
           await openApi.setClientSpeed(this.site, client, speedDownKbps, speedUpKbps);
         } catch (err) {
-          console.error(`[Omada] Could not set the package speed on router ${this.routerId} (the business WiFi speed applies): ${err.message}`);
+          console.error(`[Omada] Could not set the package speed on router ${this.routerId} (the WiFi speed limit applies): ${err.message}`);
         }
       }
       await omada.authorize({ site: this.site, clientMac: client, apMac: ap, ssidName, radioId: Number(radioId), minutes: mins });

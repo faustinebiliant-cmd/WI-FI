@@ -14,9 +14,10 @@ const MAX_ROUTERS_PER_TENANT = 10;
 // A setup link (provision token) works this long, then a new one must be made.
 // Short on purpose: a link copied or photographed by someone else soon stops working.
 const SETUP_LINK_MINUTES = 30;
-// TP-Link business WiFi speed per phone, in whole Mbps (packages can be slower, never faster)
-const MIN_WIFI_MBPS = 1;
-const MAX_WIFI_MBPS = 50;
+// TP-Link: each phone gets its package speed (1-20 Mbps), as on MikroTik. The WiFi itself also
+// gets a hidden safety limit of 20 Mbps per phone (the highest package speed): if the
+// controller ever fails to set one phone's speed, that phone still cannot use the whole line.
+const WIFI_SAFETY_KBPS = 20 * 1024;
 
 // Only what the page needs. Tokens and passwords are never sent to the browser.
 const listRouters = async (req, res) => {
@@ -121,7 +122,7 @@ const createRouter = async (req, res) => {
 // A TP-Link-only router: the business types the MAC of its TP-Link access point (EAP)
 // from the sticker. No setup commands, no tunnel.
 // With the Open API key (automation), Oswagolink at once creates the business's site in the
-// controller (WiFi name, business speed, portal) and later adopts the access point with that
+// controller (WiFi name, safety speed limit, portal) and later adopts the access point with that
 // MAC by itself. Without the key, the admin creates the site by hand (admin panel), as before.
 const createOmadaRouter = async (req, res, name, location) => {
   const apMac = normalizeMac(String((req.body && req.body.ap_mac) || ''));
@@ -129,18 +130,13 @@ const createOmadaRouter = async (req, res, name, location) => {
     return res.status(400).json({ success: false, error: 'Access point MAC: 12 letters/numbers from the sticker, for example D4-D6-DF-A5-F8-D2.' });
   }
   let wifiName = null;
-  let speedKbps = null;
+  const speedKbps = env.OMADA_OPENAPI_ENABLED ? WIFI_SAFETY_KBPS : null;
   if (env.OMADA_OPENAPI_ENABLED) {
     // Printable letters, numbers, spaces and simple symbols; no spaces at the start or end
     wifiName = String((req.body && req.body.wifi_name) || '').trim();
     if (!isValidSsidName(wifiName) || !/^[\x20-\x7e]+$/.test(wifiName)) {
       return res.status(400).json({ success: false, error: 'WiFi name: 1 to 32 letters, numbers, spaces or simple symbols (no emoji).' });
     }
-    const mbps = Number(req.body && req.body.wifi_speed_mbps);
-    if (!Number.isInteger(mbps) || mbps < MIN_WIFI_MBPS || mbps > MAX_WIFI_MBPS) {
-      return res.status(400).json({ success: false, error: `WiFi speed per phone: a whole number of Mbps from ${MIN_WIFI_MBPS} to ${MAX_WIFI_MBPS}.` });
-    }
-    speedKbps = mbps * 1024;
   }
   const routerToken = crypto.randomBytes(16).toString('hex');
 

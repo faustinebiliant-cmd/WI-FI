@@ -7,7 +7,8 @@
 //      (device account: "eap-admin" + a strong random password, kept encrypted)
 //   2. the WiFi name: open, guest network (phones cannot reach the business's own network),
 //      2.4 + 5 GHz
-//   3. the business WiFi speed per phone on that WiFi
+//   3. a hidden safety limit per phone on that WiFi (20 Mbps, the highest package speed);
+//      each phone gets its own package speed when its voucher is used
 //   4. the portal: External Portal  https://<OMADA_PUBLIC_HOST>/portal/
 //   5. before paying, phones may reach only the VPS (<OMADA_PUBLIC_IP>/32)
 //   6. our hotspot operator (OMADA_OPERATOR_USER) gets the new site, so phones can be let in

@@ -58,9 +58,10 @@ const createPackage = async (req, res) => {
     if (routerCheck.rows.length === 0) {
       return res.status(403).json({ success: false, error: 'Invalid router selected.' });
     }
-    // TP-Link-only routers: the speed is optional. 0 (or empty) = the business WiFi speed set
-    // on its controller site; 1-20 Mbps = each phone gets this speed (needs the Open API key).
-    const isOmada = routerCheck.rows[0].device_type === 'omada';
+    // TP-Link-only routers with the Open API key: the speed is required, exactly as on MikroTik
+    // (Oswagolink gives each phone its package speed). Only without the key (sites made by
+    // hand, no per-phone speed possible) the speed stays empty = the WiFi's own speed.
+    const isOmada = routerCheck.rows[0].device_type === 'omada' && !env.OMADA_OPENAPI_ENABLED;
 
     if (!isOmada && (speed_down_kbps === undefined || speed_up_kbps === undefined)) {
       return res.status(400).json({ success: false, error: 'All fields, including Router, are required' });
@@ -84,13 +85,9 @@ const createPackage = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Speed must be a whole number from 1 to 20 Mbps.' });
     }
     if (isOmada) {
-      // Both 0 (business WiFi speed), or both a real speed
-      const bothZero = down === 0 && up === 0;
-      if (!bothZero && (!isAllowedSpeed(down) || !isAllowedSpeed(up))) {
-        return res.status(400).json({ success: false, error: 'Speed: leave both empty (business WiFi speed) or choose 1 to 20 Mbps for both.' });
-      }
-      if (!bothZero && !env.OMADA_OPENAPI_ENABLED) {
-        return res.status(400).json({ success: false, error: 'Package speeds for TP-Link are not switched on yet. Leave the speed empty to use the business WiFi speed.' });
+      // Without the key a TP-Link package cannot have its own speed
+      if (down !== 0 || up !== 0) {
+        return res.status(400).json({ success: false, error: 'Package speeds for TP-Link are not switched on yet. Leave the speed empty to use the WiFi speed.' });
       }
     }
 

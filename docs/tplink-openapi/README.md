@@ -48,7 +48,7 @@ The code is in `backend/services/routers/omadaOpenApi.js`.
 | One phone's details | `GET /openapi/v1/{omadacId}/sites/{siteId}/clients/{phoneMac}` | V2-0 (test tool) |
 | Device account of a site | `PUT /openapi/v1/{omadacId}/sites/{siteId}/device-account` | V2-2 |
 | WiFi names (SSIDs) | `GET/POST /openapi/v2/{omadacId}/sites/{siteId}/wireless-network/ssids` | V2-2 |
-| WiFi speed (business speed) | `PATCH /openapi/v1/{omadacId}/sites/{siteId}/wireless-network/ssids/{ssidId}/rate-limit` | V2-2 |
+| WiFi safety speed limit (20 Mbps per phone) | `PATCH /openapi/v1/{omadacId}/sites/{siteId}/wireless-network/ssids/{ssidId}/rate-limit` | V2-2 |
 | Portal | `GET /openapi/v1/{omadacId}/sites/{siteId}/portals`, `POST .../portal` | V2-2 |
 | Allowed before login (pre-auth) | `GET/PATCH /openapi/v1/{omadacId}/sites/{siteId}/setting/access-control` | V2-2 |
 | Hotspot operator's sites | `GET /openapi/v1/{omadacId}/sites/{siteId}/hotspot/operators`, `PATCH .../hotspot/operators/{id}` (name, password, selectedSites) | V2-2, V2-4 |

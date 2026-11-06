@@ -83,7 +83,7 @@ const dashed = (mac) => String(mac).toUpperCase().replace(/:/g, '-');
 const colons = (mac) => String(mac || '').toUpperCase().replace(/-/g, ':');
 
 // Speeds come in kbps (packages store multiples of 1024 = whole Mbps). 0 or missing = no own
-// speed: the limit is removed, so the business WiFi speed applies.
+// speed: the limit is removed, so the WiFi speed limit applies.
 // Tested 6 Nov 2026: 1 Mbps limit gave 920 kbps on the phone, removed gave 2.1 Mbps.
 const toLimit = (kbps) => {
   const k = Number(kbps);

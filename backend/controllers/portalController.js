@@ -362,7 +362,7 @@ const redeemOmadaVoucher = async (req, res) => {
       cleanCode,
       deviceMac,
       ipAddress: null, // the controller reports the business's public address, not the phone's
-      // The phone gets the package speed (0 = the business WiFi speed set on the controller site)
+      // The phone gets the package speed (0, only on older packages = the WiFi's own speed limit)
       grant: async (remainingMinutes, pkg, voucher) => {
         // One phone per voucher: a phone that used this voucher before is cut off first
         // (otherwise one payment could keep two phones online)

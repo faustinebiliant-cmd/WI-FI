@@ -267,8 +267,8 @@ export default function SetupGuidePage() {
       <Section id="tplink-only" title="TP-Link only business (no MikroTik)">
         <p className="guide-text">
           The business has only a TP-Link Omada access point (EAP). The Omada controller on the VPS lets customers in and out;
-          vouchers work as usual. The WiFi speed profile is the business speed; a package can have its own lower speed (each
-          phone gets it at login, with the Open API key). The Routers page shows each access point's status (checked every
+          vouchers work as usual. With the Open API key every package has a speed (1-20 Mbps), as on MikroTik: each phone
+          gets it at login. The WiFi itself has a hidden 20 Mbps safety limit per phone. The Routers page shows each access point's status (checked every
           5 minutes). Full background: <strong>TPLINK-CONTROLLER-GUIDE.md</strong>.
         </p>
         <p className="guide-text">

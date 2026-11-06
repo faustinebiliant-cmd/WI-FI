@@ -24,9 +24,7 @@ const ADOPT_ERROR = {
   no_answer: 'The access point did not answer. Check that its cable goes to the internet box; Oswagolink tries again every 3 minutes.',
   failed: 'Connecting failed; Oswagolink tries again every 3 minutes. If it keeps failing, contact Oswagolink support.'
 };
-// Business WiFi speed choices (Mbps per phone)
-const WIFI_SPEEDS = [1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 50];
-const EMPTY_FORM = { name: '', location_label: '', ap_mac: '', wifi_name: '', wifi_speed_mbps: '2' };
+const EMPTY_FORM = { name: '', location_label: '', ap_mac: '', wifi_name: '' };
 
 const apBadgeClass = (status) =>
   status === 'online' ? 'badge-success'
@@ -137,7 +135,7 @@ export default function RoutersPage() {
           name: formData.name,
           location_label: formData.location_label,
           ap_mac: formData.ap_mac,
-          ...(tplinkAuto ? { wifi_name: formData.wifi_name, wifi_speed_mbps: Number(formData.wifi_speed_mbps) } : {})
+          ...(tplinkAuto ? { wifi_name: formData.wifi_name } : {})
         });
         const created = res.data && res.data.data;
         setShowModal(false);
@@ -331,7 +329,7 @@ export default function RoutersPage() {
                         : (waiting ? 'Waiting for setup' : router.ip_address)}
                       {isOmada && router.wifi_name && (
                         <div className="ap-line cell-muted">
-                          WiFi "{router.wifi_name}"{router.wifi_speed_kbps ? `, ${Math.round(router.wifi_speed_kbps / 1024)} Mbps per phone` : ''}
+                          WiFi "{router.wifi_name}"
                         </div>
                       )}
                     </td>
@@ -442,13 +440,6 @@ export default function RoutersPage() {
                       onChange={e => setFormData({ ...formData, wifi_name: e.target.value.replace(/[^\x20-\x7e]/g, '') })}
                     />
                   </div>
-                  <div className="form-group">
-                    <label>WiFi speed per phone</label>
-                    <select className="form-control" value={formData.wifi_speed_mbps} onChange={e => setFormData({ ...formData, wifi_speed_mbps: e.target.value })}>
-                      {WIFI_SPEEDS.map((m) => <option key={m} value={String(m)}>{m} Mbps</option>)}
-                    </select>
-                    <p className="form-hint">The fastest a phone can go. A package can be slower, never faster. Not more than your internet can carry.</p>
-                  </div>
                 </>
               )}
               <div className="modal-actions">
@@ -469,7 +460,7 @@ export default function RoutersPage() {
             <h2 className="modal-title">Access point added</h2>
             <p className="modal-sub"><strong>{omadaNext.name}</strong> is waiting for Oswagolink.</p>
             <ol className="modal-sub">
-              <li>Oswagolink prepares your WiFi (your WiFi name, the customer page and your speed).</li>
+              <li>Oswagolink prepares your WiFi (your WiFi name and the customer page). Each customer gets the speed of their package.</li>
               <li>Your technician plugs the access point into your internet box and points it to Oswagolink.</li>
               <li>Oswagolink connects it: the status changes to <strong>Online</strong>.</li>
               <li>Switch off (or put a password on) the internet box's own WiFi, so customers use yours.</li>
