@@ -4,10 +4,13 @@ Everything about the TP-Link (Omada) part of Oswagolink: what was installed, whe
 how to use and check it; what to do when something goes wrong; how to update it; and how to
 remove all of it. Plain English, **no secret values** in this file.
 
+How a TP-Link business works day to day, from the first setup to a customer's voucher:
+**`HOW-VPS-CONTROLS-TPLINK.md`**.
+
 Related guides: `VPS-HANDBOOK.md` (the whole VPS), `OWNER-CHECKUP-GUIDE.md` (regular checks),
 `SECURITY-STATUS.md` (protections). Technical commands: `vps/omada/README.md`.
 
-Last updated: 5 November 2026
+Last updated: 6 November 2026
 
 ---
 
@@ -65,7 +68,7 @@ per phone on each WiFi it makes: normally it changes nothing, but if setting a p
 ever fails, that phone gets at most 20 Mbps instead of the whole line. Older TP-Link packages without
 a speed keep working at that limit. Without the key (sites made by hand) nothing changed.
 
-**Update 7 November 2026 (automation steps V2-2, V2-3, V2-4):** with the Open API key, nobody touches
+**Update 6 November 2026 (automation steps V2-2, V2-3, V2-4, all tested on a real phone):** with the Open API key, nobody touches
 the controller for a new TP-Link business any more:
 - **Add Router → TP-Link** (business panel) asks for the access point's MAC and a **WiFi name**. Oswagolink then makes the whole site in a few seconds: site
   (Tanzania, Africa/Nairobi, General) with its own random access point login (`eap-admin`, kept
@@ -80,8 +83,9 @@ the controller for a new TP-Link business any more:
   longer shown. An access point whose MAC no business registered is **never** adopted; the admin
   Routers page lists it as "no business registered this MAC".
 - **Delete Router** forgets the access point (it returns to factory settings), deletes the site,
-  then takes it off the operator. Only sites Oswagolink made (`omada_site_auto`); the Oswagolink
-  site made by hand is never touched. If the controller refuses, the router is not deleted.
+  then takes it off the operator. Only sites the system made (`omada_site_auto`); your hand-made
+  site "Oswagolink" is never touched. **Keep that site and its name**: it keeps the operator's site
+  list from ever being empty (TP-Link refuses an empty list), and the test commands find it by name. If the controller refuses, the router is not deleted.
 - Without the Open API key everything works as before (site made by hand, site ID in the admin panel).
 
 ---
@@ -111,9 +115,9 @@ the controller for a new TP-Link business any more:
 | Device Web HTTP/HTTPS access, Standalone app management | off | Customers cannot even see an EAP's own login page; nobody can take an EAP over with the phone app |
 | History Data Retention | short (1 day clients, weekly 1 month) | Smaller database, less memory |
 | Backup Schedule | daily (move to **04:00**, see 9) | Automatic copy of the settings |
-| Site | `Oswagolink` (one site for now) | Later: **one site per business**, so businesses can never see each other |
+| Site | `Oswagolink` (made by hand, 5 Nov) | Since 6 Nov the system makes **one site per business** by itself, so businesses can never see each other. This hand-made site stays: no business uses it, but it keeps the operator's list non-empty |
 | Device account (site settings) | `eap-admin` + strong password | The login every adopted EAP gets. Different from your admin login |
-| Test WiFi, portal, speed profile, operator | `Oswagolink TP Test`, External Portal `https://oswagolink.co.tz/portal/`, pre-auth only the VPS (`69.62.105.119/32`), `Speed-2M`, operator `portal-test` (Hotspot **Admin**, only this site) | The test setup. Phase C makes these per business |
+| Test WiFi, portal, speed profile, operator | `Oswagolink TP Test`, External Portal `https://oswagolink.co.tz/portal/`, pre-auth only the VPS (`69.62.105.119/32`), `Speed-2M`, first operator `portal-test` | The test setup of 5 Nov. Since Phase C the system uses the operator `oswagolink-portal` (Hotspot **Admin**), and since 6 Nov it makes the WiFi and portal per business |
 
 ### 2c. Doors (ports) on the VPS for the controller
 | Port | Open to the internet? | Used for |
@@ -125,12 +129,14 @@ the controller for a new TP-Link business any more:
 | 8088, 8843, 8044, 27001, 19810/tcp | **No** | Admin and TP-Link extras we do not use |
 | 27217 | **No**, and it only listens inside the VPS | The controller's MongoDB database |
 
-### 2d. On your laptop (test leftovers, to clean up: section 10b)
+### 2d. On your laptop
+**Cleaned up on 6 November 2026:** the Windows test controller was uninstalled (without its
+data), the folders `C:\Users\Dell\Omada Controller` and `C:\Users\Dell\omada-test` (with the test
+operator's password) were deleted, and the firewall rule "Omada test - EAP cable only" removed.
+You look at the VPS controller through the tunnel only (section 4). Still on the laptop:
+
 | What | Why it is there |
 |---|---|
-| "Omada Network Application" (Windows) in `C:\Users\Dell\Omada Controller\` (with an old `data-old` folder) | Phase A test controller (4 November 2026) |
-| Windows firewall rule **"Omada test - EAP cable only"** | Let the EAP on the cable reach the laptop controller |
-| Folder `C:\Users\Dell\omada-test\` (`approve.js`, `operator.json`) | The test script. `operator.json` holds the test operator's password. **Keep it until Phase C is built**, then delete it |
 | Internet sharing from WiFi to the cable (Ethernet 2, `192.168.137.x`) | Gives the test EAP internet |
 
 ### 2e. On the test EAP (EAP225-Outdoor v3, MAC D4-D6-DF-A5-F8-D2)
@@ -165,7 +171,6 @@ The admin page is never open to the internet. You reach it through a private pip
    ```
 2. In the browser: **`https://127.0.0.1:8043`** → "not private" warning → Advanced → Continue.
 3. Log in with your controller login (password manager).
-4. Make sure the laptop's own Omada program is **not** running (it would take the same address).
 
 **The tunnel drops often** ("client_loop: send disconnect: Connection reset"). Then the page's
 buttons silently do nothing. Press Ctrl+C in the tunnel window, run step 1 again, press F5.
@@ -194,7 +199,7 @@ buttons silently do nothing. Press Ctrl+C in the tunnel window, run step 1 again
 | Device account of each site Oswagolink makes (since V2-2) | the database, **encrypted** (`routers.omada_device_password_encrypted`) | A different random 24-character password per business; never shown in a panel |
 | One-time setup login `oswsetup` (since V2-3) | the database, **encrypted** (`routers.omada_setup_password_encrypted`) | Shown only to that business, in its Connect window, until its access point is adopted. Only useful before adoption: afterwards the EAP has the device account |
 | Open API key `oswagolink-backend` (Client ID + Client Secret, created 6 Nov 2026) | only the VPS `.env` (`OMADA_OPENAPI_CLIENT_ID`, `OMADA_OPENAPI_CLIENT_SECRET`) | Mode Client, role **Admin**, all sites (including new ones). For automation: create/delete sites, adopt EAPs, speeds. If it leaks: delete the app in Global > Settings > Platform Integration > Open API and create a new one |
-| Hotspot operator (`portal-test` today) | laptop `omada-test\operator.json` (test); in Phase C only in the VPS `.env` | Role **Hotspot Admin**: can let phones in and out, cannot change the controller. Since V2-2 Oswagolink adds each new site to its site list (and removes it when the router is deleted); this sends its password (from `.env`) to the controller, never anywhere else |
+| Hotspot operator (`oswagolink-portal`, the name in `OMADA_OPERATOR_USER`) | only the VPS `.env` (`OMADA_OPERATOR_PASSWORD`) | Role **Hotspot Admin**: can let phones in and out, cannot change the controller. Since V2-2 Oswagolink adds each new site to its site list (and removes it when the router is deleted); this sends its password (from `.env`) to the controller, never anywhere else |
 | The controller's data `/opt/omada/` and its backups | VPS, root and the box only | Hold the controller's settings and logins: **never share or copy into the project** |
 | MongoDB (inside the box) | no password, but only reachable from inside the VPS (`127.0.0.1:27217`) | Never open 27217 |
 | Not secret | the controller ID (`omadacId`), site IDs, the Inform URL | Fine to send to Claude |
@@ -292,6 +297,7 @@ Always together with Claude, on a quiet day:
    deleted with Claude.
 
 ### 10b. From your laptop
+(Steps 1 to 3 were done on 6 November 2026.)
 1. Settings → Apps → **Omada Network Application** → Uninstall. Then delete the folder
    `C:\Users\Dell\Omada Controller` if it is still there (it holds `data-old`).
 2. PowerShell **as administrator**:
@@ -311,15 +317,15 @@ Always together with Claude, on a quiet day:
 
 | Next | What | Status |
 |---|---|---|
-| B8 | Watch memory and billing speed for a day | in progress (5 Nov 2026: controller 1.38 of 1.5 GB, CPU 2%, VPS available 1.7 GB, load 0.09) |
-| Phase C | Build it in: TP-Link businesses in the panels, the portal understands TP-Link links, the voucher cleaner cuts TP-Link phones off, one site per business, setup guide for technicians, security review | Plan to be written first, then your "go" |
+| B8 | Watch memory and billing speed | 6 Nov 2026 evening, after the busiest day: Java 1,388,964 KB (under the 1,450,000 line), box 1.56 of 1.75 GB, VPS available 1.6 GB. Morning reading on 7 Nov decides whether Java gets 600 MB instead of 700 MB |
+| Phase C | Build it in: TP-Link businesses in the panels, the portal understands TP-Link links, the voucher cleaner cuts TP-Link phones off, setup guide for technicians | done 5 Nov 2026, phone tests passed |
 | Phase D | Swahili and AzamPay, for MikroTik **and** TP-Link businesses | after Phase C |
 | V2-0 | Open API key + test tool (`node scripts/omadaOpenApiTest.js check / trial-site / speed / speed-off`) | done 6 Nov 2026 (all tests passed); TP-Link's API document saved in `docs/tplink-openapi/` |
 | V2-1 | Different speed per package + access point status in both panels | done, phone test passed 6 Nov 2026 |
-| V2-2 | Create each business's site automatically | built 7 Nov 2026 (42 laptop checks pass), VPS test pending (`trial-full` first) |
-| V2-3 | Adopt the access point automatically (MAC checked) + Inform URL and setup login in the business panel | built 7 Nov 2026, VPS test pending |
-| V2-4 | Delete Router also removes the site from the controller (only sites Oswagolink made) | built 7 Nov 2026, VPS test pending |
-| V2-5 | Security review of V2-0 to V2-4 + guides | after the VPS tests |
+| V2-2 | Create each business's site automatically | done, `trial-full` and phone test passed 6 Nov 2026 |
+| V2-3 | Adopt the access point automatically (MAC checked) + Inform URL and setup login in the business panel | done, phone test passed 6 Nov 2026 (after three fixes: symbols in the setup login, Inform URL with the IP, "adopted" only when connected) |
+| V2-4 | Delete Router also removes the site from the controller (only sites the system made) | done, tested 6 Nov 2026 (site gone, hand-made site stayed) |
+| V2-5 | Security review of V2-0 to V2-4 + guides | next (7 Nov 2026) |
 | When many TP-Link businesses | VPS with 2 CPU cores | watch section 5 |
 
 ---
@@ -332,5 +338,8 @@ Always together with Claude, on a quiet day:
   they can delete the controller's image.
 - **Never update the controller "quickly"**: always section 8, with a snapshot first.
 - **Never give the device account the same password as your admin login.**
-- **Never share** the controller's passwords, its backups, `operator.json`, or the browser's
+- **Never change a business's site by hand**, never delete or rename the hand-made site
+  "Oswagolink", never change the operator's password in the controller (the system logs in with
+  the one in `.env`): `HOW-VPS-CONTROLS-TPLINK.md` section 9.
+- **Never share** the controller's passwords, its backups, a business's setup login, or the browser's
   "Request Headers".

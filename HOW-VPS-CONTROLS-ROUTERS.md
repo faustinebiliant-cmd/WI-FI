@@ -1,7 +1,7 @@
 # How the VPS Controls the Routers
 
 Everything on the VPS that connects to, sets up, or controls the MikroTik routers, in
-plain English. No secrets in this file. For daily checks see `OWNER-CHECKUP-GUIDE.md`; for
+plain English. TP-Link access points work differently (no tunnel): see `HOW-VPS-CONTROLS-TPLINK.md`. No secrets in this file. For daily checks see `OWNER-CHECKUP-GUIDE.md`; for
 security see `SECURITY-STATUS.md`; for setting up a router see the admin panel's Setup Guide.
 
 Last updated: 3 November 2026
@@ -65,7 +65,7 @@ The program that does all the work. Its router parts:
 | **Voucher expiry** (`services/sessionCleaner.js`) | Every **15 seconds** | Ends vouchers whose time is up and removes them from the router |
 | **Online check** (same file) | Every **1 minute** | Compares who the database thinks is online with who the router says is online. A router that does not answer 3 times in a row counts as offline |
 | **Router pinger** (`scripts/pingRouters.js`) | Every **5 minutes** | Marks routers online/offline. "Offline" only after 8 minutes of silence |
-| **TP-Link adopt** (`scripts/omadaAdopt.js`, only with the TP-Link Open API key) | Every **1 minute** | Adopts a waiting TP-Link access point into its business's site, only when a business registered exactly that MAC (TPLINK-CONTROLLER-GUIDE.md, update 7 Nov 2026) |
+| **TP-Link adopt** (`scripts/omadaAdopt.js`, only with the TP-Link Open API key) | Every **1 minute** | Adopts a waiting TP-Link access point into its business's site, only when a business registered exactly that MAC (the whole TP-Link story: HOW-VPS-CONTROLS-TPLINK.md) |
 | **Emergency key** (`scripts/routerStaffDoor.js`) | Only when you run it | Opens or closes one router's staff door (Winbox) through the tunnel |
 
 ### 2d. The database (what it knows about each router)

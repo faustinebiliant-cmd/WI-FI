@@ -5,7 +5,7 @@ copy each command, paste it into the VPS window, and compare what you see
 with **"Good looks like"**. When something does not match, take a screenshot
 and send it to Claude (check the safety rules first).
 
-Last updated: 5 November 2026
+Last updated: 6 November 2026 (TP-Link automation)
 
 ---
 
@@ -56,7 +56,8 @@ cd ~/WI-FI
 |---|---|---|
 | Voucher expiry check | every 15 seconds | Ends vouchers whose time is up and removes them from the router |
 | Session sync (cleaner) | every minute | Compares who the database thinks is online with who the router says is online |
-| Router status check (pinger) | every 5 minutes | Marks routers online/offline (offline after 8 minutes of silence) |
+| Router status check (pinger) | every 5 minutes | Marks routers online/offline (offline after 8 minutes of silence). For TP-Link it also asks the controller for each access point's status |
+| TP-Link adopt | every minute | Adopts a waiting TP-Link access point into its business's site, only when a business registered exactly that MAC (`HOW-VPS-CONTROLS-TPLINK.md`) |
 | History clean-up | every night 02:00 | Deletes ended sessions and finished vouchers older than 1 month |
 | Database backup | every night 03:00 | Saves a full copy in `/var/backups/wifi-db/`, keeps the last 14 |
 | TP-Link controller backup | every night 04:00 | The controller saves its settings in `/opt/omada/data/` |
@@ -100,6 +101,9 @@ sudo docker ps --format '{{.Names}}  {{.Status}}'
 run the check again. Still not `Up`: send Claude
 `sudo tail -n 30 /opt/omada/logs/server.log`. Details: `TPLINK-CONTROLLER-GUIDE.md`.
 
+TP-Link routers also appear in the admin panel's **Routers** page (3b), with each access
+point's status. A router shows `online` only when one of its access points is online.
+
 ---
 
 ## 4. WEEKLY (5 minutes): backups, space, errors
@@ -132,6 +136,7 @@ uptime
 | `Use%` | `df -h /` | under 70% | above 80% |
 | load average (first number) | `uptime` | under 0.7 | above 0.7 most of the day (time to upgrade to KVM 2) |
 | TP-Link controller memory | `sudo docker stats --no-stream` | under 1.6 GB (its limit is 1.75 GB) | at the limit every week, or the box keeps restarting |
+| TP-Link Java memory | `sudo docker top omada -o pid,rss,args \| cut -c1-70`, the `java` line, column RSS | under 1,450,000 | above 1,450,000 (then Java gets a smaller limit, 600 MB instead of 700 MB) |
 
 **What `free -h` means:** `free` = completely unused memory (Linux keeps it low on
 purpose); `buff/cache` = borrowed to speed things up and given back instantly;
@@ -332,6 +337,7 @@ itself; this only confirms it.
 | SSH fully broken (not a ban) | hPanel → your VPS → **VNC / emergency console** (works without SSH). Log in as `biliant` | Undo the SSH rules: `sudo rm /etc/ssh/sshd_config.d/00-oswagolink.conf && sudo systemctl reload ssh`, then message Claude |
 | Data deleted or database broken | **Stop. Do not try fixes from the internet.** | Message Claude: we choose the right backup together and restore it safely |
 | TP-Link EAPs all `Disconnected`, or the controller page will not open | `sudo docker ps`: must show `omada Up`. If not: `sudo docker restart omada`, wait 10 minutes | Page still not opening: restart the SSH tunnel (`TPLINK-CONTROLLER-GUIDE.md` section 4). Still broken: send Claude `sudo tail -n 30 /opt/omada/logs/server.log` |
+| A new TP-Link access point does not connect (stays "Connect the access point" / "Waiting to be adopted") | Inform URL with the **IP** instead of the name (Connect window, second box) | `cd ~/WI-FI/backend && node scripts/omadaOpenApiTest.js waiting` and send Claude the output. Full list: `HOW-VPS-CONTROLS-TPLINK.md` section 8 |
 | `Unexpected crash, restarting` in the logs | Nothing: PM2 already started a fresh copy within a second | Send Claude the lines just above and below it: it is a bug to fix |
 | Did the backend crash? | Run the command just below this table | `code [0] via signal [SIGINT]` = a normal update restart. `code [1]` = a crash: send Claude a screenshot |
 
@@ -414,7 +420,8 @@ describes.
 | Old notes | `docs/archive/` (history only, do not follow) |
 | Your localhost vs VPS notes | `LOCALHOST-VS-VPS.md` |
 | What protects the system, what is still open | `SECURITY-STATUS.md` |
-| How the VPS sets up and controls the routers | `HOW-VPS-CONTROLS-ROUTERS.md` |
+| How the VPS sets up and controls the routers (MikroTik) | `HOW-VPS-CONTROLS-ROUTERS.md` |
+| How a TP-Link business works, from the first setup to a customer's voucher | `HOW-VPS-CONTROLS-TPLINK.md` |
 | Everything on the VPS: each part, every secret, what to renew and when | `VPS-HANDBOOK.md` |
 | TP-Link controller (Docker box `omada`, data `/opt/omada/`): history, checks, updates, removal | `TPLINK-CONTROLLER-GUIDE.md` |
 
@@ -442,6 +449,25 @@ From `pm2 logs wifi-backend` (4c). Times in the log are UTC (Tanzania = UTC + 3)
 | `Decryption failed` | A saved router password could not be unlocked | **Red**: usually means the secret key in `.env` was changed. Do not change `.env` |
 | `Failed to remove WireGuard peer` | A deleted router's VPN tunnel could not be removed; nothing was deleted | Yellow: try again in a minute; red if it keeps failing |
 | `Enrollment error` / `provisioned_at reset failed` / `Register check failed` / `Bootstrap error` | A router setup step failed (an `Enrollment error` that says `killed` = the tunnel helper took more than 30 seconds; the router tries again by itself) | Yellow during a router setup; tell Claude if a setup does not finish |
+
+### TP-Link messages
+See them with `pm2 logs wifi-backend --lines 40 --nostream | grep -iE "omada|adopt"`.
+
+| Message starts with | Meaning | Level |
+|---|---|---|
+| `[Omada] Site … created for TP-Link router …` | A business added a TP-Link router; its site was built | Green |
+| `[Omada] Site … of deleted TP-Link router … removed from the controller` | A business deleted a TP-Link router; its site is gone | Green |
+| `[Adopt] Access point … adopted into its site` / `… is connected in its site` | The system adopted a business's access point | Green |
+| `[Adopt] Access point … not adopted yet (wrong_login)` | The access point's login is not the setup login (typing mistake). Tried again every 3 minutes | Yellow: the technician resets it and does the Connect steps again |
+| `[Adopt] Access point … not adopted yet (no_answer / failed)` | The access point did not answer or adopting failed. Tried again every 3 minutes | Yellow; red if it lasts an hour |
+| `[Omada] Could not create the site for a new TP-Link router … (step …)` | Add Router failed at that step; nothing was saved, the business saw "try again" | Yellow once; red if every try fails (send Claude the line) |
+| `[Omada] Could not remove site … from the controller` | Delete Router failed; nothing was deleted | Yellow; red if it keeps failing |
+| `[Omada] Could not take deleted site … off the operator` | The site is deleted, but its number stayed in the operator's list. Harmless | Green now and then; tell Claude if it repeats |
+| `[Omada] Could not set the package speed …` | A customer got in, but at most at the 20 Mbps safety limit instead of the package speed | Yellow once; red if every voucher shows it |
+| `[Omada] Could not let a phone in …` | A customer typed a valid voucher but the controller did not let the phone in; they saw "try again" and kept the voucher | Yellow once; red if it repeats |
+| `[Omada] Could not cut off a voucher's phones …` / `Could not disconnect a phone …` | An ended voucher or a Disconnect could not reach the controller; tried again | Green when the controller was restarting; yellow if it repeats |
+| `[Omada] A half-made site … could not be deleted again` / `The unsaved site … must be deleted by hand` | Cleaning up after a failed Add Router failed: a stray site may be left in the controller | **Red**: tell Claude (it is removed by hand, together) |
+| `[Omada] The controller certificate does not match OMADA_CERT_SHA256. Nothing was sent.` | The controller's identity changed (after an update or rebuild, or something is wrong) | **Red**: TP-Link vouchers stop until it is fixed. Tell Claude the same day |
 
 ### Background work
 | Message starts with | Meaning | Level |

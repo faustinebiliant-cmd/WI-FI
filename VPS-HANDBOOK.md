@@ -9,9 +9,10 @@ Related guides (all in the project root):
 - `HOW-VPS-CONTROLS-ROUTERS.md`: the router tunnel and router control in detail
 - `SECURITY-STATUS.md`: what protects the system, what is still open
 - `TPLINK-CONTROLLER-GUIDE.md`: the TP-Link (Omada) controller: what was installed and why, checks, updates, removal
+- `HOW-VPS-CONTROLS-TPLINK.md`: how a TP-Link business works, from the first setup of its access point to a customer's voucher
 - Admin panel, Router Setup Guide: how to set up a router
 
-Last updated: 5 November 2026
+Last updated: 6 November 2026
 
 ---
 
@@ -169,7 +170,8 @@ project, push, and rebuild.
 |---|---|
 | Voucher expiry | every 15 seconds |
 | Who-is-online check with the routers | every minute |
-| Router online/offline check | every 5 minutes |
+| Router online/offline check (for TP-Link also each access point's status) | every 5 minutes |
+| TP-Link adopt: adopts a waiting access point into its business's site, only for a registered MAC (only with the Open API key) | every minute |
 | History clean-up (deletes ended sessions and vouchers older than 1 month) | every night 23:00 UTC (02:00 Tanzania), and 2 minutes after each restart |
 
 **Useful commands:** `pm2 status`, `pm2 restart wifi-backend`,
@@ -238,7 +240,7 @@ Full explanation: `HOW-VPS-CONTROLS-ROUTERS.md`.
 
 ## 8b. The TP-Link controller, in short
 
-Full explanation: `TPLINK-CONTROLLER-GUIDE.md` (history, checks, how an EAP joins, updates, removal).
+Full explanation: `TPLINK-CONTROLLER-GUIDE.md` (history, checks, updates, removal). How a business's site, access point and vouchers work: `HOW-VPS-CONTROLS-TPLINK.md`.
 
 | Thing | Where |
 |---|---|
@@ -247,6 +249,7 @@ Full explanation: `TPLINK-CONTROLLER-GUIDE.md` (history, checks, how an EAP join
 | The box recipe | `vps/omada/` in the project (README has every command) |
 | Docker settings | `/etc/docker/daemon.json` (Docker never touches the firewall or forwarding) |
 | Admin page | `https://127.0.0.1:8043` through the SSH tunnel only |
+| Sites | one per TP-Link business, made and deleted by the system; plus your hand-made site "Oswagolink" (keep it and its name) |
 
 Everyday: `sudo docker ps` (running?), `sudo docker stats --no-stream` (memory), `sudo docker restart omada`.
 
@@ -271,7 +274,9 @@ Everyday: `sudo docker ps` (running?), `sudo docker stats --no-stream` (memory),
 | Router setup codes | in the database, 30 minutes, single use | the backend | A router slot could be hijacked within those 30 minutes | They expire by themselves |
 | TP-Link controller admin login | your password manager | you | Someone with SSH access could change every EAP | Controller → your profile → change password |
 | TP-Link device account (`eap-admin`) | your password manager; every adopted EAP keeps it | you, the EAPs | Someone holding an EAP could log in to that EAP | Controller → Site Settings → Device Account (all EAPs get the new one) |
-| TP-Link hotspot operator | laptop test file now; in Phase C only in `.env` | you / the backend | Phones could be let in for free on that site | Controller → Hotspot → Operators |
+| TP-Link hotspot operator (`oswagolink-portal`) | only `.env` (`OMADA_OPERATOR_PASSWORD`) | the backend | Phones could be let in for free on TP-Link sites | Change it in the controller (Hotspot → Operators) **and** in `.env` at the same moment, restart (ask Claude): otherwise every TP-Link voucher stops |
+| TP-Link Open API key (`oswagolink-backend`) | only `.env` (`OMADA_OPENAPI_CLIENT_ID`, `OMADA_OPENAPI_CLIENT_SECRET`) | the backend | Someone with it could change every TP-Link site | Controller → Settings → Platform Integration → Open API: delete the app, make a new one, put it in `.env`, restart (ask Claude) |
+| Device account and setup login of each TP-Link business | the database, encrypted | the backend | Someone holding that access point could log in to it | Not needed: random per business; the setup login stops working once the access point is adopted |
 | TP-Link controller data and backups | `/opt/omada/` | root and the box | All controller settings and logins | Not changeable: protect them |
 
 **Never put any of these in chat, GitHub, email, screenshots, or another AI.** You may tell Claude

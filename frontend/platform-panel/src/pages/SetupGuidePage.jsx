@@ -269,13 +269,14 @@ export default function SetupGuidePage() {
           The business has only a TP-Link Omada access point (EAP). The Omada controller on the VPS lets customers in and out;
           vouchers work as usual. With the Open API key every package has a speed (1-20 Mbps), as on MikroTik: each phone
           gets it at login. The WiFi itself has a hidden 20 Mbps safety limit per phone. The Routers page shows each access point's status (checked every
-          5 minutes). Full background: <strong>TPLINK-CONTROLLER-GUIDE.md</strong>.
+          5 minutes). Full story, from the first setup to a customer's voucher: <strong>HOW-VPS-CONTROLS-TPLINK.md</strong>; the controller itself: <strong>TPLINK-CONTROLLER-GUIDE.md</strong>.
         </p>
         <p className="guide-text">
-          <strong>Automatic (with the Open API key, since 7 November 2026):</strong> Add Router also asks for the WiFi name and
-          speed, and Oswagolink makes the whole site itself (it shows "made by Oswagolink" here). The business's
+          <strong>Automatic (with the Open API key, since 6 November 2026):</strong> Add Router also asks for the WiFi name,
+          and Oswagolink makes the whole site itself (it shows "made by Oswagolink" here). The business's
           <strong> Connect</strong> window gives the technician the Inform URL and a one-time setup login, and Oswagolink adopts
-          the access point with the registered MAC within 1 to 3 minutes. Delete Router removes the site again. Steps 2 and 3
+          the access point with the registered MAC within 1 to 5 minutes (on the access point's setup page any WiFi name will do,
+          for example setup-temp; if it does not connect, use the Inform URL with the IP, the second box in the Connect window). Delete Router removes the site again. Steps 2 and 3
           below are then not needed; they stay for sites made by hand.
         </p>
 
