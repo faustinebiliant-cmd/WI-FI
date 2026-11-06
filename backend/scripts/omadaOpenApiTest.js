@@ -250,7 +250,28 @@ const waiting = async () => {
     const known = new Set(rows.map((r) => r.mac));
     return list.map((d) => `${d.mac} ${d.model} ${known.has(d.mac) ? '(registered by a business)' : '(no business registered it: never adopted)'}`).join('; ');
   });
-  await step('Inform URL for technicians', async () => omadaSites.informUrl());
+  await step('Inform URL for technicians', async () => `${omadaSites.informUrl()}  (or with the IP: ${omadaSites.informUrlIp()})`);
+  // Access points inside the sites Oswagolink made, with TP-Link's detailed status
+  const { rows: autoSites } = await db.query(
+    "SELECT r.omada_site_id, a.mac, a.adopted_at IS NOT NULL AS adopted, a.adopt_error, a.status FROM routers r JOIN omada_aps a ON a.router_id = r.id WHERE r.device_type = 'omada' AND r.omada_site_auto = true AND r.omada_site_id IS NOT NULL"
+  );
+  for (const row of autoSites) {
+    await step(`Automatic site ${row.omada_site_id}, access point ${row.mac}`, async () => {
+      const devices = listOf(await call('GET', `v1/{id}/sites/${row.omada_site_id}/devices?page=1&pageSize=200`));
+      const d = devices.find((x) => x && normalizeMac(String(x.mac || '')) === row.mac);
+      const inController = d ? `in the site: status ${d.status} (${STATUS[d.status] || '?'}), detail ${d.detailStatus} (${DETAIL[d.detailStatus] || '?'})` : 'not in the site';
+      return `${inController}; database: adopted=${row.adopted}, error=${row.adopt_error || 'none'}, last status=${row.status || 'none'}`;
+    });
+  }
+};
+
+// TP-Link's detailed device status (from its Open API document)
+const DETAIL = {
+  0: 'Disconnected', 1: 'Disconnected (migrating)', 10: 'Provisioning', 11: 'Configuring', 12: 'Upgrading', 13: 'Rebooting',
+  14: 'Connected', 15: 'Connected (wireless)', 16: 'Connected (migrating)', 17: 'Connected (wireless, migrating)',
+  20: 'Pending', 21: 'Pending (wireless)', 22: 'Adopting', 23: 'Adopting (wireless)', 24: 'Adopt failed', 25: 'Adopt failed (wireless)',
+  26: 'Managed by others', 27: 'Managed by others (wireless)', 30: 'Heartbeat missed', 31: 'Heartbeat missed (wireless)',
+  32: 'Heartbeat missed (migrating)', 33: 'Heartbeat missed (wireless, migrating)', 40: 'Isolated', 41: 'Isolated (migrating)', 50: 'Slice configuring'
 };
 
 // ------------------------------------------------------------

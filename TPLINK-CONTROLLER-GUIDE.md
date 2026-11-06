@@ -47,6 +47,17 @@ gives the business WiFi speed (the speed profile on the WiFi), and a package spe
 faster than that. If setting the speed fails, the customer still gets in at the business WiFi speed.
 Both panels also show each access point's status (online, offline, pending, …), checked every 5 minutes.
 
+**Update 6 November 2026 (first phone test of the automatic adopt):**
+- The access point's own setup page demands a symbol in the password, so the one-time setup login
+  now has symbols (`@ # * !`). The setup page also insists on a WiFi name and password: anything
+  will do (`setup-temp`), the controller replaces it with the business's WiFi.
+- Behind the laptop's internet sharing the access point could not look up `oswagolink.co.tz`; the
+  Inform URL with the IP (`69.62.105.119?dPort=...`) worked. The Connect window now shows both.
+- An access point is counted as adopted only when the controller shows it **connected** (it can show
+  "disconnected" for a moment while being adopted). One that the 5-minute check sees waiting again
+  is adopted again automatically. Check with `node scripts/omadaOpenApiTest.js waiting` (shows
+  TP-Link's detailed status, for example "Adopt failed" or "Managed by others").
+
 **Update 6 November 2026 (one speed setting, as on MikroTik):** with the Open API key, every TP-Link
 package **must** have a speed (1-20 Mbps), exactly like MikroTik, and Add Router no longer asks for a
 WiFi speed (two speed settings confused businesses). Oswagolink puts a hidden **20 Mbps safety limit**

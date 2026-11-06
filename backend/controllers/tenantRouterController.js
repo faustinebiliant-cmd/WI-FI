@@ -267,6 +267,7 @@ const getTplinkSetup = async (req, res) => {
       success: true,
       data: {
         inform_url: omadaSites.informUrl(),
+        inform_url_ip: omadaSites.informUrlIp(),
         setup_username: waiting ? omadaSites.SETUP_USER : null,
         setup_password: password || null,
         aps: router.aps

@@ -66,6 +66,9 @@ const setupPassword = () => {
 // What the technician types on the access point (System > Controller Settings).
 // Not secret: it only says where our controller is.
 const informUrl = () => `${env.OMADA_PUBLIC_HOST}?dPort=29810&mPort=29814&omadacId=${env.OMADA_CONTROLLER_ID}`;
+// The same with the VPS's IP address: for an internet connection that cannot look up names for
+// the access point (seen behind a laptop's internet sharing, 5 and 6 Nov 2026)
+const informUrlIp = () => `${env.OMADA_PUBLIC_IP}?dPort=29810&mPort=29814&omadacId=${env.OMADA_CONTROLLER_ID}`;
 
 // ------------------------------------------------------------
 // Sites
@@ -79,9 +82,16 @@ const siteExists = async (siteId) => (await listSites()).some((s) => s && s.site
 let operatorQueue = Promise.resolve();
 const changeOperatorSites = (siteId, add) => {
   const job = operatorQueue.then(async () => {
-    // The operator list is read through a site the operator already has
+    // The operator list is read through a site the operator already has: the site itself,
+    // the sites in the database, and finally every site in the controller (after a delete the
+    // site itself is gone, and the database may have no other TP-Link site)
     const { rows } = await db.query("SELECT omada_site_id FROM routers WHERE device_type = 'omada' AND omada_site_id IS NOT NULL LIMIT 20");
-    const through = [siteId, ...rows.map((r) => r.omada_site_id).filter((s) => s !== siteId)];
+    let through = [...new Set([siteId, ...rows.map((r) => r.omada_site_id)])];
+    try {
+      through = [...new Set([...through, ...(await listSites()).map((s) => s && s.siteId).filter((s) => typeof s === 'string')])];
+    } catch (err) {
+      // the database sites are tried anyway
+    }
     let op = null;
     let opSite = null;
     for (const s of through) {
@@ -248,6 +258,7 @@ const listPending = async (siteId) =>
     .map((d) => ({ mac: normalizeMac(String((d && d.mac) || '')), model: String((d && (d.model || d.modelName)) || '').slice(0, 40) }))
     .filter((d) => d.mac);
 
+const CONNECTED = 1; // device status: 0 disconnected, 1 connected, 2 pending, 3 heartbeat missed, 4 isolated
 const ADOPT_ERRORS = { '-39003': 'wrong_login', '-39002': 'no_answer' };
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -273,9 +284,10 @@ const adopt = async (siteId, mac, login, { tries = 10, everyMs = 4000 } = {}) =>
     if (code === 0) return 'adopted';
     if (ADOPT_ERRORS[String(code)]) return ADOPT_ERRORS[String(code)];
     if (code === -39004) return 'failed';
-    // Still busy: is it in the site already?
+    // Still busy: is it connected in the site already? (Only "connected" counts: while it is
+    // being adopted it can show as disconnected for a moment, seen 6 Nov 2026)
     const devices = listOf(await call('GET', `v1/{id}/sites/${siteId}/devices?page=1&pageSize=200`));
-    if (devices.some((d) => d && normalizeMac(String(d.mac || '')) === mac && d.status !== 2)) return 'adopted';
+    if (devices.some((d) => d && normalizeMac(String(d.mac || '')) === mac && d.status === CONNECTED)) return 'adopted';
   }
   return 'no_answer';
 };
@@ -288,6 +300,8 @@ module.exports = {
   listPending,
   adopt,
   informUrl,
+  informUrlIp,
+  CONNECTED,
   SETUP_USER,
   _test: { strongPassword, setupPassword }
 };

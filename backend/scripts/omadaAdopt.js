@@ -3,9 +3,10 @@
 // Runs once a minute (started by server.js, only with the Open API key), then exits.
 //
 // For every access point a business registered (its MAC from the sticker) on a site that
-// Oswagolink created, and that has not joined yet:
-//   1. already in its site?            -> marked adopted
-//   2. waiting in the controller?      -> adopted into THAT business's site: first with the
+// Oswagolink created, and that has not joined yet (or that the pinger saw waiting again):
+//   1. connected in its site?           -> marked adopted
+//   2. waiting in the controller, or waiting inside its own site
+//                                       -> adopted into THAT business's site: first with the
 //      factory login, then with the router's one-time setup login (shown in the business panel)
 //   3. not seen yet                     -> nothing (the technician has not typed the Inform URL)
 // An access point whose MAC no business registered is never adopted.
@@ -26,10 +27,10 @@ const listOf = (r) => (Array.isArray(r) ? r : Array.isArray(r && r.data) ? r.dat
 const run = async () => {
   if (!env.OMADA_OPENAPI_ENABLED) return;
   const { rows } = await db.query(
-    `SELECT a.id, a.mac, r.id AS router_id, r.omada_site_id, r.omada_setup_password_encrypted
+    `SELECT a.id, a.mac, a.adopted_at, r.id AS router_id, r.omada_site_id, r.omada_setup_password_encrypted
      FROM omada_aps a JOIN routers r ON r.id = a.router_id
      WHERE r.device_type = 'omada' AND r.omada_site_auto = true AND r.omada_site_id IS NOT NULL
-       AND a.adopted_at IS NULL
+       AND (a.adopted_at IS NULL OR a.status = 'pending')
        AND (a.adopt_tried_at IS NULL OR a.adopt_tried_at < NOW() - make_interval(mins => $1::int))
      ORDER BY a.adopt_tried_at NULLS FIRST, a.created_at
      LIMIT 50`,
@@ -45,19 +46,24 @@ const run = async () => {
     const site = ap.omada_site_id;
     if (!mac) continue;
     try {
-      // 1. Already in its site (for example adopted by hand)?
+      // 1. Connected in its site (adopted, also by hand)?
       const devices = listOf(await call('GET', `v1/{id}/sites/${site}/devices?page=1&pageSize=200`));
-      if (devices.some((d) => d && normalizeMac(String(d.mac || '')) === mac && d.status !== 2)) {
-        await db.query('UPDATE omada_aps SET adopted_at = NOW(), adopt_error = NULL WHERE id = $1', [ap.id]);
-        console.log(`[Adopt] Access point ${mac} is in its site (router ${ap.router_id})`);
+      const inSite = devices.find((d) => d && normalizeMac(String(d.mac || '')) === mac) || null;
+      if (inSite && inSite.status === omadaSites.CONNECTED) {
+        await db.query("UPDATE omada_aps SET adopted_at = COALESCE(adopted_at, NOW()), adopt_error = NULL, status = 'online', status_at = NOW() WHERE id = $1", [ap.id]);
+        if (!ap.adopted_at) console.log(`[Adopt] Access point ${mac} is connected in its site (router ${ap.router_id})`);
         continue;
       }
-      // 2. Waiting to be adopted?
-      if (!pendingBySite.has(site)) pendingBySite.set(site, await omadaSites.listPending(site));
-      if (!pendingBySite.get(site).some((d) => d.mac === mac)) continue;
+      // 2. Waiting to be adopted: in the controller's waiting list, or waiting inside its own site
+      const waitingInSite = Boolean(inSite && inSite.status === 2);
+      if (!waitingInSite) {
+        if (!pendingBySite.has(site)) pendingBySite.set(site, await omadaSites.listPending(site));
+        if (!pendingBySite.get(site).some((d) => d.mac === mac)) continue;
+      }
 
       tried += 1;
-      await db.query('UPDATE omada_aps SET adopt_tried_at = NOW() WHERE id = $1', [ap.id]);
+      // Not adopted any more (also when it was marked adopted too early): the panel shows it waiting
+      await db.query('UPDATE omada_aps SET adopt_tried_at = NOW(), adopted_at = NULL WHERE id = $1', [ap.id]);
       let result = await omadaSites.adopt(site, mac, null);
       if (result === 'wrong_login' && ap.omada_setup_password_encrypted) {
         const password = decrypt(ap.omada_setup_password_encrypted);

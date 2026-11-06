@@ -496,6 +496,7 @@ export default function RoutersPage() {
                     <ol className="modal-sub">
                       <li>Plug the access point into your internet box (with its power adapter). If it was used before, reset it: hold the reset button for 10 seconds.</li>
                       <li>With a phone, join the access point's own WiFi and open <strong>omadaeap.net</strong>. When it asks you to make a login, use exactly the <strong>username and password below</strong>.</li>
+                      <li>When it asks for WiFi names and passwords, type anything (for example <strong>setup-temp</strong> and <strong>Temp-2026x</strong>): Oswagolink replaces them with your WiFi when it connects. Finish the setup.</li>
                       <li>Open <strong>System &gt; Controller Settings &gt; Controller Inform URL</strong>, paste the Inform URL below, and save.</li>
                       <li>Wait 1 to 3 minutes: Oswagolink connects it by itself, and the status on the Routers page changes to <strong>Online</strong>.</li>
                       <li>Switch off (or put a password on) the internet box's own WiFi, so customers use yours.</li>
@@ -503,6 +504,9 @@ export default function RoutersPage() {
                     <CommandBox title="Username" text={apSetupData.setup_username} copyLabel="Copy" />
                     <CommandBox title="Password" note="Only for connecting this access point. Afterwards Oswagolink changes it to its own." text={apSetupData.setup_password} copyLabel="Copy" />
                     <CommandBox title="Inform URL" note="Type it exactly: all small letters, no spaces." text={apSetupData.inform_url} copyLabel="Copy" />
+                    {apSetupData.inform_url_ip && (
+                      <CommandBox title="Inform URL (if not connected after 5 minutes)" note="Some internet connections cannot find the name above: then put this one in the same box instead." text={apSetupData.inform_url_ip} copyLabel="Copy" />
+                    )}
                   </>
                 ) : (
                   <p className="modal-sub">All access points of this router are connected.</p>
