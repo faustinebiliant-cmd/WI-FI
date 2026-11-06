@@ -64,4 +64,7 @@ Oswagolink keeps the tested `extPortal/auth` with the voucher's time).
 - **Device account password:** 10 to 64 characters, with uppercase, lowercase, number **and**
   symbol (`! # $ % & * @ ^`), and **never the same character twice in a row**.
 - **MAC addresses** in commands are written with dashes: `AA-BB-CC-DD-EE-FF`.
+- **Creating a WiFi (v2 ssids):** besides the fields the document marks as required, the
+  controller also needs `ssidEnable: true` and `chooseDevices: 0`, otherwise it answers -1001
+  "Invalid request parameters" (found with `wifi-probe`, 6 Nov 2026).
 - **Phone speed:** `upUnit` / `downUnit` 1 = Kbps, 2 = Mbps; limit 1 to 1024.

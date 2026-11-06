@@ -144,6 +144,8 @@ const createBusinessSite = async ({ label, wifiName, speedKbps }) => {
     const ssid = await call('POST', `v2/{id}/sites/${siteId}/wireless-network/ssids`, {
       name: wifiName,
       deviceType: 1,          // access points
+      ssidEnable: true,       // WiFi switched on (the controller refuses without these two,
+      chooseDevices: 0,       // found with wifi-probe 6 Nov 2026): on all access points of the site
       band: 3,                // 2.4 GHz + 5 GHz
       guestNetEnable: true,   // phones cannot reach the business's own network
       security: 0,            // open: the portal decides who gets in
