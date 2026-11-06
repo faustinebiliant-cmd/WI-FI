@@ -51,6 +51,14 @@ The code is in `backend/services/routers/omadaOpenApi.js`.
 | WiFi speed (business speed) | `PATCH /openapi/v1/{omadacId}/sites/{siteId}/wireless-network/ssids/{ssidId}/rate-limit` | V2-2 |
 | Portal | `GET /openapi/v1/{omadacId}/sites/{siteId}/portals`, `POST .../portal` | V2-2 |
 | Allowed before login (pre-auth) | `GET/PATCH /openapi/v1/{omadacId}/sites/{siteId}/setting/access-control` | V2-2 |
+| Hotspot operator's sites | `GET /openapi/v1/{omadacId}/sites/{siteId}/hotspot/operators`, `PATCH .../hotspot/operators/{id}` (name, password, selectedSites) | V2-2, V2-4 |
+
+The code for V2-2 to V2-4 is in `backend/services/routers/omadaSites.js` and
+`backend/scripts/omadaAdopt.js`. Test on the VPS: `node scripts/omadaOpenApiTest.js trial-full`
+(builds a complete site, shows it next to the hand-made one, removes it) and `... waiting`.
+
+Not used, on purpose: `hotspot/clients/{clientMac}/auth` (lets a phone in, but without a time;
+Oswagolink keeps the tested `extPortal/auth` with the voucher's time).
 
 ## Rules TP-Link checks (learned by testing)
 - **Device account password:** 10 to 64 characters, with uppercase, lowercase, number **and**

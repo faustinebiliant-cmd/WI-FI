@@ -18,13 +18,23 @@ const AP_LABEL = {
   isolated: 'No internet cable',
   not_found: 'Not connected yet'
 };
+// Why Oswagolink could not adopt the access point yet (it tries again every 3 minutes)
+const ADOPT_ERROR = {
+  wrong_login: 'The access point has a different login than the one below. Reset it (hold the reset button 10 seconds) and do step 2 again with exactly this login.',
+  no_answer: 'The access point did not answer. Check that its cable goes to the internet box; Oswagolink tries again every 3 minutes.',
+  failed: 'Connecting failed; Oswagolink tries again every 3 minutes. If it keeps failing, contact Oswagolink support.'
+};
+// Business WiFi speed choices (Mbps per phone)
+const WIFI_SPEEDS = [1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 50];
+const EMPTY_FORM = { name: '', location_label: '', ap_mac: '', wifi_name: '', wifi_speed_mbps: '2' };
+
 const apBadgeClass = (status) =>
   status === 'online' ? 'badge-success'
     : ['offline', 'heartbeat_missed', 'isolated'].includes(status) ? 'badge-danger'
       : status === 'pending' ? 'badge-warning' : 'badge-neutral';
 
 // One command with its own copy button
-function CommandBox({ title, note, text, tone = 'blue' }) {
+function CommandBox({ title, note, text, tone = 'blue', copyLabel = 'Copy Command' }) {
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
   const isLong = text.length > LONG_COMMAND;
@@ -48,7 +58,7 @@ function CommandBox({ title, note, text, tone = 'blue' }) {
       {showText && <code className="cmd-code">{text}</code>}
       <div className="cmd-actions">
         <button onClick={copy} className={`btn btn-sm ${copied ? 'btn-copied' : 'btn-primary'}`}>
-          {copied ? 'Copied!' : <><FiCopy size={18} /> Copy Command</>}
+          {copied ? 'Copied!' : <><FiCopy size={18} /> {copyLabel}</>}
         </button>
         {isLong && (
           <button type="button" onClick={() => setShowText(!showText)} className="btn btn-sm btn-link">
@@ -79,7 +89,13 @@ export default function RoutersPage() {
   const [deleteError, setDeleteError] = useState('');
   const [actionError, setActionError] = useState('');
 
-  const [formData, setFormData] = useState({ name: '', location_label: '', ap_mac: '' });
+  const [formData, setFormData] = useState(EMPTY_FORM);
+  // true: Oswagolink makes TP-Link sites and connects access points by itself
+  const [tplinkAuto, setTplinkAuto] = useState(false);
+  // "Connect access point" window: the router, and what the server sent (Inform URL, setup login)
+  const [apSetup, setApSetup] = useState(null);
+  const [apSetupData, setApSetupData] = useState(null);
+  const [apSetupError, setApSetupError] = useState('');
   // '' = not chosen yet, 'mikrotik' or 'omada' (TP-Link only)
   const [routerType, setRouterType] = useState('');
   // After adding a TP-Link router: what happens next (no setup commands)
@@ -87,7 +103,7 @@ export default function RoutersPage() {
 
   const openAdd = () => {
     setRouterType('');
-    setFormData({ name: '', location_label: '', ap_mac: '' });
+    setFormData(EMPTY_FORM);
     setErrorMsg('');
     setShowModal(true);
   };
@@ -98,6 +114,7 @@ export default function RoutersPage() {
     try {
       const res = await apiClient.get('/tenant/routers');
       setRouters(res.data.data);
+      setTplinkAuto(Boolean(res.data.tplink_auto));
       setLoadError('');
     } catch (error) {
       console.error(error);
@@ -119,12 +136,16 @@ export default function RoutersPage() {
           device_type: 'omada',
           name: formData.name,
           location_label: formData.location_label,
-          ap_mac: formData.ap_mac
+          ap_mac: formData.ap_mac,
+          ...(tplinkAuto ? { wifi_name: formData.wifi_name, wifi_speed_mbps: Number(formData.wifi_speed_mbps) } : {})
         });
+        const created = res.data && res.data.data;
         setShowModal(false);
-        setOmadaNext(res.data && res.data.data);
-        setFormData({ name: '', location_label: '', ap_mac: '' });
+        setFormData(EMPTY_FORM);
         fetchRouters();
+        // Automatic: the WiFi is ready, show how to connect the access point
+        if (created && created.site_auto) openApSetup(created);
+        else setOmadaNext(created);
         return;
       }
 
@@ -142,7 +163,7 @@ export default function RoutersPage() {
       setSetupToken(token);
       setShowModal(false);
       setShowSetupModal(true);
-      setFormData({ name: '', location_label: '', ap_mac: '' });
+      setFormData(EMPTY_FORM);
       fetchRouters();
     } catch (error) {
       setErrorMsg(error.response?.data?.error || 'Failed to create router');
@@ -172,6 +193,25 @@ export default function RoutersPage() {
     } catch (error) {
       setActionError(error.response?.data?.error || 'Failed to create new setup commands.');
     }
+  };
+
+  // TP-Link: the Inform URL and the one-time setup login (asked fresh each time, never kept)
+  const openApSetup = async (router) => {
+    setApSetup(router);
+    setApSetupData(null);
+    setApSetupError('');
+    try {
+      const res = await apiClient.get(`/tenant/routers/${router.id}/tplink-setup`);
+      setApSetupData(res.data && res.data.data);
+    } catch (error) {
+      setApSetupError(error.response?.data?.error || 'Failed to load the setup details.');
+    }
+  };
+  const closeApSetup = () => {
+    setApSetup(null);
+    setApSetupData(null);
+    setApSetupError('');
+    fetchRouters();
   };
 
   const handleDelete = async () => {
@@ -260,6 +300,8 @@ export default function RoutersPage() {
                 const isOnline = (router.status || '').toLowerCase() === 'online' &&
                   (!isOmada || !apsChecked || aps.some((a) => a.status === 'online'));
                 const waiting = isOmada ? !router.site_ready : (!router.ip_address || router.ip_address === '0.0.0.0');
+                // TP-Link with an automatic site: an access point has not joined yet
+                const apWaiting = isOmada && router.site_auto && aps.some((a) => !a.adopted);
                 return (
                   <tr key={router.id}>
                     <td className="cell-strong">{router.name}</td>
@@ -267,6 +309,8 @@ export default function RoutersPage() {
                     <td>
                       {isOmada && waiting ? (
                         <span className="badge">Waiting for Oswagolink</span>
+                      ) : apWaiting && !isOnline ? (
+                        <span className="badge badge-warning">Connect the access point</span>
                       ) : (
                         <span className={`badge ${isOnline ? 'badge-success' : 'badge-danger'}`}>
                           {isOnline ? 'Online' : 'Offline'}
@@ -280,13 +324,24 @@ export default function RoutersPage() {
                                 <div key={a.mac} className="ap-line">
                                   Access point {a.mac}
                                   {a.status && <span className={`badge ${apBadgeClass(a.status)}`}>{AP_LABEL[a.status] || a.status}</span>}
+                                  {router.site_auto && !a.adopted && a.adopt_error && <span className="badge badge-danger">Not connected: see Connect</span>}
                                 </div>
                               ))
                             : '-')
                         : (waiting ? 'Waiting for setup' : router.ip_address)}
+                      {isOmada && router.wifi_name && (
+                        <div className="ap-line cell-muted">
+                          WiFi "{router.wifi_name}"{router.wifi_speed_kbps ? `, ${Math.round(router.wifi_speed_kbps / 1024)} Mbps per phone` : ''}
+                        </div>
+                      )}
                     </td>
                     <td className="col-actions">
                       <div className="actions">
+                        {apWaiting && (
+                          <button onClick={() => openApSetup(router)} className="btn btn-sm btn-soft">
+                            Connect
+                          </button>
+                        )}
                         {!isOmada && !router.provisioned && (
                           <button onClick={() => showSetupAgain(router)} className="btn btn-sm btn-soft">
                             Setup Commands
@@ -372,6 +427,30 @@ export default function RoutersPage() {
                   <p className="form-hint">Only a phone on this access point can use the vouchers of this router.</p>
                 </div>
               )}
+              {routerType === 'omada' && tplinkAuto && (
+                <>
+                  <div className="form-group">
+                    <label>WiFi name (what customers see)</label>
+                    <input
+                      className="form-control"
+                      required
+                      type="text"
+                      placeholder="e.g. Mama Lishe WiFi"
+                      maxLength={32}
+                      value={formData.wifi_name}
+                      // Letters, numbers, spaces and simple symbols (no emoji)
+                      onChange={e => setFormData({ ...formData, wifi_name: e.target.value.replace(/[^\x20-\x7e]/g, '') })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>WiFi speed per phone</label>
+                    <select className="form-control" value={formData.wifi_speed_mbps} onChange={e => setFormData({ ...formData, wifi_speed_mbps: e.target.value })}>
+                      {WIFI_SPEEDS.map((m) => <option key={m} value={String(m)}>{m} Mbps</option>)}
+                    </select>
+                    <p className="form-hint">The fastest a phone can go. A package can be slower, never faster. Not more than your internet can carry.</p>
+                  </div>
+                </>
+              )}
               <div className="modal-actions">
                 <button type="button" onClick={() => setRouterType('')} disabled={isCreating} className="btn btn-secondary">Back</button>
                 <button type="submit" disabled={isCreating} className="btn btn-primary">
@@ -398,6 +477,52 @@ export default function RoutersPage() {
             <p className="notice notice-info">Meanwhile you can already create packages for it on the Packages page.</p>
             <div className="modal-actions">
               <button onClick={() => setOmadaNext(null)} className="btn btn-primary">OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TP-LINK: CONNECT THE ACCESS POINT (automatic site) */}
+      {apSetup && (
+        <div className="modal-overlay">
+          <div className="modal-content modal-wide">
+            <h2 className="modal-title">Connect Your TP-Link Access Point</h2>
+            <p className="modal-sub">
+              Your WiFi <strong>{apSetup.wifi_name ? `"${apSetup.wifi_name}"` : ''}</strong> is ready at Oswagolink. Give these steps to your technician.
+            </p>
+            {apSetupError && <div className="alert alert-danger">{apSetupError}</div>}
+            {!apSetupData && !apSetupError && <Loader message="Loading..." />}
+            {apSetupData && (
+              <>
+                {(apSetupData.aps || []).map((a) => (
+                  <div key={a.mac} className={`notice ${a.adopted ? 'notice-info' : (a.adopt_error ? 'notice-warning' : 'notice-info')}`}>
+                    <strong>Access point {a.mac}:</strong>{' '}
+                    {a.adopted ? 'connected. You can close this window.' : (ADOPT_ERROR[a.adopt_error] || 'waiting for the technician (steps below).')}
+                  </div>
+                ))}
+                {apSetupData.setup_password ? (
+                  <>
+                    <ol className="modal-sub">
+                      <li>Plug the access point into your internet box (with its power adapter). If it was used before, reset it: hold the reset button for 10 seconds.</li>
+                      <li>With a phone, join the access point's own WiFi and open <strong>omadaeap.net</strong>. When it asks you to make a login, use exactly the <strong>username and password below</strong>.</li>
+                      <li>Open <strong>System &gt; Controller Settings &gt; Controller Inform URL</strong>, paste the Inform URL below, and save.</li>
+                      <li>Wait 1 to 3 minutes: Oswagolink connects it by itself, and the status on the Routers page changes to <strong>Online</strong>.</li>
+                      <li>Switch off (or put a password on) the internet box's own WiFi, so customers use yours.</li>
+                    </ol>
+                    <CommandBox title="Username" text={apSetupData.setup_username} copyLabel="Copy" />
+                    <CommandBox title="Password" note="Only for connecting this access point. Afterwards Oswagolink changes it to its own." text={apSetupData.setup_password} copyLabel="Copy" />
+                    <CommandBox title="Inform URL" note="Type it exactly: all small letters, no spaces." text={apSetupData.inform_url} copyLabel="Copy" />
+                  </>
+                ) : (
+                  <p className="modal-sub">All access points of this router are connected.</p>
+                )}
+              </>
+            )}
+            <div className="modal-actions">
+              {apSetupData && apSetupData.setup_password && (
+                <button onClick={() => openApSetup(apSetup)} className="btn btn-secondary">Check again</button>
+              )}
+              <button onClick={closeApSetup} className="btn btn-primary">Close</button>
             </div>
           </div>
         </div>
@@ -452,6 +577,9 @@ export default function RoutersPage() {
           <div className="modal-content modal-narrow">
             <h2 className="modal-title danger">Delete Router</h2>
             <p className="modal-sub">Are you sure you want to delete <strong>{deleteTarget.name}</strong>? This will delete all packages and vouchers.</p>
+            {deleteTarget.device_type === 'omada' && deleteTarget.site_auto && (
+              <p className="notice notice-warning">Its WiFi is removed too, and its access point goes back to factory settings.</p>
+            )}
             {deleteError && (
               <div className="alert alert-danger">
                 {deleteError}

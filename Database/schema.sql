@@ -16,6 +16,7 @@
 --   2026-11-03-logout-everywhere.sql       tenant_users.logged_out_at
 --   2026-11-05-tplink-routers.sql          routers.device_type + omada_site_id, table omada_aps
 --   2026-11-06-omada-ap-status.sql         omada_aps.status + status_at (access point online/offline)
+--   2026-11-07-omada-automation.sql        automatic TP-Link sites, adoption and clean-up (V2-2 to V2-4)
 --
 -- When the database changes: update this file AND add a migration file.
 -- ============================================================
@@ -86,9 +87,16 @@ CREATE TABLE public.routers (
     device_type varchar(20) NOT NULL DEFAULT 'mikrotik'
       CONSTRAINT routers_device_type_check CHECK (device_type IN ('mikrotik', 'omada')),
     omada_site_id varchar(24) UNIQUE,    -- TP-Link only: the business's site in the Omada controller
+    omada_site_auto boolean NOT NULL DEFAULT false, -- true = Oswagolink created the site (only these are deleted automatically)
+    omada_wifi_name varchar(32),         -- TP-Link: the WiFi name Oswagolink created
+    omada_speed_kbps integer,            -- TP-Link: the business WiFi speed per phone (whole Mbps)
+    omada_device_password_encrypted text, -- TP-Link: the site's access point login (device account), encrypted
+    omada_setup_password_encrypted text, -- TP-Link: one-time setup login typed on a new access point, encrypted
     created_at timestamptz DEFAULT now() NOT NULL,
     CONSTRAINT routers_omada_site_id_check
-      CHECK (omada_site_id IS NULL OR (omada_site_id ~ '^[0-9a-f]{24}$' AND device_type = 'omada'))
+      CHECK (omada_site_id IS NULL OR (omada_site_id ~ '^[0-9a-f]{24}$' AND device_type = 'omada')),
+    CONSTRAINT routers_omada_speed_check
+      CHECK (omada_speed_kbps IS NULL OR (omada_speed_kbps BETWEEN 1024 AND 102400 AND omada_speed_kbps % 1024 = 0))
 );
 
 -- 4b. omada_aps (the TP-Link access points of a TP-Link router; one router each)
@@ -99,6 +107,9 @@ CREATE TABLE public.omada_aps (
     -- What the controller reports (checked every 5 minutes with the Open API key); NULL = never checked
     status varchar(20) CHECK (status IS NULL OR status IN ('online', 'offline', 'pending', 'heartbeat_missed', 'isolated', 'not_found')),
     status_at timestamptz,
+    adopted_at timestamptz,              -- when it joined its site (NULL = not yet)
+    adopt_tried_at timestamptz,          -- the last automatic adoption try
+    adopt_error varchar(30) CHECK (adopt_error IS NULL OR adopt_error IN ('wrong_login', 'no_answer', 'failed')),
     created_at timestamptz DEFAULT now() NOT NULL
 );
 

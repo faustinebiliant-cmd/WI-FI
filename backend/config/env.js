@@ -203,6 +203,21 @@ if (OMADA_OPENAPI_ENABLED) {
 }
 
 // ------------------------------------------------------------
+// Where TP-Link access points and phones find Oswagolink (not secret; optional, these
+// defaults are our VPS). Used when Oswagolink creates a business's site (V2-2):
+//   OMADA_PUBLIC_HOST   the name in the portal address and the Inform URL
+//   OMADA_PUBLIC_IP     the VPS address phones may reach before paying (pre-auth)
+// ------------------------------------------------------------
+const OMADA_PUBLIC_HOST = (trimmed(process.env.OMADA_PUBLIC_HOST) || 'oswagolink.co.tz').toLowerCase();
+const OMADA_PUBLIC_IP = trimmed(process.env.OMADA_PUBLIC_IP) || '69.62.105.119';
+if (!/^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(OMADA_PUBLIC_HOST)) {
+  fail('OMADA_PUBLIC_HOST must be a domain name like oswagolink.co.tz');
+}
+if (!/^((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(OMADA_PUBLIC_IP)) {
+  fail('OMADA_PUBLIC_IP must be the VPS IPv4 address like 69.62.105.119');
+}
+
+// ------------------------------------------------------------
 // Frozen export. Nothing downstream reads process.env.
 // ------------------------------------------------------------
 const env = Object.freeze({
@@ -236,7 +251,9 @@ const env = Object.freeze({
 
   OMADA_OPENAPI_ENABLED,
   OMADA_OPENAPI_CLIENT_ID,
-  OMADA_OPENAPI_CLIENT_SECRET
+  OMADA_OPENAPI_CLIENT_SECRET,
+  OMADA_PUBLIC_HOST,
+  OMADA_PUBLIC_IP
 });
 
 module.exports = env;

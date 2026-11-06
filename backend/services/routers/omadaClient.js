@@ -229,6 +229,12 @@ const cutMac = async (site, mac) => {
   return valid.length;
 };
 
+// Forget the shared login, so the next call logs in again. Used after Oswagolink gave the
+// operator a new site: a fresh login surely includes it.
+const resetSession = () => {
+  session = null;
+};
+
 // Is the controller answering for this site? (a tiny list request)
 const ping = async (site) => {
   await call('GET', `/api/v2/hotspot/sites/${site}/clients?currentPage=1&currentPageSize=1`);
@@ -240,6 +246,7 @@ module.exports = {
   listValid,
   cutMac,
   ping,
+  resetSession,
   OmadaError,
   // For omadaOpenApi.js only: the same certificate-checked connection
   rawRequest,

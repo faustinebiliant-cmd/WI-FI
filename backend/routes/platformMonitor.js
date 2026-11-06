@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const authPlatform = require('../middleware/authPlatform');
-const { listAllRouters, setOmadaSite } = require('../controllers/platformRouterController');
+const { listAllRouters, setOmadaSite, listWaitingAccessPoints } = require('../controllers/platformRouterController');
 const { listAllSessions, forceDisconnect } = require('../controllers/platformSessionController');
 const { listAuditLogs } = require('../controllers/platformAuditLogController');
 
@@ -12,6 +12,8 @@ router.use(authPlatform);
 router.get('/routers', listAllRouters);
 // TP-Link: save the business's controller site ID
 router.patch('/routers/:id/omada-site', setOmadaSite);
+// TP-Link: access points waiting in the controller (registered by a business or not)
+router.get('/omada/waiting', listWaitingAccessPoints);
 
 // Sessions
 router.get('/sessions', listAllSessions);

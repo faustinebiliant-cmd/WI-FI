@@ -217,6 +217,13 @@ const runPinger = () => runScript('pingRouters.js', 270000, 'Pinger');
 runPinger();
 const pingerInterval = setInterval(runPinger, 5 * 60 * 1000);
 
+// TP-Link automatic adopt (only with the Open API key): every minute, access points that
+// businesses registered and that wait in the controller join their business's site.
+// At most 4 minutes per run; a run still busy is never started twice.
+const adoptInterval = env.OMADA_OPENAPI_ENABLED
+  ? setInterval(() => runScript('omadaAdopt.js', 4 * 60 * 1000, 'TP-Link adopt'), 60 * 1000)
+  : null;
+
 // History clean-up: deletes history older than 1 month. Every night at 02:00
 // Tanzania time (23:00 UTC), one hour before the database backup, and once
 // 2 minutes after start-up.
@@ -261,6 +268,7 @@ const gracefulShutdown = (signal) => {
 
     // 2. Stop background tasks
     clearInterval(pingerInterval);
+    if (adoptInterval) clearInterval(adoptInterval);
     clearInterval(historyInterval);
     clearTimeout(historyStartTimer);
     stopSessionCleaner();

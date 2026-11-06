@@ -14,6 +14,8 @@ const AP_LABEL = {
   isolated: 'Isolated',
   not_found: 'Not in the site'
 };
+const ADOPT_ERROR = { wrong_login: 'wrong login on the access point', no_answer: 'access point did not answer', failed: 'adopt failed' };
+
 const apBadgeClass = (status) =>
   status === 'online' ? 'badge-success'
     : ['offline', 'heartbeat_missed', 'isolated'].includes(status) ? 'badge-danger'
@@ -29,13 +31,21 @@ export default function RoutersPage() {
   const [siteError, setSiteError] = useState('');
   const [siteSaving, setSiteSaving] = useState(false);
 
+  // TP-Link access points waiting in the controller (with the Open API key)
+  const [waiting, setWaiting] = useState(null);
+
   const load = () =>
     apiClient.get('/platform/routers')
       .then(res => setRouters(res.data.data))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
 
-  useEffect(() => { load(); }, []);
+  const loadWaiting = () =>
+    apiClient.get('/platform/omada/waiting')
+      .then(res => setWaiting(res.data.enabled ? res.data.data : null))
+      .catch(() => setWaiting(null));
+
+  useEffect(() => { load(); loadWaiting(); }, []);
 
   const openSite = (router) => {
     setSiteTarget(router);
@@ -68,9 +78,23 @@ export default function RoutersPage() {
       <div className="page-header">
         <div>
           <h1>All Routers</h1>
-          <p>Every router across all businesses. TP-Link routers need their controller site ID (Setup Guide, "TP-Link only").</p>
+          <p>Every router across all businesses. New TP-Link routers get their controller site automatically; older ones made by hand need their site ID (Setup Guide, "TP-Link only").</p>
         </div>
       </div>
+
+      {waiting && waiting.length > 0 && (
+        <div className="notice notice-warning">
+          <strong>TP-Link access points waiting in the controller:</strong>
+          {waiting.map((w) => (
+            <div key={w.mac} className="ap-line">
+              {w.mac} {w.model}{' '}
+              {w.registered
+                ? <span className="badge badge-neutral">registered by a business: Oswagolink adopts it</span>
+                : <span className="badge badge-danger">no business registered this MAC: never adopted</span>}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="table-container">
         {loading ? (
@@ -102,9 +126,15 @@ export default function RoutersPage() {
                         <span key={a.mac} className="cell-sub ap-line">
                           Access point {a.mac}
                           {a.status && <span className={`badge ${apBadgeClass(a.status)}`}>{AP_LABEL[a.status] || a.status}</span>}
+                          {router.site_auto && !a.adopted && <span className="badge badge-warning">not adopted yet{a.adopt_error ? `: ${ADOPT_ERROR[a.adopt_error] || a.adopt_error}` : ''}</span>}
                         </span>
                       ))}
-                      {isOmada && router.omada_site_id && <span className="cell-sub">Site {router.omada_site_id}</span>}
+                      {isOmada && router.omada_site_id && (
+                        <span className="cell-sub">
+                          Site {router.omada_site_id} ({router.site_auto ? 'made by Oswagolink' : 'made by hand'})
+                          {router.wifi_name ? `, WiFi "${router.wifi_name}"` : ''}
+                        </span>
+                      )}
                     </td>
                     <td>{isOmada ? 'TP-Link' : 'MikroTik'}</td>
                     <td>{router.location_label || '-'}</td>
@@ -118,7 +148,7 @@ export default function RoutersPage() {
                       )}
                     </td>
                     <td className="col-actions">
-                      {isOmada && (
+                      {isOmada && !router.site_auto && (
                         <button onClick={() => openSite(router)} className="btn btn-sm btn-soft">
                           {router.omada_site_id ? 'Change site ID' : 'Set site ID'}
                         </button>

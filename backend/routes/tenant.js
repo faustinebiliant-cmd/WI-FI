@@ -5,7 +5,7 @@ const { tenantLoginLimiter, tenantAccountLoginLimiter, tenantGlobalLimiter } = r
 
 const { login, changePassword, endImpersonationSelf, exchangeImpersonationCode, logoutAllDevices } = require('../controllers/authTenantController');
 const { listPackages, createPackage, deletePackage } = require('../controllers/tenantPackageController');
-const { listRouters, createRouter, newSetupToken, deleteRouter } = require('../controllers/tenantRouterController');
+const { listRouters, createRouter, newSetupToken, deleteRouter, getTplinkSetup } = require('../controllers/tenantRouterController');
 const { generateVouchers, listVouchers, revokeVoucher } = require('../controllers/tenantVoucherController');
 const { getActiveSessions, disconnectSession } = require('../controllers/tenantSessionController');
 const { getDashboardStats } = require('../controllers/tenantDashboardController');
@@ -32,6 +32,7 @@ router.delete('/packages/:id', deletePackage);
 router.get('/routers', listRouters);
 router.post('/routers', createRouter);
 router.post('/routers/:id/setup-token', newSetupToken);
+router.get('/routers/:id/tplink-setup', getTplinkSetup);
 router.delete('/routers/:id', deleteRouter);
 
 router.post('/vouchers/generate', generateVouchers);

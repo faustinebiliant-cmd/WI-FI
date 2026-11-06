@@ -271,6 +271,13 @@ export default function SetupGuidePage() {
           phone gets it at login, with the Open API key). The Routers page shows each access point's status (checked every
           5 minutes). Full background: <strong>TPLINK-CONTROLLER-GUIDE.md</strong>.
         </p>
+        <p className="guide-text">
+          <strong>Automatic (with the Open API key, since 7 November 2026):</strong> Add Router also asks for the WiFi name and
+          speed, and Oswagolink makes the whole site itself (it shows "made by Oswagolink" here). The business's
+          <strong> Connect</strong> window gives the technician the Inform URL and a one-time setup login, and Oswagolink adopts
+          the access point with the registered MAC within 1 to 3 minutes. Delete Router removes the site again. Steps 2 and 3
+          below are then not needed; they stay for sites made by hand.
+        </p>
 
         <h3 className="guide-step">1. The business adds it (Business Panel)</h3>
         <p className="guide-text">

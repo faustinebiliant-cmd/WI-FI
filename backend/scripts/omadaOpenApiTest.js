@@ -1,5 +1,5 @@
 // ============================================================
-// Oswagolink - TP-Link Open API test tool (step V2-0 of the automation plan)
+// Oswagolink - TP-Link Open API test tool (automation steps V2-0 to V2-4)
 //
 // Run on the VPS from the backend folder:
 //   node scripts/omadaOpenApiTest.js check
@@ -12,6 +12,12 @@
 //       speed test). Example: speed A6:4E:3C:A5:6C:87 2 1
 //   node scripts/omadaOpenApiTest.js speed-off <PHONE-MAC>
 //       Removes that phone's own speed again.
+//   node scripts/omadaOpenApiTest.js trial-full
+//       V2-2/V2-4: builds a complete business site "zz-oswagolink-trial-full" exactly as the
+//       backend does (WiFi, speed, portal, pre-login, operator), shows it next to the
+//       Oswagolink site made by hand, then removes it again as Delete Router does.
+//   node scripts/omadaOpenApiTest.js waiting
+//       V2-3: access points waiting to be adopted, and whether a business registered them.
 //
 // Never prints the key, the access token or any password.
 // ============================================================
@@ -19,6 +25,8 @@ const crypto = require('crypto');
 const env = require('../config/env');
 const { call } = require('../services/routers/omadaOpenApi');
 const { normalizeMac } = require('../utils/validators');
+const db = require('../config/db');
+const omadaSites = require('../services/routers/omadaSites');
 
 const TRIAL_NAME = 'zz-oswagolink-trial';
 const SITE_NAME = 'Oswagolink';
@@ -169,6 +177,78 @@ const speed = async (macArg, downArg, upArg, off) => {
   });
 };
 
+// ------------------------------------------------------------
+// trial-full: the complete automatic site, compared with the hand-made one
+// ------------------------------------------------------------
+const FULL_NAME = 'zz-oswagolink-trial-full';
+const listOf = (r) => (Array.isArray(r) ? r : Array.isArray(r && r.data) ? r.data : []);
+const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o && o[k] !== undefined).map((k) => [k, o[k]]));
+
+// Only settings, never passwords
+const describeSite = async (siteId) => {
+  const S = `v1/{id}/sites/${siteId}`;
+  const out = {};
+  const ssids = listOf(await call('GET', `v2/{id}/sites/${siteId}/wireless-network/ssids?page=1&pageSize=100`));
+  out.wifi = ssids.map((w) => ({
+    ...pick(w, ['name', 'band', 'security', 'guestNetEnable', 'broadcast', 'pmfMode', 'vlanEnable']),
+    ...Object.fromEntries(Object.entries(w).filter(([k]) => /rate/i.test(k)))
+  }));
+  out.portal = listOf(await call('GET', `${S}/portals`)).map((x) => ({
+    ...pick(x, ['name', 'enable', 'authType', 'authTimeout', 'httpsRedirectEnable', 'landingPage', 'externalPortal']),
+    wifiCount: (x.ssidList || []).length
+  }));
+  const ac = await call('GET', `${S}/setting/access-control`);
+  out.preLogin = {
+    on: Boolean(ac && ac.preAuthAccessEnable),
+    allowed: ((ac && ac.preAuthAccessPolicies) || []).map((x) => (x.ip ? `${x.ip}/${x.subnetMask}` : x.url))
+  };
+  const ops = listOf(await call('GET', `${S}/hotspot/operators?page=1&pageSize=100`));
+  const op = ops.find((o) => o && o.name === env.OMADA_OPERATOR_USER);
+  out.operatorHasSite = Boolean(op && Array.isArray(op.selectedSites) && op.selectedSites.includes(siteId));
+  return out;
+};
+
+const trialFull = async () => {
+  const model = await findSite(SITE_NAME);
+  if (!model) return bad(`site "${SITE_NAME}" not found`);
+  if (await findSite(FULL_NAME)) return bad(`"${FULL_NAME}" already exists: delete it in the controller first`);
+  let site = null;
+  const made = await step('Create complete trial site (as Add Router does)', async () => {
+    try {
+      site = await omadaSites.createBusinessSite({ label: FULL_NAME, wifiName: 'zz Oswagolink Trial', speedKbps: 2048 });
+    } catch (err) {
+      throw new Error(`failed at step "${err.stage}": ${err.message} (the half-made site was removed)`);
+    }
+    return `site ID ${site.siteId}`;
+  });
+  if (!made) return;
+  await step('Hand-made site Oswagolink', async () => JSON.stringify(await describeSite(model.siteId)));
+  await step('Automatic trial site     ', async () => JSON.stringify(await describeSite(site.siteId)));
+  await step('Remove trial site (as Delete Router does)', async () => {
+    await omadaSites.deleteBusinessSite(site.siteId, []);
+    return (await findSite(FULL_NAME)) ? 'still listed!' : 'gone';
+  });
+  await step('Operator no longer has the trial site', async () => {
+    const ops = listOf(await call('GET', `v1/{id}/sites/${model.siteId}/hotspot/operators?page=1&pageSize=100`));
+    const op = ops.find((o) => o && o.name === env.OMADA_OPERATOR_USER);
+    if (!op) throw new Error('operator not found');
+    return (op.selectedSites || []).includes(site.siteId) ? 'still has it!' : `yes (${(op.selectedSites || []).length} site(s) left)`;
+  });
+};
+
+const waiting = async () => {
+  const model = await findSite(SITE_NAME);
+  if (!model) return bad(`site "${SITE_NAME}" not found`);
+  await step('Access points waiting to be adopted', async () => {
+    const list = await omadaSites.listPending(model.siteId);
+    if (list.length === 0) return 'none';
+    const { rows } = await db.query('SELECT mac FROM omada_aps WHERE mac = ANY($1::varchar[])', [list.map((d) => d.mac)]);
+    const known = new Set(rows.map((r) => r.mac));
+    return list.map((d) => `${d.mac} ${d.model} ${known.has(d.mac) ? '(registered by a business)' : '(no business registered it: never adopted)'}`).join('; ');
+  });
+  await step('Inform URL for technicians', async () => omadaSites.informUrl());
+};
+
 (async () => {
   if (!env.OMADA_OPENAPI_ENABLED) {
     bad('OMADA_OPENAPI_CLIENT_ID and OMADA_OPENAPI_CLIENT_SECRET are not in .env');
@@ -180,7 +260,9 @@ const speed = async (macArg, downArg, upArg, off) => {
     else if (cmd === 'trial-site') await trialSite();
     else if (cmd === 'speed') await speed(a, b, c, false);
     else if (cmd === 'speed-off') await speed(a, null, null, true);
-    else console.log('Use: check | trial-site | speed <PHONE-MAC> <down-Mbps> <up-Mbps> | speed-off <PHONE-MAC>');
+    else if (cmd === 'trial-full') await trialFull();
+    else if (cmd === 'waiting') await waiting();
+    else console.log('Use: check | trial-site | trial-full | waiting | speed <PHONE-MAC> <down-Mbps> <up-Mbps> | speed-off <PHONE-MAC>');
   } catch (err) {
     bad(err.message);
   }
