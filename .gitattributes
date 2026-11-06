@@ -3,3 +3,6 @@
 vps/* text eol=lf
 vps/** text eol=lf
 *.sh text eol=lf
+
+# TP-Link API document: keep exactly as downloaded
+docs/tplink-openapi/*.json -text

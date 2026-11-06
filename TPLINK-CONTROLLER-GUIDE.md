@@ -270,7 +270,7 @@ Always together with Claude, on a quiet day:
 | B8 | Watch memory and billing speed for a day | in progress (5 Nov 2026: controller 1.38 of 1.5 GB, CPU 2%, VPS available 1.7 GB, load 0.09) |
 | Phase C | Build it in: TP-Link businesses in the panels, the portal understands TP-Link links, the voucher cleaner cuts TP-Link phones off, one site per business, setup guide for technicians, security review | Plan to be written first, then your "go" |
 | Phase D | Swahili and AzamPay, for MikroTik **and** TP-Link businesses | after Phase C |
-| V2-0 | Open API key + test tool (`node scripts/omadaOpenApiTest.js check / trial-site / speed / speed-off`) | done 6 Nov 2026 (all tests passed) |
+| V2-0 | Open API key + test tool (`node scripts/omadaOpenApiTest.js check / trial-site / speed / speed-off`) | done 6 Nov 2026 (all tests passed); TP-Link's API document saved in `docs/tplink-openapi/` |
 | V2-1 | Different speed per package + access point status in both panels | built 6 Nov 2026, phone test pending |
 | V2-2 | Create each business's site automatically (today: you create it, about 10 minutes, from a checklist) | next |
 | V2-3 | Adopt the access point automatically (MAC checked) + Inform URL shown in the business panel | after V2-2 |
