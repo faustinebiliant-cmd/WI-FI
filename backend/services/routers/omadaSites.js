@@ -52,12 +52,14 @@ const strongPassword = () => {
   return out.join('');
 };
 
-// The one-time setup login the technician types on a new access point. Letters and numbers
-// only (easy on a phone), no look-alike characters, never the same character twice in a row.
+// The one-time setup login the technician types on a new access point. The access point
+// demands uppercase, lowercase, number AND symbol, never the same character twice in a row
+// (seen on the EAP's own setup page, 6 Nov 2026). No look-alike characters, and only symbols
+// that are easy to find on a phone keyboard.
 const setupPassword = () => {
-  const sets = ['ABCDEFGHJKMNPQRSTUVWXYZ', 'abcdefghjkmnpqrstuvwxyz', '23456789'];
+  const sets = ['ABCDEFGHJKMNPQRSTUVWXYZ', 'abcdefghjkmnpqrstuvwxyz', '23456789', '@#*!'];
   const out = [];
-  for (let i = 0; i < 12; i++) out.push(sets[i % 3][crypto.randomInt(sets[i % 3].length)]);
+  for (let i = 0; i < 12; i++) out.push(sets[i % 4][crypto.randomInt(sets[i % 4].length)]);
   return out.join('');
 };
 

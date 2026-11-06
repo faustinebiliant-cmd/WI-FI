@@ -62,7 +62,7 @@ the controller for a new TP-Link business any more:
   `https://oswagolink.co.tz/portal/`, before-paying access only to `69.62.105.119/32`, and the site is
   added to the hotspot operator. If any step fails, the half-made site is deleted again and nothing is saved.
 - The business panel then shows **Connect**: the steps for the technician, the Inform URL and a
-  **one-time setup login** (`oswsetup` + 12 letters/numbers) to type on the new access point.
+  **one-time setup login** (`oswsetup` + 12 characters: letters, numbers and symbols from `@ # * !`, as the access point demands) to type on the new access point.
   Every minute, `scripts/omadaAdopt.js` adopts the access point with **exactly the MAC the business
   registered**, into **that business's site** (first with the factory login, then with the setup
   login). After adoption the access point gets the site's own login, and the setup login is no
