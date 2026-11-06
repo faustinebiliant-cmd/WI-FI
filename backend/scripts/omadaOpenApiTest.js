@@ -18,6 +18,10 @@
 //       Oswagolink site made by hand, then removes it again as Delete Router does.
 //   node scripts/omadaOpenApiTest.js waiting
 //       V2-3: access points waiting to be adopted, and whether a business registered them.
+//   node scripts/omadaOpenApiTest.js wifi-probe
+//       Shows the WiFi settings of the hand-made Oswagolink site (no passwords), then on a
+//       throw-away site "zz-oswagolink-probe" tries creating the WiFi several ways (one
+//       setting changed each time) to find which value the controller refuses; deletes it.
 //
 // Never prints the key, the access token or any password.
 // ============================================================
@@ -249,6 +253,73 @@ const waiting = async () => {
   await step('Inform URL for technicians', async () => omadaSites.informUrl());
 };
 
+// ------------------------------------------------------------
+// wifi-probe: which WiFi setting does the controller refuse?
+// ------------------------------------------------------------
+const PROBE_NAME = 'zz-oswagolink-probe';
+const SECRET_KEY = /^(psk|ppsk|ent)Setting$|pass|secret|radius|key/i;
+
+const wifiProbe = async () => {
+  const model = await findSite(SITE_NAME);
+  if (!model) return bad(`site "${SITE_NAME}" not found`);
+  if (await findSite(PROBE_NAME)) return bad(`"${PROBE_NAME}" already exists: delete it in the controller first`);
+
+  let modelWifi = null;
+  await step('Hand-made WiFi settings (no passwords)', async () => {
+    const list = listOf(await call('GET', `v2/{id}/sites/${model.siteId}/wireless-network/ssids?page=1&pageSize=100`));
+    if (list.length === 0) return 'no WiFi on the hand-made site';
+    modelWifi = Object.fromEntries(Object.entries(list[0]).filter(([k]) => !SECRET_KEY.test(k)));
+    return JSON.stringify(modelWifi);
+  });
+
+  const info = await call('GET', `v1/{id}/sites/${model.siteId}`);
+  let siteId = null;
+  const made = await step('Create probe site', async () => {
+    const r = await call('POST', 'v1/{id}/sites', {
+      name: PROBE_NAME, type: 0, region: info.region, timeZone: info.timeZone, scenario: info.scenario,
+      deviceAccountSetting: { username: 'eap-admin', password: strongPassword() }, supportES: false, supportL2: false
+    });
+    siteId = (r && (r.siteId || r.id)) || ((await findSite(PROBE_NAME)) || {}).siteId || null;
+    return siteId ? `site ID ${siteId}` : 'created, but no ID returned';
+  });
+  if (!made || !siteId) return;
+
+  const base = {
+    deviceType: 1, band: 3, guestNetEnable: true, security: 0, broadcast: true, vlanEnable: false,
+    mloEnable: false, pmfMode: 3, enable11r: false, hidePwd: false
+  };
+  const tries = [
+    ['as Add Router sends it', {}],
+    ['ssidEnable true', { ssidEnable: true }],
+    ['ssidEnable true + chooseDevices 0', { ssidEnable: true, chooseDevices: 0 }],
+    ['pmfMode 2', { pmfMode: 2 }],
+    ['pmfMode 1', { pmfMode: 1 }],
+    ['guestNetEnable false', { guestNetEnable: false }],
+    ['band 1 (2.4 GHz only)', { band: 1 }],
+    ['deviceType 3', { deviceType: 3 }],
+    ['all extras off', { ssidEnable: true, chooseDevices: 0, prohibitWifiShare: false, wifiCallingEnable: false, greEnable: false, enhancedIotConnectivity: false }]
+  ];
+  if (modelWifi) {
+    const copy = {};
+    for (const k of Object.keys(base).concat(['ssidEnable', 'chooseDevices', 'prohibitWifiShare', 'wifiCallingEnable', 'enhancedIotConnectivity'])) {
+      if (modelWifi[k] !== undefined && typeof modelWifi[k] !== 'object') copy[k] = modelWifi[k];
+    }
+    tries.push(['copy of the hand-made WiFi values', copy]);
+  }
+  let n = 0;
+  for (const [label, change] of tries) {
+    n += 1;
+    await step(`WiFi try ${n}: ${label}`, async () => {
+      const r = await call('POST', `v2/{id}/sites/${siteId}/wireless-network/ssids`, { ...base, ...change, name: `zz probe ${n}` });
+      return `accepted${r && r.id ? ' (id returned)' : ' (no id returned)'}`;
+    });
+  }
+  await step('Delete probe site', async () => {
+    await call('DELETE', `v1/{id}/sites/${siteId}`);
+    return (await findSite(PROBE_NAME)) ? 'still listed!' : 'gone';
+  });
+};
+
 (async () => {
   if (!env.OMADA_OPENAPI_ENABLED) {
     bad('OMADA_OPENAPI_CLIENT_ID and OMADA_OPENAPI_CLIENT_SECRET are not in .env');
@@ -262,7 +333,8 @@ const waiting = async () => {
     else if (cmd === 'speed-off') await speed(a, null, null, true);
     else if (cmd === 'trial-full') await trialFull();
     else if (cmd === 'waiting') await waiting();
-    else console.log('Use: check | trial-site | trial-full | waiting | speed <PHONE-MAC> <down-Mbps> <up-Mbps> | speed-off <PHONE-MAC>');
+    else if (cmd === 'wifi-probe') await wifiProbe();
+    else console.log('Use: check | trial-site | trial-full | waiting | wifi-probe | speed <PHONE-MAC> <down-Mbps> <up-Mbps> | speed-off <PHONE-MAC>');
   } catch (err) {
     bad(err.message);
   }
