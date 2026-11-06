@@ -52,6 +52,7 @@ yet). Decision for the first version: **one speed per business** (packages diffe
 | 5 Nov 2026 | **The box recipe** `vps/omada/` in the project (Dockerfile, starter, README) | Builds the box from official parts only: Ubuntu 24.04, Java 21, MongoDB 8.0, and the controller 6.3.0.45 from `static.tp-link.com`, refused if its fingerprint (SHA256) does not match | delete the image, 10a step 1 |
 | 5 Nov 2026 | **The box itself**, name `omada` | Runs the controller all the time; restarts by itself after a crash or reboot; at most **1.5 GB** memory and **60% of the CPU**; no special rights; runs as an ordinary user (not root) | 10a step 1 |
 | 5 Nov 2026 | **Folder `/opt/omada/`** (data + logs) | The controller's database, settings and automatic backups. Kept outside the box so updates do not lose anything | 10a step 4 |
+| 6 Nov 2026 | **Java memory settings** in the starter (`MALLOC_ARENA_MAX=2`, network buffers 128 MB, code space 96 MB) | Java used 1.38 GB with a 700 MB heap and slowly climbed to the box's 1.5 GB limit; these are the standard fixes for that climb | rebuild without them (not needed) |
 | 5 Nov 2026 | **Firewall: 4 new doors** (see 2c) | EAPs anywhere must reach the controller, and customers' phones must reach the portal entrance | 10a step 3 |
 
 ### 2b. Settings inside the controller (and why)

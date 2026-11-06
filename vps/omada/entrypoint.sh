@@ -29,8 +29,17 @@ done
 mkdir -p "$D/data/db" "$D/logs" "$D/work"
 
 cd "$D/lib"
+
+# Memory (measured 6 Nov 2026: Java used 1.38 GB with a 700 MB heap and kept climbing).
+# - MALLOC_ARENA_MAX=2: Linux gives a busy Java program many memory pools that grow and
+#   are never returned; 2 pools is the standard cure for that slow climb.
+# - Network buffers and compiled-code space get sensible caps.
+# The heap (Java's main storage) stays at 700 MB, so the controller keeps the same room.
+export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-2}"
+
 exec java -server \
     -Xms128m -Xmx"${OMADA_JAVA_XMX:-700m}" \
+    -XX:MaxDirectMemorySize=128m -XX:ReservedCodeCacheSize=96m \
     -XX:MaxHeapFreeRatio=60 -XX:MinHeapFreeRatio=30 \
     -Djava.awt.headless=true -Djdk.lang.Process.launchMechanism=vfork \
     -cp "$D/lib/*:$D/properties:" \
