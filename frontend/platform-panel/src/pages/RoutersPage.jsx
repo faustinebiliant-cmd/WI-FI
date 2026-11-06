@@ -5,6 +5,20 @@ import Loader from '../shared/components/Loader';
 // A site ID from the Omada controller: 24 characters 0-9 and a-f
 const SITE_ID_RE = /^[0-9a-f]{24}$/;
 
+// TP-Link access point status, as the controller reports it (checked every 5 minutes)
+const AP_LABEL = {
+  online: 'Online',
+  offline: 'Offline',
+  pending: 'Pending (adopt it)',
+  heartbeat_missed: 'Heartbeat missed',
+  isolated: 'Isolated',
+  not_found: 'Not in the site'
+};
+const apBadgeClass = (status) =>
+  status === 'online' ? 'badge-success'
+    : ['offline', 'heartbeat_missed', 'isolated'].includes(status) ? 'badge-danger'
+      : status === 'pending' ? 'badge-warning' : 'badge-neutral';
+
 export default function RoutersPage() {
   const [routers, setRouters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -78,13 +92,18 @@ export default function RoutersPage() {
             <tbody>
               {routers.map((router) => {
                 const isOmada = router.device_type === 'omada';
-                const apMacs = Array.isArray(router.ap_macs) ? router.ap_macs : [];
+                const aps = Array.isArray(router.aps) ? router.aps : [];
                 return (
                   <tr key={router.id}>
                     <td className="cell-strong">{router.tenant_name || 'Unknown'}</td>
                     <td>
                       {router.name}
-                      {isOmada && apMacs.length > 0 && <span className="cell-sub">Access point {apMacs.join(', ')}</span>}
+                      {isOmada && aps.map((a) => (
+                        <span key={a.mac} className="cell-sub ap-line">
+                          Access point {a.mac}
+                          {a.status && <span className={`badge ${apBadgeClass(a.status)}`}>{AP_LABEL[a.status] || a.status}</span>}
+                        </span>
+                      ))}
                       {isOmada && router.omada_site_id && <span className="cell-sub">Site {router.omada_site_id}</span>}
                     </td>
                     <td>{isOmada ? 'TP-Link' : 'MikroTik'}</td>

@@ -13,7 +13,10 @@ const CHECK_TIMEOUT_MS = 8000;    // give up on one router after 8 seconds
 const OFFLINE_AFTER_MINUTES = 8;  // show "offline" only after this long without an answer
 const RECENTLY_SEEN_MINUTES = 3;  // the session cleaner (every minute) answered for these already
 
-const withTimeout = (promise, ms) =>
+// The access point statuses the database accepts (see migration 2026-11-06-omada-ap-status.sql)
+const AP_STATUSES = new Set(['online', 'offline', 'pending', 'heartbeat_missed', 'isolated', 'not_found']);
+
+const withTimeout =(promise, ms) =>
   Promise.race([
     promise,
     new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
@@ -34,6 +37,16 @@ const checkOne = async (r) => {
         "UPDATE routers SET status = 'online', last_seen_at = NOW() WHERE id = $1",
         [r.id]
       );
+      // TP-Link: the status of each access point (only known values are saved)
+      if (Array.isArray(status.aps)) {
+        for (const ap of status.aps) {
+          if (!AP_STATUSES.has(ap && ap.status)) continue;
+          await db.query(
+            'UPDATE omada_aps SET status = $1, status_at = NOW() WHERE router_id = $2 AND mac = $3',
+            [ap.status, r.id, ap.mac]
+          );
+        }
+      }
       return 'online';
     }
   } catch (err) {
@@ -59,9 +72,11 @@ const run = async () => {
   console.log('[Pinger] Checking router statuses...');
   const { rows: routers } = await db.query(
     // Routers the session cleaner heard from in the last few minutes are online: no need to ask again.
+    // TP-Link routers are always asked: the cleaner only knows the controller answers, not
+    // whether each access point is online.
     // Random order: if a run is ever cut short, a different set of routers misses out each time
     `SELECT id, tenant_id, device_type, omada_site_id, ip_address, api_port, api_username, api_password_encrypted FROM routers
-     WHERE last_seen_at IS NULL OR last_seen_at < NOW() - make_interval(mins => $1::int)
+     WHERE last_seen_at IS NULL OR last_seen_at < NOW() - make_interval(mins => $1::int) OR device_type = 'omada'
      ORDER BY random()`,
     [RECENTLY_SEEN_MINUTES]
   );

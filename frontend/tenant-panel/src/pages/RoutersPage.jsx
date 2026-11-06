@@ -9,6 +9,20 @@ import { onlyNameChars } from '../shared/inputRules';
 // Longer commands are hidden until "Show command" is pressed; short ones stay visible
 const LONG_COMMAND = 120;
 
+// TP-Link access point status, as the controller reports it (checked every 5 minutes)
+const AP_LABEL = {
+  online: 'Online',
+  offline: 'Offline',
+  pending: 'Waiting to be adopted',
+  heartbeat_missed: 'Not answering',
+  isolated: 'No internet cable',
+  not_found: 'Not connected yet'
+};
+const apBadgeClass = (status) =>
+  status === 'online' ? 'badge-success'
+    : ['offline', 'heartbeat_missed', 'isolated'].includes(status) ? 'badge-danger'
+      : status === 'pending' ? 'badge-warning' : 'badge-neutral';
+
 // One command with its own copy button
 function CommandBox({ title, note, text, tone = 'blue' }) {
   const [copied, setCopied] = useState(false);
@@ -239,9 +253,13 @@ export default function RoutersPage() {
             <tbody>
               {routers.map((router) => {
                 const isOmada = router.device_type === 'omada';
-                const isOnline = (router.status || '').toLowerCase() === 'online';
+                const aps = Array.isArray(router.aps) ? router.aps : [];
+                const apsChecked = aps.some((a) => a.status);
+                // TP-Link: online only when the controller answers AND an access point is online
+                // (when the access points have been checked; before that, the controller answer)
+                const isOnline = (router.status || '').toLowerCase() === 'online' &&
+                  (!isOmada || !apsChecked || aps.some((a) => a.status === 'online'));
                 const waiting = isOmada ? !router.site_ready : (!router.ip_address || router.ip_address === '0.0.0.0');
-                const apMacs = Array.isArray(router.ap_macs) ? router.ap_macs : [];
                 return (
                   <tr key={router.id}>
                     <td className="cell-strong">{router.name}</td>
@@ -257,7 +275,14 @@ export default function RoutersPage() {
                     </td>
                     <td className={waiting && !isOmada ? 'cell-muted' : undefined}>
                       {isOmada
-                        ? (apMacs.length > 0 ? `Access point ${apMacs.join(', ')}` : '-')
+                        ? (aps.length > 0
+                            ? aps.map((a) => (
+                                <div key={a.mac} className="ap-line">
+                                  Access point {a.mac}
+                                  {a.status && <span className={`badge ${apBadgeClass(a.status)}`}>{AP_LABEL[a.status] || a.status}</span>}
+                                </div>
+                              ))
+                            : '-')
                         : (waiting ? 'Waiting for setup' : router.ip_address)}
                     </td>
                     <td className="col-actions">

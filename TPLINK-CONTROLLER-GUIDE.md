@@ -40,6 +40,13 @@ TP-Link access point (an "EAP") does the billing job itself:
 laptop, Phase B on the VPS). Building it into the panels and the portal is **Phase C** (not done
 yet). Decision for the first version: **one speed per business** (packages differ by time and price).
 
+**Update 6 November 2026 (automation step V2-1):** with the Open API key, a TP-Link package can have
+its **own speed** (1-20 Mbps). When a voucher is used, the phone gets that speed before it is let in
+(tested on a phone: 1 Mbps limit gave 920 kbps, removed gave 2.1 Mbps). A package without a speed
+gives the business WiFi speed (the speed profile on the WiFi), and a package speed can never be
+faster than that. If setting the speed fails, the customer still gets in at the business WiFi speed.
+Both panels also show each access point's status (online, offline, pending, …), checked every 5 minutes.
+
 ---
 
 ## 2. What was installed and changed, and why (history)
@@ -263,8 +270,11 @@ Always together with Claude, on a quiet day:
 | B8 | Watch memory and billing speed for a day | in progress (5 Nov 2026: controller 1.38 of 1.5 GB, CPU 2%, VPS available 1.7 GB, load 0.09) |
 | Phase C | Build it in: TP-Link businesses in the panels, the portal understands TP-Link links, the voucher cleaner cuts TP-Link phones off, one site per business, setup guide for technicians, security review | Plan to be written first, then your "go" |
 | Phase D | Swahili and AzamPay, for MikroTik **and** TP-Link businesses | after Phase C |
-| Later | Different speed per package (TP-Link's Open API) | the first version uses one speed per business |
-| Later | Create each business's site automatically (today: you create it, about 10 minutes, from a checklist) | after the first 5 to 10 TP-Link customers |
+| V2-0 | Open API key + test tool (`node scripts/omadaOpenApiTest.js check / trial-site / speed / speed-off`) | done 6 Nov 2026 (all tests passed) |
+| V2-1 | Different speed per package + access point status in both panels | built 6 Nov 2026, phone test pending |
+| V2-2 | Create each business's site automatically (today: you create it, about 10 minutes, from a checklist) | next |
+| V2-3 | Adopt the access point automatically (MAC checked) + Inform URL shown in the business panel | after V2-2 |
+| V2-4 | Delete Router also removes the site from the controller | after V2-3 |
 | When many TP-Link businesses | VPS with 2 CPU cores | watch section 5 |
 
 ---

@@ -100,6 +100,9 @@ tbody tr:hover td { background: #f8fafc; }
 .badge-warning { background: var(--warning-soft); color: #92400e; }
 .badge-danger { background: var(--danger-soft); color: #991b1b; }
 .badge-neutral { background: #f1f5f9; color: var(--gray); }
+/* A TP-Link access point with its status badge (Routers page) */
+.ap-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ap-line + .ap-line { margin-top: 4px; }
 
 .alert { padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 13px; }
 .alert-danger { background: var(--danger-soft); color: #b91c1c; }

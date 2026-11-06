@@ -40,7 +40,13 @@ export default function PackagesPage() {
       const list = res.data.data || [];
       setRouters(list);
       // With one router (the usual case) it is chosen already
-      if (list.length > 0) setFormData(prev => ({ ...prev, router_id: prev.router_id || list[0].id }));
+      // (a TP-Link router starts with no own speed: the business WiFi speed)
+      if (list.length > 0) {
+        setFormData(prev => {
+          if (prev.router_id) return prev;
+          return { ...prev, router_id: list[0].id, speed_mbps: list[0].device_type === 'omada' ? '' : prev.speed_mbps };
+        });
+      }
     } catch (error) {
       console.error(error);
     }
@@ -57,17 +63,28 @@ export default function PackagesPage() {
     }
   };
 
-  // TP-Link-only routers: one speed for the whole business, so packages have no speed field
+  // TP-Link-only routers: the speed is optional (empty = the business WiFi speed set by
+  // Oswagolink). If package speeds are not switched on for TP-Link yet, there is no speed field.
   const selectedRouter = routers.find((r) => r.id === formData.router_id);
   const isOmada = selectedRouter && selectedRouter.device_type === 'omada';
+  const omadaSpeeds = isOmada && selectedRouter.package_speeds === true;
+  const speedEmpty = String(formData.speed_mbps).trim() === '';
+  const sendSpeed = !isOmada || (omadaSpeeds && !speedEmpty);
+
+  const chooseRouter = (routerId) => {
+    const r = routers.find((x) => x.id === routerId);
+    // TP-Link starts with no own speed (business WiFi speed); MikroTik needs one
+    const tp = r && r.device_type === 'omada';
+    setFormData((f) => ({ ...f, router_id: routerId, speed_mbps: tp ? '' : (f.speed_mbps || 5) }));
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
     const speed_mbps = Number(formData.speed_mbps);
-    if (!isOmada && (!Number.isInteger(speed_mbps) || speed_mbps < MIN_SPEED_MBPS || speed_mbps > MAX_SPEED_MBPS)) {
-      setErrorMsg(`Speed must be a whole number from ${MIN_SPEED_MBPS} to ${MAX_SPEED_MBPS} Mbps.`);
+    if (sendSpeed && (!Number.isInteger(speed_mbps) || speed_mbps < MIN_SPEED_MBPS || speed_mbps > MAX_SPEED_MBPS)) {
+      setErrorMsg(`Speed must be a whole number from ${MIN_SPEED_MBPS} to ${MAX_SPEED_MBPS} Mbps${isOmada ? ' (or empty for the business WiFi speed)' : ''}.`);
       return;
     }
     if (!formData.router_id) {
@@ -89,13 +106,17 @@ export default function PackagesPage() {
         name: formData.name,
         price_tzs: Number(formData.price_tzs),
         duration_minutes: duration_minutes,
-        // TP-Link: no speed of its own (the server saves 0)
-        ...(isOmada ? {} : { speed_down_kbps: speed_kbps, speed_up_kbps: speed_kbps }),
+        // TP-Link without a speed: the business WiFi speed (the server saves 0)
+        ...(sendSpeed ? { speed_down_kbps: speed_kbps, speed_up_kbps: speed_kbps } : {}),
         router_id: formData.router_id
       });
       setShowModal(false);
       toast(`Package "${formData.name}" created`);
-      setFormData({ name: '', price_tzs: '', duration_value: 1, duration_unit: 'hours', speed_mbps: 5, router_id: routers[0]?.id || '' });
+      setFormData({
+        name: '', price_tzs: '', duration_value: 1, duration_unit: 'hours',
+        speed_mbps: routers[0]?.device_type === 'omada' ? '' : 5,
+        router_id: routers[0]?.id || ''
+      });
       fetchPackages();
     } catch (error) {
       setErrorMsg(error.response?.data?.error || 'Failed to create package');
@@ -165,8 +186,8 @@ export default function PackagesPage() {
                   <td>{pkg.router_name || '-'}</td>
                   <td>TZS {pkg.price_tzs.toLocaleString()}</td>
                   <td>{formatDuration(pkg.duration_minutes)}</td>
-                  <td className={pkg.router_type === 'omada' ? 'cell-muted' : undefined}>
-                    {pkg.router_type === 'omada' ? 'Business speed' : `${pkg.speed_down_kbps / 1024} Mbps`}
+                  <td className={pkg.speed_down_kbps > 0 ? undefined : 'cell-muted'}>
+                    {pkg.speed_down_kbps > 0 ? `${pkg.speed_down_kbps / 1024} Mbps` : 'Business speed'}
                   </td>
                   <td className="col-actions">
                     <button onClick={() => openDelete(pkg)} className="btn btn-sm btn-danger">
@@ -225,7 +246,7 @@ export default function PackagesPage() {
                   className="form-control"
                   required
                   value={formData.router_id}
-                  onChange={e => setFormData({ ...formData, router_id: e.target.value })}
+                  onChange={e => chooseRouter(e.target.value)}
                   disabled={isSubmitting}
                 >
                   {routers.length === 0 && <option value="">Add a router first (Routers page)</option>}
@@ -234,27 +255,35 @@ export default function PackagesPage() {
                 <p className="form-hint">Customers see this package only on this router's WiFi.</p>
               </div>
 
-              {isOmada ? (
+              {isOmada && !omadaSpeeds ? (
                 <p className="notice notice-info">
                   <strong>Speed:</strong> on a TP-Link router every customer gets the same speed (set by
                   Oswagolink for your business), so packages differ by time and price.
                 </p>
               ) : (
                 <div className="form-group">
-                  <label>Speed (Mbps, {MIN_SPEED_MBPS} to {MAX_SPEED_MBPS})</label>
+                  <label>
+                    Speed (Mbps, {MIN_SPEED_MBPS} to {MAX_SPEED_MBPS}){isOmada ? ', optional' : ''}
+                  </label>
                   <input
                     className="form-control"
-                    required
+                    required={!isOmada}
                     type="number"
                     min={MIN_SPEED_MBPS}
                     max={MAX_SPEED_MBPS}
                     step="1"
                     inputMode="numeric"
-                    placeholder={`${MIN_SPEED_MBPS} - ${MAX_SPEED_MBPS}`}
+                    placeholder={isOmada ? 'Empty = business WiFi speed' : `${MIN_SPEED_MBPS} - ${MAX_SPEED_MBPS}`}
                     value={formData.speed_mbps}
                     onChange={e => setFormData({ ...formData, speed_mbps: e.target.value.replace(/[^0-9]/g, '') })}
                     disabled={isSubmitting}
                   />
+                  {isOmada && (
+                    <p className="form-hint">
+                      Leave empty to give customers your business WiFi speed. A package speed cannot be
+                      faster than the business WiFi speed.
+                    </p>
+                  )}
                 </div>
               )}
 

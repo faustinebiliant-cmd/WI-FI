@@ -13,6 +13,11 @@ const listAllRouters = async (req, res) => {
                (SELECT json_agg(a.mac ORDER BY a.created_at) FROM omada_aps a WHERE a.router_id = r.id),
                '[]'::json
              ) AS ap_macs,
+             COALESCE(
+               (SELECT json_agg(json_build_object('mac', a.mac, 'status', a.status, 'status_at', a.status_at) ORDER BY a.created_at)
+                FROM omada_aps a WHERE a.router_id = r.id),
+               '[]'::json
+             ) AS aps,
              t.business_name as tenant_name
       FROM routers r
       JOIN tenants t ON r.tenant_id = t.id

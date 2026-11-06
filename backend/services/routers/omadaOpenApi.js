@@ -76,4 +76,45 @@ const call = async (method, path, body) => {
   throw new OmadaError('controller refused after a new token', 'refused');
 };
 
-module.exports = { call, OmadaError };
+// ------------------------------------------------------------
+// What the rest of the backend uses (all values must already be checked by the caller)
+// ------------------------------------------------------------
+const dashed = (mac) => String(mac).toUpperCase().replace(/:/g, '-');
+const colons = (mac) => String(mac || '').toUpperCase().replace(/-/g, ':');
+
+// Speeds come in kbps (packages store multiples of 1024 = whole Mbps). 0 or missing = no own
+// speed: the limit is removed, so the business WiFi speed applies.
+// Tested 6 Nov 2026: 1 Mbps limit gave 920 kbps on the phone, removed gave 2.1 Mbps.
+const toLimit = (kbps) => {
+  const k = Number(kbps);
+  if (!Number.isInteger(k) || k <= 0) return null;
+  if (k % 1024 === 0 && k / 1024 <= 1024) return { unit: 2, value: k / 1024 }; // Mbps
+  if (k <= 1024) return { unit: 1, value: k };                                  // Kbps
+  return { unit: 2, value: Math.min(1024, Math.round(k / 1024)) };
+};
+
+const setClientSpeed = async (site, clientMac, downKbps, upKbps) => {
+  const down = toLimit(downKbps);
+  const up = toLimit(upKbps);
+  const customRateLimit = {
+    downEnable: Boolean(down),
+    upEnable: Boolean(up),
+    ...(down ? { downUnit: down.unit, downLimit: down.value } : {}),
+    ...(up ? { upUnit: up.unit, upLimit: up.value } : {})
+  };
+  await call('PATCH', `v1/{id}/sites/${site}/clients/${dashed(clientMac)}/ratelimit`, { mode: 0, customRateLimit });
+  return Boolean(down || up);
+};
+
+const AP_STATUS = { 0: 'offline', 1: 'online', 2: 'pending', 3: 'heartbeat_missed', 4: 'isolated' };
+
+// The access points of a site with their status: [{ mac: 'AA:BB:..', status: 'online' }]
+const listSiteDevices = async (site) => {
+  const r = await call('GET', `v1/{id}/sites/${site}/devices?page=1&pageSize=200`);
+  const list = Array.isArray(r && r.data) ? r.data : [];
+  return list
+    .filter((d) => d && typeof d.mac === 'string')
+    .map((d) => ({ mac: colons(d.mac), status: AP_STATUS[d.status] || 'offline' }));
+};
+
+module.exports = { call, setClientSpeed, listSiteDevices, OmadaError, _test: { toLimit } };

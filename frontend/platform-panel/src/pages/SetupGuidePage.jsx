@@ -267,7 +267,9 @@ export default function SetupGuidePage() {
       <Section id="tplink-only" title="TP-Link only business (no MikroTik)">
         <p className="guide-text">
           The business has only a TP-Link Omada access point (EAP). The Omada controller on the VPS lets customers in and out;
-          vouchers work as usual. One speed for the whole business. Full background: <strong>TPLINK-CONTROLLER-GUIDE.md</strong>.
+          vouchers work as usual. The WiFi speed profile is the business speed; a package can have its own lower speed (each
+          phone gets it at login, with the Open API key). The Routers page shows each access point's status (checked every
+          5 minutes). Full background: <strong>TPLINK-CONTROLLER-GUIDE.md</strong>.
         </p>
 
         <h3 className="guide-step">1. The business adds it (Business Panel)</h3>

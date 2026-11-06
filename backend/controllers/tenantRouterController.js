@@ -3,6 +3,7 @@
 // ============================================================
 const crypto = require('crypto');
 const db = require('../config/db');
+const env = require('../config/env');
 const { isValidName, nameRuleMessage, isValidUUID, normalizeMac } = require('../utils/validators');
 const { encrypt } = require('../utils/encryption');
 const { removeWireGuardPeer } = require('../services/wireguard');
@@ -26,13 +27,21 @@ const listRouters = async (req, res) => {
               COALESCE(
                 (SELECT json_agg(a.mac ORDER BY a.created_at) FROM omada_aps a WHERE a.router_id = r.id),
                 '[]'::json
-              ) AS ap_macs
+              ) AS ap_macs,
+              COALESCE(
+                (SELECT json_agg(json_build_object('mac', a.mac, 'status', a.status, 'status_at', a.status_at) ORDER BY a.created_at)
+                 FROM omada_aps a WHERE a.router_id = r.id),
+                '[]'::json
+              ) AS aps
        FROM routers r
        WHERE r.tenant_id = $1
        ORDER BY r.created_at DESC`,
       [req.tenantId]
     );
-    return res.status(200).json({ success: true, data: rows });
+    // package_speeds: can this router's packages have their own speed?
+    // (MikroTik always; TP-Link only when the Open API key is set up on the server)
+    const data = rows.map((r) => ({ ...r, package_speeds: r.device_type !== 'omada' || env.OMADA_OPENAPI_ENABLED }));
+    return res.status(200).json({ success: true, data });
   } catch (error) {
     console.error('List routers error:', error);
     return res.status(500).json({ success: false, error: 'Failed to list routers' });
@@ -129,7 +138,15 @@ const createOmadaRouter = async (req, res, name, location) => {
         [req.tenantId, name, location || null, routerToken]
       );
       await client.query('INSERT INTO omada_aps (router_id, mac) VALUES ($1, $2)', [rows[0].id, apMac]);
-      return { router: { ...rows[0], ap_macs: [apMac], site_ready: false } };
+      return {
+        router: {
+          ...rows[0],
+          ap_macs: [apMac],
+          aps: [{ mac: apMac, status: null, status_at: null }],
+          site_ready: false,
+          package_speeds: env.OMADA_OPENAPI_ENABLED
+        }
+      };
     });
     if (created.limit) {
       return res.status(400).json({ success: false, error: 'You have reached the maximum number of routers.' });

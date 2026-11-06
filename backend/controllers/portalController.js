@@ -362,8 +362,8 @@ const redeemOmadaVoucher = async (req, res) => {
       cleanCode,
       deviceMac,
       ipAddress: null, // the controller reports the business's public address, not the phone's
-      // (the package speed is not used: one speed per business, set on its controller site)
-      grant: async (remainingMinutes, _pkg, voucher) => {
+      // The phone gets the package speed (0 = the business WiFi speed set on the controller site)
+      grant: async (remainingMinutes, pkg, voucher) => {
         // One phone per voucher: a phone that used this voucher before is cut off first
         // (otherwise one payment could keep two phones online)
         const { rows: others } = await db.query(
@@ -379,7 +379,9 @@ const redeemOmadaVoucher = async (req, res) => {
           apMac,
           ssidName: ssid_name,
           radioId: Number(radio_id),
-          minutes: remainingMinutes
+          minutes: remainingMinutes,
+          speedDownKbps: Number(pkg.speed_down_kbps) || 0,
+          speedUpKbps: Number(pkg.speed_up_kbps) || 0
         });
       }
     });

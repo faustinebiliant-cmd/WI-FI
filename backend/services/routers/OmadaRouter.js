@@ -9,13 +9,16 @@
 //   removeVoucher(code)   cut off every phone that used this voucher on this router
 //   getActiveUsers()      phones that are let in right now
 //   disconnectUser(mac)   cut one phone off
-//   checkStatus()         is the controller answering for this site?
+//   checkStatus()         is the controller answering for this site? (+ each access point's status)
 //
 // Not available for TP-Link: createVoucher (MikroTik only), setStaffDoorOpen.
-// One speed per business (set on the site in the controller), so speeds are ignored here.
+// Speeds: with the Open API key, each phone gets its package's speed (0 = the business
+// WiFi speed set on the controller site). Without the key, the business WiFi speed only.
 // ============================================================
 const db = require('../../config/db');
+const env = require('../../config/env');
 const omada = require('./omadaClient');
+const openApi = require('./omadaOpenApi');
 const { normalizeMac, isValidOmadaSiteId, isValidSsidName, isValidRadioId } = require('../../utils/validators');
 
 const MAX_MINUTES = 366 * 24 * 60; // a year: longer than any package
@@ -32,7 +35,8 @@ class OmadaRouter {
 
   // Let one phone in for `minutes`. Any older approval of the same phone is cut first,
   // so the time is exactly the voucher's remaining time.
-  async authorizeClient({ clientMac, apMac, ssidName, radioId, minutes }) {
+  // speedDownKbps / speedUpKbps: the package speed (0 = the business WiFi speed).
+  async authorizeClient({ clientMac, apMac, ssidName, radioId, minutes, speedDownKbps = 0, speedUpKbps = 0 }) {
     const client = normalizeMac(clientMac);
     const ap = normalizeMac(apMac);
     const mins = Number(minutes);
@@ -42,6 +46,17 @@ class OmadaRouter {
     }
     try {
       await omada.cutMac(this.site, client);
+      // The speed is set BEFORE the phone is let in, so it never has a moment at full speed.
+      // The controller keeps a phone's speed, so it is set (or removed) on every voucher.
+      // If only the speed fails, the phone still gets in at the business WiFi speed: the
+      // customer paid and must not be refused because of the speed.
+      if (env.OMADA_OPENAPI_ENABLED) {
+        try {
+          await openApi.setClientSpeed(this.site, client, speedDownKbps, speedUpKbps);
+        } catch (err) {
+          console.error(`[Omada] Could not set the package speed on router ${this.routerId} (the business WiFi speed applies): ${err.message}`);
+        }
+      }
       await omada.authorize({ site: this.site, clientMac: client, apMac: ap, ssidName, radioId: Number(radioId), minutes: mins });
       return { ok: true };
     } catch (err) {
@@ -99,11 +114,19 @@ class OmadaRouter {
     return { ok: false, error: 'There is no staff door on a TP-Link router' };
   }
 
-  // Version 1: "online" means the controller answers for this site. (Whether the EAP
-  // itself is online comes with the read-only Open API key, Phase C step C0.)
+  // "online" means the controller answers for this site (the router can be used).
+  // With the Open API key, also the status of each access point: aps = [{ mac, status }]
+  // (the pinger saves it; an access point missing from the site is 'not_found').
   async checkStatus() {
-    await omada.ping(this.site);
-    return { online: true, version: 'omada' };
+    if (!env.OMADA_OPENAPI_ENABLED) {
+      await omada.ping(this.site);
+      return { online: true, version: 'omada' };
+    }
+    const devices = await openApi.listSiteDevices(this.site);
+    const byMac = new Map(devices.map((d) => [d.mac, d.status]));
+    const { rows } = await db.query('SELECT mac FROM omada_aps WHERE router_id = $1', [this.routerId]);
+    const aps = rows.map((r) => ({ mac: r.mac, status: byMac.get(r.mac) || 'not_found' }));
+    return { online: true, version: 'omada', aps };
   }
 }
 

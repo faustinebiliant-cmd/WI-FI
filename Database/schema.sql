@@ -15,6 +15,7 @@
 --   2026-11-03-password-changed-at.sql     tenant_users.password_changed_at
 --   2026-11-03-logout-everywhere.sql       tenant_users.logged_out_at
 --   2026-11-05-tplink-routers.sql          routers.device_type + omada_site_id, table omada_aps
+--   2026-11-06-omada-ap-status.sql         omada_aps.status + status_at (access point online/offline)
 --
 -- When the database changes: update this file AND add a migration file.
 -- ============================================================
@@ -95,6 +96,9 @@ CREATE TABLE public.omada_aps (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     router_id uuid REFERENCES public.routers(id) ON DELETE CASCADE NOT NULL,
     mac varchar(17) UNIQUE NOT NULL CHECK (mac ~ '^([0-9A-F]{2}:){5}[0-9A-F]{2}$'),
+    -- What the controller reports (checked every 5 minutes with the Open API key); NULL = never checked
+    status varchar(20) CHECK (status IS NULL OR status IN ('online', 'offline', 'pending', 'heartbeat_missed', 'isolated', 'not_found')),
+    status_at timestamptz,
     created_at timestamptz DEFAULT now() NOT NULL
 );
 

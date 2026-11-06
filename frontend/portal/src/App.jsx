@@ -92,7 +92,7 @@ export default function App() {
     loadInfo();
   }, [routerToken]);
 
-  // TP-Link businesses have one speed for all customers: their packages carry speed 0,
+  // A TP-Link package without its own speed (the business WiFi speed) carries speed 0,
   // and no speed is shown
   const showSpeed = (mbps) => Number(mbps) > 0;
 

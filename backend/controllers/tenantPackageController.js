@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const env = require('../config/env');
 const { getRouter, isRouterReady, ROUTER_ADAPTER_COLUMNS } = require('../services/routers/routerFactory');
 const { isValidUUID, isValidName, nameRuleMessage, isWholeNumberBetween } = require('../utils/validators');
 
@@ -57,8 +58,8 @@ const createPackage = async (req, res) => {
     if (routerCheck.rows.length === 0) {
       return res.status(403).json({ success: false, error: 'Invalid router selected.' });
     }
-    // TP-Link-only routers: one speed for the whole business (set on its controller site),
-    // so the package has no speed of its own (saved as 0)
+    // TP-Link-only routers: the speed is optional. 0 (or empty) = the business WiFi speed set
+    // on its controller site; 1-20 Mbps = each phone gets this speed (needs the Open API key).
     const isOmada = routerCheck.rows[0].device_type === 'omada';
 
     if (!isOmada && (speed_down_kbps === undefined || speed_up_kbps === undefined)) {
@@ -68,8 +69,9 @@ const createPackage = async (req, res) => {
     // MATH VALIDATION & MAX LIMITS
     const price = Number(price_tzs);
     const duration = Number(duration_minutes);
-    const down = isOmada ? 0 : Number(speed_down_kbps);
-    const up = isOmada ? 0 : Number(speed_up_kbps);
+    const omadaSpeed = (v) => (v === undefined || v === null || v === '' ? 0 : Number(v));
+    const down = isOmada ? omadaSpeed(speed_down_kbps) : Number(speed_down_kbps);
+    const up = isOmada ? omadaSpeed(speed_up_kbps) : Number(speed_up_kbps);
 
     if (![price, duration, down, up].every(Number.isFinite)) {
       return res.status(400).json({ success: false, error: 'Price, duration and speeds must be numbers.' });
@@ -80,6 +82,16 @@ const createPackage = async (req, res) => {
     if (duration <= 0 || duration > 525600) return res.status(400).json({ success: false, error: 'Duration must be between 1 minute and 365 days.' });
     if (!isOmada && (!isAllowedSpeed(down) || !isAllowedSpeed(up))) {
       return res.status(400).json({ success: false, error: 'Speed must be a whole number from 1 to 20 Mbps.' });
+    }
+    if (isOmada) {
+      // Both 0 (business WiFi speed), or both a real speed
+      const bothZero = down === 0 && up === 0;
+      if (!bothZero && (!isAllowedSpeed(down) || !isAllowedSpeed(up))) {
+        return res.status(400).json({ success: false, error: 'Speed: leave both empty (business WiFi speed) or choose 1 to 20 Mbps for both.' });
+      }
+      if (!bothZero && !env.OMADA_OPENAPI_ENABLED) {
+        return res.status(400).json({ success: false, error: 'Package speeds for TP-Link are not switched on yet. Leave the speed empty to use the business WiFi speed.' });
+      }
     }
 
     // Limit: max 20 packages per tenant. Count and add under one lock per business,
