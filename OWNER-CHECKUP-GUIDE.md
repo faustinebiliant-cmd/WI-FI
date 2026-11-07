@@ -5,7 +5,7 @@ copy each command, paste it into the VPS window, and compare what you see
 with **"Good looks like"**. When something does not match, take a screenshot
 and send it to Claude (check the safety rules first).
 
-Last updated: 6 November 2026 (TP-Link automation)
+Last updated: 7 November 2026 (TP-Link controller memory ceilings)
 
 ---
 
@@ -101,6 +101,18 @@ sudo docker ps --format '{{.Names}}  {{.Status}}'
 run the check again. Still not `Up`: send Claude
 `sudo tail -n 30 /opt/omada/logs/server.log`. Details: `TPLINK-CONTROLLER-GUIDE.md`.
 
+**Did it restart by itself?** Look at the time after `Up`. `Up 3 days` is good. `Up 20 minutes`
+on a day when nobody restarted the VPS or the controller means Docker restarted it by itself
+(for example it reached its memory limit). TP-Link vouchers then failed for a few minutes and
+work again. Tell Claude the time you saw it.
+
+**Temporary (until about 10 November 2026):** morning and evening, also run the memory check
+below and send Claude a screenshot. The controller got new memory ceilings on 7 November; this
+proves its memory goes flat (expected about 1.5 to 1.7 GB):
+```
+sudo docker stats --no-stream --format '{{.Name}}  CPU {{.CPUPerc}}  MEM {{.MemUsage}}'; free -h | head -2; uptime
+```
+
 TP-Link routers also appear in the admin panel's **Routers** page (3b), with each access
 point's status. A router shows `online` only when one of its access points is online.
 
@@ -135,8 +147,8 @@ uptime
 | `used` | `free -h`, line `Swap:` | `0B` or small and not growing | grows week after week |
 | `Use%` | `df -h /` | under 70% | above 80% |
 | load average (first number) | `uptime` | under 0.7 | above 0.7 most of the day (time to upgrade to KVM 2) |
-| TP-Link controller memory | `sudo docker stats --no-stream` | under 1.6 GB (its limit is 1.75 GB) | at the limit every week, or the box keeps restarting |
-| TP-Link Java memory | `sudo docker top omada -o pid,rss,args \| cut -c1-70`, the `java` line, column RSS | under 1,450,000 | above 1,450,000 (then Java gets a smaller limit, 600 MB instead of 700 MB) |
+| TP-Link controller memory | `sudo docker stats --no-stream` | flat, about 1.5 to 1.7 GB (its limit is 1.75 GB). After a restart it starts near 1.2 GB and climbs for a day or two, then stays | 1.73 GB or more, or the controller restarted by itself (3c) |
+| TP-Link memory ceilings in use | `sudo docker top omada -o pid,args \| grep -oE 'Xmx[0-9]+m\|wiredTigerCacheSizeGB [0-9.]+'` | `Xmx600m` and `wiredTigerCacheSizeGB 0.25` (that line twice is normal) | other values or nothing: the controller was started without them |
 
 **What `free -h` means:** `free` = completely unused memory (Linux keeps it low on
 purpose); `buff/cache` = borrowed to speed things up and given back instantly;
@@ -371,7 +383,8 @@ describes.
 | `4 additional security updates can be applied with ESM Apps` at login | Optional extra updates from Ubuntu Pro (free for personal use); can be enabled later |
 | `client_loop: send disconnect: Connection reset` in the tunnel window | Your internet cut the quiet SSH tunnel. Run the tunnel command again (`TPLINK-CONTROLLER-GUIDE.md` section 4) |
 | `channel 2: open failed: connect failed: Connection refused` in the tunnel window | The TP-Link controller is still starting (5 to 10 minutes after a restart). Wait |
-| TP-Link controller memory near 1.3–1.5 GB | Normal for Java + MongoDB (it jumps up when someone works in the controller's admin pages, and stays there); the box is limited to 1.75 GB and billing is never affected |
+| TP-Link controller memory between 1.2 and 1.7 GB, slowly climbing | Normal: Java and MongoDB fill their memory up to a ceiling (600 MB and 0.25 GB since 7 Nov 2026) and keep it, because memory is faster than the disk. Together they fit in the 1.75 GB box. Billing is never affected (`TPLINK-CONTROLLER-GUIDE.md` section 3) |
+| `wiredTigerCacheSizeGB 0.25` shown twice in the ceilings check | Two processes carry the same start line (a small starter and MongoDB itself): one setting |
 | `LF will be replaced by CRLF` | Windows/Linux line-ending notice, harmless |
 | `Swap: 2.0Gi … 0B used` | The memory safety net is ready and not needed: good |
 | Router `offline` at night | Router switched off or without internet; it comes back by itself |

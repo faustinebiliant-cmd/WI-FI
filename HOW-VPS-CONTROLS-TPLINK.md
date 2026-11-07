@@ -8,7 +8,7 @@ deleting the router. No secrets in this file.
 - The controller itself (installing, updating, removing): `TPLINK-CONTROLLER-GUIDE.md`
 - Regular checks: `OWNER-CHECKUP-GUIDE.md`
 
-Last updated: 6 November 2026 (everything below was tested on a real phone that day)
+Last updated: 7 November 2026 (tested on a real phone on 6 November; memory ceilings 7 November)
 
 ---
 
@@ -56,7 +56,7 @@ WiFi, portal and access points). Businesses can never see each other.
 
 | Part | Where | In plain English |
 |---|---|---|
-| **The controller** | Docker box `omada`, data in `/opt/omada/` | Runs all the time; restarts by itself after a crash or reboot; at most 1.75 GB memory |
+| **The controller** | Docker box `omada`, data in `/opt/omada/` | Runs all the time; restarts by itself after a crash, a reboot, or if it ever reaches its memory limit (1.75 GB). Java and its database have memory ceilings that fit inside that limit (`TPLINK-CONTROLLER-GUIDE.md` section 3) |
 | **The doors for access points** | Firewall: 29810 + 19810 (udp), 29811 to 29817 (tcp) | Where access points knock to find and talk to the controller |
 | **The portal entrance** | Firewall: 8880 (tcp) | Phones pass here for a moment on their way to our portal |
 | **The controller's admin page** | 8043, **closed** to the internet | Only you, through the SSH tunnel |
@@ -227,9 +227,11 @@ What each line means: `OWNER-CHECKUP-GUIDE.md` section 13, "TP-Link messages".
 
 **Controller memory** (weekly)
 ```
-sudo docker stats --no-stream --format '{{.Name}}  CPU {{.CPUPerc}}  MEM {{.MemUsage}}'; sudo docker top omada -o pid,rss,args | cut -c1-70
+sudo docker stats --no-stream --format '{{.Name}}  CPU {{.CPUPerc}}  MEM {{.MemUsage}}'
+sudo docker top omada -o pid,args | grep -oE 'Xmx[0-9]+m|wiredTigerCacheSizeGB [0-9.]+'
 ```
-Good looks like: box memory under 1.6 GB (limit 1.75 GB); the `java` line under 1,450,000.
+Good looks like: box memory flat at about 1.5 to 1.7 GB (limit 1.75 GB); `Xmx600m` and
+`wiredTigerCacheSizeGB 0.25` (that line twice is normal).
 
 ---
 

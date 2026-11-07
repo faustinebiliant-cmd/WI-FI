@@ -12,7 +12,7 @@ Related guides (all in the project root):
 - `HOW-VPS-CONTROLS-TPLINK.md`: how a TP-Link business works, from the first setup of its access point to a customer's voucher
 - Admin panel, Router Setup Guide: how to set up a router
 
-Last updated: 6 November 2026
+Last updated: 7 November 2026
 
 ---
 
@@ -244,7 +244,7 @@ Full explanation: `TPLINK-CONTROLLER-GUIDE.md` (history, checks, updates, remova
 
 | Thing | Where |
 |---|---|
-| The controller (Omada 6.3.0.45) | Docker box `omada`: at most 1.75 GB memory and 60% CPU, restarts by itself |
+| The controller (Omada 6.3.0.45) | Docker box `omada`: at most 1.75 GB memory and 60% CPU, restarts by itself. Inside: Java at most 600 MB main storage, MongoDB cache 0.25 GB (since 7 Nov 2026), so both fit; memory settles at about 1.5 to 1.7 GB |
 | Its data, settings, backups, logs | `/opt/omada/data/`, `/opt/omada/logs/` (**never delete**) |
 | The box recipe | `vps/omada/` in the project (README has every command) |
 | Docker settings | `/etc/docker/daemon.json` (Docker never touches the firewall or forwarding) |

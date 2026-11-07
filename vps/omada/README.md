@@ -58,7 +58,7 @@ then the **Run** command above with other values (`OMADA_JAVA_XMX` like `600m`; 
 0.25 0.3 0.35 0.4 0.5 0.75 1 1.5 2; anything else is refused and the box does not start: `sudo docker logs omada`).
 `/opt/omada` is never touched. The controller is off about 10 minutes. Check the values in use:
 ```bash
-sudo docker top omada -o args | grep -oE 'Xmx[0-9]+m|wiredTigerCacheSizeGB [0-9.]+'
+sudo docker top omada -o pid,args | grep -oE 'Xmx[0-9]+m|wiredTigerCacheSizeGB [0-9.]+'
 ```
 The values used until 7 Nov 2026: `-e OMADA_JAVA_XMX=700m -e OMADA_MONGO_CACHE_GB=0.4` (0.4 is close to
 MongoDB's own choice then).

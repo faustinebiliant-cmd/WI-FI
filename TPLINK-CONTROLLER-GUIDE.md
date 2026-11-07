@@ -10,7 +10,7 @@ How a TP-Link business works day to day, from the first setup to a customer's vo
 Related guides: `VPS-HANDBOOK.md` (the whole VPS), `OWNER-CHECKUP-GUIDE.md` (regular checks),
 `SECURITY-STATUS.md` (protections). Technical commands: `vps/omada/README.md`.
 
-Last updated: 6 November 2026
+Last updated: 7 November 2026
 
 ---
 
@@ -101,6 +101,7 @@ the controller for a new TP-Link business any more:
 | 5 Nov 2026 | **The box itself**, name `omada` | Runs the controller all the time; restarts by itself after a crash or reboot; at most **1.75 GB** memory (1.5 GB until 6 Nov 2026) and **60% of the CPU**; no special rights; runs as an ordinary user (not root) | 10a step 1 |
 | 5 Nov 2026 | **Folder `/opt/omada/`** (data + logs) | The controller's database, settings and automatic backups. Kept outside the box so updates do not lose anything | 10a step 4 |
 | 6 Nov 2026 | **Java memory settings** in the starter (`MALLOC_ARENA_MAX=2`, network buffers 128 MB, code space 96 MB) | Java used 1.38 GB with a 700 MB heap and slowly climbed to the box's 1.5 GB limit; these are the standard fixes for that climb. Result: Java flat at 1.21 GB for over an hour | rebuild without them (not needed) |
+| 7 Nov 2026 | **Memory ceilings** in the starter: Java's main storage 700 → **600 MB** (`OMADA_JAVA_XMX`), MongoDB's cache limited to **0.25 GB** (`OMADA_MONGO_CACHE_GB`, added to `eap.mongod.args` on every start). Box rebuilt and started again with the same data | With no business using it, Java reached 1.41 GB and the box 1.60 of 1.75 GB, still climbing. Java's and MongoDB's own ceilings added up to about 1.9 GB, more than the box; now about 1.7 GB, so they fit. After the restart: 1.20 GB | start the box again with `-e OMADA_JAVA_XMX=700m -e OMADA_MONGO_CACHE_GB=0.4` (`vps/omada/README.md`) |
 | 6 Nov 2026 | **Box limit raised 1.5 → 1.75 GB** (`sudo docker update --memory 1.75g --memory-swap 2.25g omada`, no restart) | Working in the controller's admin pages (login, creating the Open API key, firmware check, then the API document) made Java jump from 1.22 to 1.36 GB and the box to 1.497 of 1.5 GB. Java keeps that memory afterwards, so 1.5 GB was too tight | `sudo docker update --memory 1.5g --memory-swap 2g omada` |
 | 5 Nov 2026 | **Firewall: 4 new doors** (see 2c) | EAPs anywhere must reach the controller, and customers' phones must reach the portal entrance | 10a step 3 |
 
@@ -151,9 +152,30 @@ To give it back to MikroTik use: section 10c.
 | What you want | Command | Good looks like |
 |---|---|---|
 | Is it running? | `sudo docker ps --format '{{.Names}}  {{.Status}}'` | `omada  Up …` |
-| Memory and CPU | `sudo docker stats --no-stream --format '{{.Name}}  CPU {{.CPUPerc}}  MEM {{.MemUsage}}'` | memory under 1.6 GB (limit 1.75 GB), CPU usually a few % |
+| Memory and CPU | `sudo docker stats --no-stream --format '{{.Name}}  CPU {{.CPUPerc}}  MEM {{.MemUsage}}'` | memory flat, about 1.5 to 1.7 GB (limit 1.75 GB); CPU usually a few % |
+| Memory ceilings in use | `sudo docker top omada -o pid,args \| grep -oE 'Xmx[0-9]+m\|wiredTigerCacheSizeGB [0-9.]+'` | `Xmx600m` and `wiredTigerCacheSizeGB 0.25` (twice is normal) |
+| Did it restart by itself? | `sudo docker ps --format '{{.Names}}  {{.Status}}'` | `Up` for days. A short time on a quiet day = Docker restarted it by itself |
 | Restart it | `sudo docker restart omada` | It takes **5 to 10 minutes** to be fully up (Java starts slowly on our CPU limit) |
 | Its recent errors (to send Claude) | `sudo tail -n 30 /opt/omada/logs/server.log` | mostly `INFO` lines |
+
+**How the controller uses memory (plain English).** The box holds two programs: **Java** (the
+controller itself) and **MongoDB** (its database). Both keep data in memory because memory is much
+faster than the disk, and both keep what they took. So after every start the memory climbs for a
+day or two, even with no business at all, and then stops at the ceilings:
+
+| Part | Ceiling | Set by |
+|---|---|---|
+| Java's main storage | **600 MB** | `OMADA_JAVA_XMX=600m` in the start command |
+| Java's code and network space | 96 MB + 128 MB | the starter |
+| Java's housekeeping | about 300 to 500 MB | Java itself |
+| MongoDB's cache | **0.25 GB** (+ about 0.1 GB for MongoDB itself) | `OMADA_MONGO_CACHE_GB=0.25` |
+| **Everything together** | **about 1.7 GB**, inside the box's 1.75 GB | |
+
+The number of businesses decides how **fast** it fills, not how **high**: more access points and
+phones add only a little (roughly 10 MB per access point). If the box ever reaches 1.75 GB anyway,
+Docker restarts the controller by itself: TP-Link vouchers fail for 3 to 5 minutes, nothing is lost,
+the rest of the VPS never notices. Room for growth: about 20 to 30 TP-Link access points on this
+VPS (KVM 1); KVM 2 would allow a 3 to 4 GB box and about 100 to 200 access points.
 
 **Memory words** (`free -h`): `free` is completely unused memory (Linux keeps it low on purpose);
 `buff/cache` is borrowed and given back instantly; **`available` is the real number to watch**
@@ -183,7 +205,7 @@ buttons silently do nothing. Press Ctrl+C in the tunnel window, run step 1 again
 | When | What | How |
 |---|---|---|
 | Daily (with the backend check) | Controller running | Section 3, "Is it running?" |
-| Weekly | Memory under 1.6 GB; VPS `available` above 1 GB | Section 3 + `free -h` |
+| Weekly | Memory flat at about 1.5 to 1.7 GB, ceilings in use, no restart by itself; VPS `available` above 1 GB | Section 3 + `free -h` |
 | Weekly | The controller's backups exist | `sudo ls -l /opt/omada/data/autobackup/` (newest from last night) |
 | Weekly | EAPs online | Controller → Devices: all `Connected` |
 | Every 2 to 3 months | Controller update check (never automatic) | Section 8 |
@@ -317,7 +339,7 @@ Always together with Claude, on a quiet day:
 
 | Next | What | Status |
 |---|---|---|
-| B8 | Watch memory and billing speed | 6 Nov 2026 evening, after the busiest day: Java 1,388,964 KB (under the 1,450,000 line), box 1.56 of 1.75 GB, VPS available 1.6 GB. Morning reading on 7 Nov decides whether Java gets 600 MB instead of 700 MB |
+| B8 | Watch memory and billing speed | 7 Nov 2026: memory ceilings set (Java 600 MB, MongoDB cache 0.25 GB), box 1.20 GB after the restart. Readings morning and evening until about 10 Nov must show it going flat below 1.73 GB |
 | Phase C | Build it in: TP-Link businesses in the panels, the portal understands TP-Link links, the voucher cleaner cuts TP-Link phones off, setup guide for technicians | done 5 Nov 2026, phone tests passed |
 | Phase D | Swahili and AzamPay, for MikroTik **and** TP-Link businesses | after Phase C |
 | V2-0 | Open API key + test tool (`node scripts/omadaOpenApiTest.js check / trial-site / speed / speed-off`) | done 6 Nov 2026 (all tests passed); TP-Link's API document saved in `docs/tplink-openapi/` |
