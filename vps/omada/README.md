@@ -7,6 +7,8 @@ The TP-Link controller runs in a Docker box on the VPS. Everything here is for t
 |---|---|---|
 | Network | `host` | No Docker networking; the UFW firewall stays in full control |
 | Memory | 1.75 GB (+0.5 GB swap); raised from 1.5 GB on 6 Nov 2026 with `sudo docker update --memory 1.75g --memory-swap 2.25g omada` | Can never starve billing |
+| Java main storage (heap) | 600 MB: `-e OMADA_JAVA_XMX=600m` (700 MB until 7 Nov 2026) | Java and MongoDB each fill their memory up to a ceiling and keep it; with these two ceilings both fit in the box |
+| MongoDB cache | 0.25 GB: `-e OMADA_MONGO_CACHE_GB=0.25` (MongoDB chose about 0.375 GB by itself until 7 Nov 2026). The starter adds `--wiredTigerCacheSizeGB` to `eap.mongod.args` in `omada.properties` on every start | same |
 | CPU | at most 0.6 of the core | Billing always keeps at least 40% |
 | User | `omada` (uid 508), no extra rights | Never root |
 | Data | `/opt/omada/data`, logs `/opt/omada/logs` | Survives updates and rebuilds |
@@ -41,11 +43,25 @@ sudo chown -R 508:508 /opt/omada
 sudo docker run -d --name omada --init --network host --restart unless-stopped \
   --memory 1.75g --memory-swap 2.25g --cpus 0.6 --stop-timeout 120 \
   --cap-drop ALL --security-opt no-new-privileges \
-  -e OMADA_JAVA_XMX=700m \
+  -e OMADA_JAVA_XMX=600m -e OMADA_MONGO_CACHE_GB=0.25 \
   -v /opt/omada/data:/opt/tplink/EAPController/data \
   -v /opt/omada/logs:/opt/tplink/EAPController/logs \
   oswagolink/omada:6.3.0.45
 ```
+
+## Change the memory ceilings (no rebuild of the controller download, same data)
+The values are read when the box starts, so the box is made again with new values:
+```bash
+sudo docker stop omada && sudo docker rm omada
+```
+then the **Run** command above with other values (`OMADA_JAVA_XMX` like `600m`; `OMADA_MONGO_CACHE_GB` one of
+0.25 0.3 0.35 0.4 0.5 0.75 1 1.5 2; anything else is refused and the box does not start: `sudo docker logs omada`).
+`/opt/omada` is never touched. The controller is off about 10 minutes. Check the values in use:
+```bash
+sudo docker top omada -o args | grep -oE 'Xmx[0-9]+m|wiredTigerCacheSizeGB [0-9.]+'
+```
+The values used until 7 Nov 2026: `-e OMADA_JAVA_XMX=700m -e OMADA_MONGO_CACHE_GB=0.4` (0.4 is close to
+MongoDB's own choice then).
 
 ## Everyday
 | What | Command |
